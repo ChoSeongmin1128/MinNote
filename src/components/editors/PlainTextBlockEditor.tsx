@@ -222,6 +222,11 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
           autoCorrect="off"
           wrap={mode === 'code' ? 'off' : 'soft'}
           onFocus={onFocus}
+          onBlur={(event) => {
+            if (mode === 'code') {
+              event.currentTarget.setSelectionRange(0, 0);
+            }
+          }}
           onScroll={syncOverlayScroll}
           onInput={(event) => {
             const textarea = event.currentTarget;

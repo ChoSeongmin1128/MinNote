@@ -1187,10 +1187,6 @@ button {
   background: color-mix(in srgb, Highlight 18%, transparent);
 }
 
-.plain-editor-input.is-code:not(:focus)::selection {
-  background: transparent;
-}
-
 .plain-editor-input.is-text {
   overflow: hidden;
   padding: 1px 0;
