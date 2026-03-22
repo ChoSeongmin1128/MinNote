@@ -13,7 +13,7 @@
 
 - 저장소에는 루트 문서, repo-local skills, Vite 기반 React 프런트엔드, `src-tauri` Rust 백엔드 스캐폴드가 존재합니다.
 - `package.json`, `pnpm-lock.yaml`, `src/`, `src-tauri/`가 실제 기준점입니다.
-- 현재 로컬 환경에서는 Node/pnpm은 확인됐지만 Rust toolchain은 아직 없습니다. 따라서 Tauri 실행 검증은 Rust 설치 전까지 제한될 수 있습니다.
+- 현재 로컬 환경에서는 Node/pnpm, Rust toolchain, `tauri-cli`가 확인됐습니다.
 
 ## 작업 원칙
 

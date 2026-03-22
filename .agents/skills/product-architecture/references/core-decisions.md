@@ -13,14 +13,14 @@
 - 앱 셸은 `Tauri`를 사용합니다.
 - 주 구현 언어는 `TypeScript + Rust`입니다.
 - 프런트엔드 UI 프레임워크는 `React + TypeScript`입니다.
-- 에디터 코어는 `Tiptap 중심 + CodeMirror 보조`입니다.
-- 저장 방식은 `SQLite canonical + export/import 보조`입니다.
-- Markdown 블록의 canonical 저장 형식은 `Tiptap JSON`입니다.
+- 에디터 코어는 `BlockNote 기반 Markdown 편집기 + plain textarea 기반 Code/Text 편집기`입니다.
+- 저장 방식은 `SQLite canonical`입니다.
+- Markdown 블록의 canonical 저장 형식은 `normalized Markdown string`입니다.
 - Code 블록의 canonical 저장 형식은 `plain string + language metadata`입니다.
 - Plain text 블록의 canonical 저장 형식은 `plain string`입니다.
 - 문서 데이터 모델은 `Document -> ordered Blocks` 구조입니다.
 - 블록 순서는 문서별 `integer position`으로 저장합니다.
-- 문서 제목은 `optional`이며, scratch 성격 문서는 임시 이름으로 다룰 수 있습니다.
+- 문서 제목 입력은 비워둘 수 있지만, 저장 시에는 `Untitled` 계열 이름으로 정규화합니다.
 - 프런트엔드는 Tauri `invoke`를 통해 Rust command facade만 호출하고, SQLite 접근은 Rust 계층이 담당합니다.
 - 1차 블록 종류는 `Markdown + Code + Plain text`입니다.
 - Markdown 블록은 clipboard 기반 붙여넣기를 지원합니다.
@@ -31,7 +31,7 @@
 - 삭제는 별도 확인 모달 없이 바로 처리합니다.
 - 앱 종료 전에는 한 번 더 저장/flush 합니다.
 - 별도 복구 UI는 v1에서 두지 않습니다.
-- 기존 오픈소스 코드는 기반으로 쓰지 않고 완전 신규로 구현합니다.
+- 기존 앱 코드를 포크하지는 않지만, 에디터와 렌더링에는 오픈소스 라이브러리를 사용합니다.
 
 ## 미정인 항목
 
@@ -49,11 +49,11 @@
 - Markdown 블록은 렌더링된 것처럼 보이되 편집 가능한 경험을 우선 검토합니다.
 - 제품의 중심 장점은 “구조적 블록 분리”와 “빠른 편집”의 균형입니다.
 - 헥사고날 아키텍처 기준으로 블록/문서 도메인, 저장소, 에디터 어댑터, 데스크톱 어댑터의 경계를 분리해야 합니다.
-- 저장 계층에서는 `Document`와 `ordered Blocks`를 중심으로 repository port를 설계하고, Markdown 블록은 구조화된 `Tiptap JSON`을 저장하는 방향을 기본값으로 둡니다.
+- 저장 계층에서는 `Document`와 `ordered Blocks`를 중심으로 repository port를 설계하고, Markdown 블록은 정규화된 Markdown 문자열을 저장하는 방향을 기본값으로 둡니다.
 - Code 블록은 구조화된 rich format 대신 원문 문자열과 언어 메타데이터를 저장하는 방향을 기본값으로 둡니다.
 - Plain text 블록은 별도 구조 없이 원문 문자열을 저장하는 방향을 기본값으로 둡니다.
 - 블록 순서는 fractional index보다 단순한 `integer position`을 기본값으로 둡니다.
-- 문서 메타데이터에는 제목 필드를 둘 수 있지만, 사용자에게 제목 입력을 강제하지 않는 방향을 기본값으로 둡니다.
+- 문서 메타데이터에는 제목 필드를 두되, 사용자가 비워두면 저장 시 `Untitled` 계열 이름으로 정규화하는 방향을 기본값으로 둡니다.
 - 프런트엔드는 저장소나 SQL을 직접 알지 않고, Rust command facade -> application service -> repository port -> SQLite adapter 흐름을 따릅니다.
 - 붙여넣기 경험은 block type에 따라 다르게 처리하고, 파일 import/export는 별도 기능으로 미룹니다.
 - 자동 저장을 기본값으로 두고, 명시적 저장 단축키는 flush 성격으로 취급합니다.
