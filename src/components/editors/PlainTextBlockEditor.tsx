@@ -256,9 +256,9 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
             if (event.key === 'Tab') {
               event.preventDefault();
               const TAB = '    ';
+              const lineStart = getLineStart(val, selectionStart);
               if (event.shiftKey) {
-                const lineStart = getLineStart(val, selectionStart);
-                const linePrefix = val.slice(lineStart, selectionStart);
+                const linePrefix = val.slice(lineStart, lineStart + TAB.length);
                 const removeCount = Math.min(TAB.length, linePrefix.length - linePrefix.trimStart().length);
                 if (removeCount > 0) {
                   const nextValue = `${val.slice(0, lineStart)}${val.slice(lineStart + removeCount)}`;
@@ -268,10 +268,9 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
                   syncTextareaHeight(textarea);
                 }
               } else {
-                const nextValue = `${val.slice(0, selectionStart)}${TAB}${val.slice(selectionEnd)}`;
-                const nextCaret = selectionStart + TAB.length;
+                const nextValue = `${val.slice(0, lineStart)}${TAB}${val.slice(lineStart)}`;
                 textarea.value = nextValue;
-                textarea.setSelectionRange(nextCaret, nextCaret);
+                textarea.setSelectionRange(selectionStart + TAB.length, selectionEnd + TAB.length);
                 emitChange(nextValue);
                 syncTextareaHeight(textarea);
               }

@@ -1051,6 +1051,11 @@ button {
   color: var(--text);
 }
 
+.markdown-blocknote-shell .ProseMirror {
+  -webkit-spell-check: false;
+  spell-check: false;
+}
+
 .markdown-blocknote-shell .bn-block-content {
   padding: 2px 0;
 }

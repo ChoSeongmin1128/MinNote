@@ -69,6 +69,15 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
         },
       },
       initialContent: createEmptyMarkdownBlocks(),
+      _tiptapOptions: {
+        editorProps: {
+          attributes: {
+            spellcheck: 'false',
+            autocorrect: 'off',
+            autocapitalize: 'off',
+          },
+        },
+      },
     },
     [blockId],
   );
