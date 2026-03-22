@@ -312,8 +312,11 @@ export async function copySingleBlock(blockId: string) {
   await navigator.clipboard.writeText(encodeBlockClipboard(blockData));
 }
 
-export async function pasteBlocks() {
+export function clearBlockClipboard() {
   hasBlockClipboard = false;
+}
+
+export async function pasteBlocks() {
   try {
     const currentDocument = getCurrentDocument();
     if (!currentDocument) {

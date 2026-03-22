@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import {
+  clearBlockClipboard,
   copySelectedBlocks,
   copySingleBlock,
   deleteBlock,
@@ -92,13 +93,18 @@ export function useAppShortcuts() {
         return;
       }
 
-      // 블록 선택 상태에서 복사
-      if (event.key.toLowerCase() === 'c' && (allBlocksSelected || blockSelected)) {
-        event.preventDefault();
-        if (allBlocksSelected) {
-          void copySelectedBlocks();
-        } else if (blockSelected && selectedBlockId) {
-          void copySingleBlock(selectedBlockId);
+      // 복사
+      if (event.key.toLowerCase() === 'c') {
+        if (allBlocksSelected || blockSelected) {
+          event.preventDefault();
+          if (allBlocksSelected) {
+            void copySelectedBlocks();
+          } else if (blockSelected && selectedBlockId) {
+            void copySingleBlock(selectedBlockId);
+          }
+        } else {
+          // 일반 텍스트 복사 → 블록 클립보드 해제
+          clearBlockClipboard();
         }
         return;
       }

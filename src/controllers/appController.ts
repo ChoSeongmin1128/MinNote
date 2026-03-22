@@ -14,6 +14,7 @@ export {
   updateMarkdownBlock,
   updateCodeBlock,
   updateTextBlock,
+  clearBlockClipboard,
   copySelectedBlocks,
   copySingleBlock,
   deleteSelectedBlocks,
