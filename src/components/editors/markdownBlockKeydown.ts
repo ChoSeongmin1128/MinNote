@@ -13,6 +13,7 @@ import type { BlockCaretPlacement } from '../../lib/types';
 interface MarkdownKeydownParams {
   editor: BlockNoteEditorLike;
   isWholeBlockSelectedRef: MutableRefObject<boolean>;
+  deleteReadyRef: MutableRefObject<boolean>;
   emitSelectionVisualState: () => void;
   getCurrentMarkdown: () => string;
   onCreateBelow: () => void;
@@ -24,6 +25,7 @@ interface MarkdownKeydownParams {
 export function createMarkdownKeydownHandler({
   editor,
   isWholeBlockSelectedRef,
+  deleteReadyRef,
   emitSelectionVisualState,
   getCurrentMarkdown,
   onCreateBelow,
@@ -97,10 +99,16 @@ export function createMarkdownKeydownHandler({
     if (event.key === 'Backspace' && isMarkdownContentEmpty(getCurrentMarkdown())) {
       if (isBlockNoteSelectionEmpty(editor)) {
         if (editor.document.length <= 1) {
-          event.preventDefault();
-          isWholeBlockSelectedRef.current = false;
-          onDeleteIfEmpty();
-          emitSelectionVisualState();
+          if (deleteReadyRef.current) {
+            event.preventDefault();
+            isWholeBlockSelectedRef.current = false;
+            deleteReadyRef.current = false;
+            onDeleteIfEmpty();
+            emitSelectionVisualState();
+          } else {
+            event.preventDefault();
+            deleteReadyRef.current = true;
+          }
         }
         // 빈 paragraph가 여러 개면 BlockNote가 자체적으로 병합하도록 허용
       }
@@ -109,6 +117,7 @@ export function createMarkdownKeydownHandler({
 
     if (event.key.length === 1 || event.key === 'Enter' || event.key === 'Tab') {
       isWholeBlockSelectedRef.current = false;
+      deleteReadyRef.current = false;
       emitSelectionVisualState();
     }
   };

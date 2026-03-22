@@ -45,7 +45,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   icloudSyncEnabled: false,
   isSettingsOpen: false,
   isSidebarOpen: false,
-  lastCodeLanguage: 'plaintext' as CodeLanguageId,
+  lastCodeLanguage: 'javascript' as CodeLanguageId,
   setDocuments: (documents) => set({ documents: sortDocuments(documents) }),
   upsertDocumentSummary: (document) =>
     set((state) => ({

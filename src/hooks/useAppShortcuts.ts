@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import {
   copySelectedBlocks,
+  copySingleBlock,
   deleteBlock,
   deleteSelectedBlocks,
   flushCurrentDocument,
+  pasteBlocks,
 } from '../controllers/appController';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 
@@ -21,12 +23,14 @@ function isEditableTarget(target: EventTarget | null) {
 
 export function useAppShortcuts() {
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
+  const blockSelected = useDocumentSessionStore((state) => state.blockSelected);
   const allBlocksSelected = useDocumentSessionStore((state) => state.allBlocksSelected);
   const selectedBlockId = useDocumentSessionStore((state) => state.selectedBlockId);
+  const setBlockSelected = useDocumentSessionStore((state) => state.setBlockSelected);
   const setAllBlocksSelected = useDocumentSessionStore((state) => state.setAllBlocksSelected);
 
   const lastSelectAllRef = useRef(0);
-  const lastBlockRef = useRef<string | null>(null);
+  const selectAllStageRef = useRef(0);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -40,7 +44,7 @@ export function useAppShortcuts() {
         return;
       }
 
-      if ((event.key === 'Backspace' || event.key === 'Delete') && selectedBlockId && !isEditableTarget(event.target)) {
+      if ((event.key === 'Backspace' || event.key === 'Delete') && blockSelected && selectedBlockId && !isEditableTarget(event.target)) {
         event.preventDefault();
         void deleteBlock(selectedBlockId);
         return;
@@ -59,24 +63,60 @@ export function useAppShortcuts() {
 
       if (event.key.toLowerCase() === 'a') {
         const now = Date.now();
-        const isSecondSelection =
-          lastBlockRef.current === selectedBlockId &&
-          now - lastSelectAllRef.current < 700;
-
+        const isContinuation = now - lastSelectAllRef.current < 700;
         lastSelectAllRef.current = now;
-        lastBlockRef.current = selectedBlockId;
 
-        if (isSecondSelection) {
+        if (!isContinuation) {
+          // 1단계: 블록 내 텍스트 전체 선택 (에디터가 처리)
+          selectAllStageRef.current = 1;
+          return;
+        }
+
+        if (selectAllStageRef.current === 1) {
+          // 2단계: 블록 자체 선택
+          event.preventDefault();
+          setBlockSelected(true);
+          selectAllStageRef.current = 2;
+          return;
+        }
+
+        if (selectAllStageRef.current === 2) {
+          // 3단계: 전체 블록 선택
           event.preventDefault();
           setAllBlocksSelected(true);
+          selectAllStageRef.current = 0;
+          return;
         }
 
         return;
       }
 
-      if (event.key.toLowerCase() === 'c' && allBlocksSelected) {
+      // 블록 선택 상태에서 복사
+      if (event.key.toLowerCase() === 'c' && (allBlocksSelected || blockSelected)) {
         event.preventDefault();
-        void copySelectedBlocks();
+        if (allBlocksSelected) {
+          void copySelectedBlocks();
+        } else if (blockSelected && selectedBlockId) {
+          void copySingleBlock(selectedBlockId);
+        }
+        return;
+      }
+
+      // 블록 선택 상태에서 잘라내기
+      if (event.key.toLowerCase() === 'x' && (allBlocksSelected || blockSelected)) {
+        event.preventDefault();
+        if (allBlocksSelected) {
+          void copySelectedBlocks().then(() => deleteSelectedBlocks());
+        } else if (blockSelected && selectedBlockId) {
+          void copySingleBlock(selectedBlockId).then(() => deleteBlock(selectedBlockId));
+        }
+        return;
+      }
+
+      // 붙여넣기 (블록 선택 상태에서만 블록 붙여넣기)
+      if (event.key.toLowerCase() === 'v' && (allBlocksSelected || blockSelected)) {
+        event.preventDefault();
+        void pasteBlocks();
       }
     };
 
@@ -90,5 +130,5 @@ export function useAppShortcuts() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('beforeunload', onBeforeUnload);
     };
-  }, [allBlocksSelected, currentDocument, selectedBlockId, setAllBlocksSelected]);
+  }, [allBlocksSelected, blockSelected, currentDocument, selectedBlockId, setAllBlocksSelected, setBlockSelected]);
 }

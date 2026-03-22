@@ -1,5 +1,6 @@
+import { createPortal } from 'react-dom';
 import { Check } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 export type ContextMenuItem =
   | {
@@ -31,6 +32,15 @@ export function ContextMenu({ x, y, items, onAction, onClose }: ContextMenuProps
     [items],
   );
   const [selectedId, setSelectedId] = useState(actionItems.find((item) => !item.disabled)?.id ?? null);
+  const [position, setPosition] = useState({ left: x, top: y });
+
+  useLayoutEffect(() => {
+    const menu = rootRef.current;
+    if (!menu) return;
+    const left = Math.min(x, window.innerWidth - menu.offsetWidth - 8);
+    const top = Math.min(y, window.innerHeight - menu.offsetHeight - 8);
+    setPosition({ left: Math.max(8, left), top: Math.max(8, top) });
+  }, [x, y]);
 
   useEffect(() => {
     rootRef.current?.focus();
@@ -49,13 +59,13 @@ export function ContextMenu({ x, y, items, onAction, onClose }: ContextMenuProps
 
   const selectedAction = actionItems.find((item) => item.id === selectedId) ?? null;
 
-  return (
+  return createPortal(
     <div
       ref={rootRef}
       className="app-context-menu"
       role="menu"
       tabIndex={-1}
-      style={{ left: `${x}px`, top: `${y}px` }}
+      style={{ left: `${position.left}px`, top: `${position.top}px` }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
@@ -127,6 +137,7 @@ export function ContextMenu({ x, y, items, onAction, onClose }: ContextMenuProps
           </button>
         ),
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -19,15 +19,20 @@ function CodeLanguageMenu({ anchorRect, value, onSelect, onClose }: CodeLanguage
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
+  const visibleOptions = useMemo(
+    () => CODE_LANGUAGE_OPTIONS.filter((option) => !('hidden' in option && option.hidden)),
+    [],
+  );
+
   const filtered = useMemo(() => {
-    if (!query.trim()) return CODE_LANGUAGE_OPTIONS;
+    if (!query.trim()) return visibleOptions;
     const q = query.toLowerCase();
-    return CODE_LANGUAGE_OPTIONS.filter(
+    return visibleOptions.filter(
       (option) =>
         option.label.toLowerCase().includes(q) ||
         option.id.toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [query, visibleOptions]);
 
   useLayoutEffect(() => {
     const menu = rootRef.current;

@@ -15,7 +15,9 @@ export {
   updateCodeBlock,
   updateTextBlock,
   copySelectedBlocks,
+  copySingleBlock,
   deleteSelectedBlocks,
+  pasteBlocks,
 } from './blockController';
 export {
   bootstrapApp,

@@ -99,8 +99,13 @@ export function BlockCard({
 
     await changeBlockKind(block.id, kind);
 
-    if (kind === 'markdown' || kind === 'text') {
+    if (kind === 'markdown') {
       updateMarkdownBlock(block.id, createEmptyMarkdownContent());
+      return;
+    }
+
+    if (kind === 'text') {
+      updateTextBlock(block.id, '');
       return;
     }
 
@@ -148,8 +153,8 @@ export function BlockCard({
   }, []);
 
   const contextMenuItems = useMemo(
-    () => buildBlockContextMenuItems(block, isEmpty),
-    [block, isEmpty],
+    () => buildBlockContextMenuItems(),
+    [],
   );
 
   const handleContextAction = useCallback(
@@ -160,11 +165,9 @@ export function BlockCard({
         onPaste: handlePaste,
         onSelectAll: handleSelectAll,
         onDelete: handleDeleteIfEmpty,
-        onSelectKind: handleTypeChange,
-        onSelectLanguage: handleLanguageChange,
       });
     },
-    [handleCopy, handleCut, handleDeleteIfEmpty, handleLanguageChange, handlePaste, handleSelectAll, handleTypeChange],
+    [handleCopy, handleCut, handleDeleteIfEmpty, handlePaste, handleSelectAll],
   );
 
   return (

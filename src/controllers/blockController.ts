@@ -11,6 +11,7 @@ import type { CodeLanguageId } from '../lib/blockOptions';
 import {
   createEmptyMarkdownContent,
   isMarkdownContentEmpty,
+  serializeBlockToMarkdown,
   serializeDocumentToMarkdown,
 } from '../lib/markdown';
 import type { BlockKind } from '../lib/types';
@@ -254,6 +255,86 @@ export async function copySelectedBlocks() {
   }
 
   await navigator.clipboard.writeText(text);
+}
+
+export async function copySingleBlock(blockId: string) {
+  const currentDocument = getCurrentDocument();
+  if (!currentDocument) {
+    return;
+  }
+
+  const block = findBlock(currentDocument, blockId);
+  if (!block) {
+    return;
+  }
+
+  const text = serializeBlockToMarkdown(block);
+  if (!text) {
+    return;
+  }
+
+  await navigator.clipboard.writeText(text);
+}
+
+export async function pasteBlocks() {
+  try {
+    const currentDocument = getCurrentDocument();
+    if (!currentDocument) {
+      return;
+    }
+
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) {
+      return;
+    }
+
+    const selectedBlockId = useDocumentSessionStore.getState().selectedBlockId;
+    const selectedBlock = selectedBlockId ? findBlock(currentDocument, selectedBlockId) : null;
+
+    // 선택된 블록이 비어있으면 해당 블록에 내용 채우기
+    if (selectedBlock && selectedBlock.kind === 'markdown' && isMarkdownContentEmpty(selectedBlock.content)) {
+      updateMarkdownBlock(selectedBlock.id, text);
+      useDocumentSessionStore.getState().setBlockSelected(false);
+      useDocumentSessionStore.getState().setAllBlocksSelected(false);
+      return;
+    }
+
+    if (selectedBlock && selectedBlock.kind === 'text' && !selectedBlock.content.trim()) {
+      updateTextBlock(selectedBlock.id, text);
+      useDocumentSessionStore.getState().setBlockSelected(false);
+      useDocumentSessionStore.getState().setAllBlocksSelected(false);
+      return;
+    }
+
+    // 비어있지 않으면 아래에 새 블록 추가
+    const afterBlockId = selectedBlockId ?? currentDocument.blocks.at(-1)?.id ?? null;
+    await flushCurrentDocument();
+    const nextDocument = toDocumentVm(
+      await desktopApi.createBlockBelow(currentDocument.id, afterBlockId, 'markdown'),
+    );
+
+    const newBlock = nextDocument.blocks.find((block) => {
+      if (!afterBlockId) return block.position === 0;
+      const source = currentDocument.blocks.find((entry) => entry.id === afterBlockId);
+      return source ? block.position === source.position + 1 : false;
+    }) ?? nextDocument.blocks.at(-1) ?? null;
+
+    if (newBlock) {
+      clearError();
+      useWorkspaceStore.getState().upsertDocumentSummary(summarizeDocument(nextDocument));
+      useDocumentSessionStore.setState({
+        currentDocument: nextDocument,
+        selectedBlockId: newBlock.id,
+        blockSelected: false,
+        allBlocksSelected: false,
+        focusRequest: { blockId: newBlock.id, caret: 'start' as const, nonce: Date.now() + Math.random() },
+        lastSavedAt: nextDocument.updatedAt,
+      });
+      updateMarkdownBlock(newBlock.id, text);
+    }
+  } catch (error) {
+    reportWorkspaceError(error, '블록을 붙여넣지 못했습니다.');
+  }
 }
 
 export async function deleteSelectedBlocks() {

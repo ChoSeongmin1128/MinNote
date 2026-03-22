@@ -2,7 +2,7 @@ import hljs from 'highlight.js/lib/core';
 import type { LanguageFn } from 'highlight.js';
 
 export const CODE_LANGUAGE_OPTIONS = [
-  { id: 'plaintext', label: 'Plain Text' },
+  { id: 'plaintext', label: 'Plain Text', hidden: true },
   { id: 'json', label: 'JSON' },
   { id: 'javascript', label: 'JavaScript' },
   { id: 'typescript', label: 'TypeScript' },
