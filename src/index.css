@@ -1184,8 +1184,11 @@ button {
 }
 
 .plain-editor-input.is-code::selection {
-  background: color-mix(in srgb, Highlight 24%, transparent);
-  color: transparent;
+  background: color-mix(in srgb, Highlight 18%, transparent);
+}
+
+.plain-editor-input.is-code:not(:focus)::selection {
+  background: transparent;
 }
 
 .plain-editor-input.is-text {
