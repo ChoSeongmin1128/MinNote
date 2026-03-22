@@ -11,6 +11,7 @@ export interface BlockFocusRequest {
 interface DocumentSessionState {
   currentDocument: DocumentVm | null;
   selectedBlockId: string | null;
+  selectedBlockIds: string[];
   blockSelected: boolean;
   allBlocksSelected: boolean;
   isFlushing: boolean;
@@ -18,6 +19,7 @@ interface DocumentSessionState {
   focusRequest: BlockFocusRequest | null;
   setCurrentDocument: (document: DocumentVm | null) => void;
   setSelectedBlockId: (blockId: string | null) => void;
+  setSelectedBlockIds: (blockIds: string[]) => void;
   setBlockSelected: (value: boolean) => void;
   setAllBlocksSelected: (value: boolean) => void;
   setIsFlushing: (value: boolean) => void;
@@ -39,6 +41,7 @@ function createFocusRequest(blockId: string, caret: BlockCaretPlacement): BlockF
 export const useDocumentSessionStore = create<DocumentSessionState>((set, get) => ({
   currentDocument: null,
   selectedBlockId: null,
+  selectedBlockIds: [],
   blockSelected: false,
   allBlocksSelected: false,
   isFlushing: false,
@@ -48,6 +51,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
     set({
       currentDocument,
       selectedBlockId: currentDocument?.blocks[0]?.id ?? null,
+      selectedBlockIds: [],
       blockSelected: false,
       allBlocksSelected: false,
       focusRequest: currentDocument?.blocks[0]
@@ -55,14 +59,16 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
         : null,
       lastSavedAt: currentDocument?.updatedAt ?? null,
     }),
-  setSelectedBlockId: (selectedBlockId) => set({ selectedBlockId, blockSelected: false, allBlocksSelected: false }),
+  setSelectedBlockId: (selectedBlockId) => set({ selectedBlockId, selectedBlockIds: [], blockSelected: false, allBlocksSelected: false }),
+  setSelectedBlockIds: (selectedBlockIds) => set({ selectedBlockIds, blockSelected: selectedBlockIds.length > 0, allBlocksSelected: false }),
   setBlockSelected: (blockSelected) => set({ blockSelected, allBlocksSelected: false }),
-  setAllBlocksSelected: (allBlocksSelected) => set({ allBlocksSelected }),
+  setAllBlocksSelected: (allBlocksSelected) => set({ allBlocksSelected, selectedBlockIds: allBlocksSelected ? [] : get().selectedBlockIds }),
   setIsFlushing: (isFlushing) => set({ isFlushing }),
   setLastSavedAt: (lastSavedAt) => set({ lastSavedAt }),
   requestBlockFocus: (blockId, caret) =>
     set({
       selectedBlockId: blockId,
+      selectedBlockIds: [],
       allBlocksSelected: false,
       focusRequest: createFocusRequest(blockId, caret),
     }),
@@ -81,6 +87,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
     const target = currentDocument.blocks[fromIndex - 1];
     set({
       selectedBlockId: target.id,
+      selectedBlockIds: [],
       allBlocksSelected: false,
       focusRequest: createFocusRequest(target.id, caret),
     });
@@ -99,6 +106,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
     const target = currentDocument.blocks[fromIndex + 1];
     set({
       selectedBlockId: target.id,
+      selectedBlockIds: [],
       allBlocksSelected: false,
       focusRequest: createFocusRequest(target.id, caret),
     });

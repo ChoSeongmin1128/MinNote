@@ -29,13 +29,21 @@ function DocumentTitleInput({ title }: { title: string | null }) {
   );
 }
 
+function getBlockIdFromEvent(target: EventTarget | null): string | null {
+  if (!(target instanceof HTMLElement)) return null;
+  const card = target.closest('[data-block-card-id]');
+  return card?.getAttribute('data-block-card-id') ?? null;
+}
+
 export function DocumentCanvas() {
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const selectedBlockId = useDocumentSessionStore((state) => state.selectedBlockId);
+  const selectedBlockIds = useDocumentSessionStore((state) => state.selectedBlockIds);
   const blockSelected = useDocumentSessionStore((state) => state.blockSelected);
   const allBlocksSelected = useDocumentSessionStore((state) => state.allBlocksSelected);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const blocksSelectionRef = useRef<HTMLDivElement | null>(null);
+  const dragSelectStartRef = useRef<string | null>(null);
 
   const blocks = useMemo(() => currentDocument?.blocks ?? [], [currentDocument?.blocks]);
   const blockTintPreset = currentDocument?.blockTintOverride ?? defaultBlockTintPreset;
@@ -72,7 +80,39 @@ export function DocumentCanvas() {
 
   return (
     <section className="document-canvas">
-      <div ref={surfaceRef} className="document-surface" data-block-preset={blockTintPreset}>
+      <div
+        ref={surfaceRef}
+        className="document-surface"
+        data-block-preset={blockTintPreset}
+        onMouseDown={(event) => {
+          if (event.button !== 0) return;
+          const blockId = getBlockIdFromEvent(event.target);
+          if (blockId) {
+            dragSelectStartRef.current = blockId;
+          }
+        }}
+        onMouseMove={(event) => {
+          if (event.buttons !== 1 || !dragSelectStartRef.current) return;
+          const currentBlockId = getBlockIdFromEvent(event.target);
+          if (!currentBlockId || currentBlockId === dragSelectStartRef.current) {
+            if (selectedBlockIds.length > 0) {
+              useDocumentSessionStore.getState().setSelectedBlockIds([]);
+            }
+            return;
+          }
+          // 두 블록 사이의 모든 블록을 선택
+          const startIdx = blocks.findIndex((b) => b.id === dragSelectStartRef.current);
+          const endIdx = blocks.findIndex((b) => b.id === currentBlockId);
+          if (startIdx < 0 || endIdx < 0) return;
+          const from = Math.min(startIdx, endIdx);
+          const to = Math.max(startIdx, endIdx);
+          const ids = blocks.slice(from, to + 1).map((b) => b.id);
+          useDocumentSessionStore.getState().setSelectedBlockIds(ids);
+        }}
+        onMouseUp={() => {
+          dragSelectStartRef.current = null;
+        }}
+      >
         <div className="document-head">
           <DocumentTitleInput key={`${currentDocument.id}:${currentDocument.title ?? ''}`} title={currentDocument.title} />
           <DocumentMenu />
@@ -88,7 +128,7 @@ export function DocumentCanvas() {
               <BlockCard
                 block={block}
                 isSelected={selectedBlockId === block.id}
-                isBlockSelected={blockSelected && selectedBlockId === block.id}
+                isBlockSelected={(blockSelected && selectedBlockId === block.id) || selectedBlockIds.includes(block.id)}
                 isAllSelected={allBlocksSelected}
                 isAlternate={index % 2 === 1}
                 isDragging={dragState?.activeId === block.id}
