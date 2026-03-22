@@ -41,6 +41,7 @@ import { TypeMenu } from './TypeMenu';
 interface BlockCardProps {
   block: BlockVm;
   isSelected: boolean;
+  isBlockSelected: boolean;
   isAllSelected: boolean;
   isAlternate: boolean;
   isDragging: boolean;
@@ -56,6 +57,7 @@ function EditorFallback() {
 export function BlockCard({
   block,
   isSelected,
+  isBlockSelected,
   isAllSelected,
   isAlternate,
   isDragging,
@@ -175,7 +177,7 @@ export function BlockCard({
     <section
       ref={blockCardRef}
       data-block-card-id={block.id}
-      className={`block-card block-card-${block.kind}${isSelected ? ' is-selected' : ''}${markdownSelectionState.hasSelection ? ' has-editor-selection' : ''}${markdownSelectionState.isWholeBlockSelected ? ' is-markdown-select-all' : ''}${isAllSelected ? ' is-all-selected' : ''}${isAlternate ? ' is-alternate' : ''}${isDragging ? ' is-dragging' : ''}`}
+      className={`block-card block-card-${block.kind}${isSelected ? ' is-selected' : ''}${isBlockSelected ? ' is-block-selected' : ''}${markdownSelectionState.hasSelection ? ' has-editor-selection' : ''}${markdownSelectionState.isWholeBlockSelected ? ' is-markdown-select-all' : ''}${isAllSelected ? ' is-all-selected' : ''}${isAlternate ? ' is-alternate' : ''}${isDragging ? ' is-dragging' : ''}`}
       onPointerEnter={() => {
         void preloadBlockCardEditor(block.kind);
       }}

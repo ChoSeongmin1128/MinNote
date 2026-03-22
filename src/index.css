@@ -789,7 +789,6 @@ button {
 }
 
 .block-card.is-selected,
-.block-card.is-markdown-select-all,
 .block-card.is-all-selected {
   border-color: color-mix(in srgb, Highlight 44%, transparent);
   box-shadow:
@@ -797,7 +796,8 @@ button {
     0 1px 4px color-mix(in srgb, Highlight 10%, transparent);
 }
 
-.block-card.is-markdown-select-all {
+.block-card.is-block-selected,
+.block-card.is-all-selected {
   border-color: color-mix(in srgb, Highlight 58%, CanvasText 6%);
   background:
     linear-gradient(
@@ -808,7 +808,8 @@ button {
     var(--block-tint-odd);
 }
 
-.block-card.is-markdown-select-all.is-alternate {
+.block-card.is-block-selected.is-alternate,
+.block-card.is-all-selected.is-alternate {
   background:
     linear-gradient(
       0deg,

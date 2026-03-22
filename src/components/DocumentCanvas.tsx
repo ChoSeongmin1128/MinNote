@@ -32,6 +32,7 @@ function DocumentTitleInput({ title }: { title: string | null }) {
 export function DocumentCanvas() {
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const selectedBlockId = useDocumentSessionStore((state) => state.selectedBlockId);
+  const blockSelected = useDocumentSessionStore((state) => state.blockSelected);
   const allBlocksSelected = useDocumentSessionStore((state) => state.allBlocksSelected);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const blocksSelectionRef = useRef<HTMLDivElement | null>(null);
@@ -48,7 +49,16 @@ export function DocumentCanvas() {
     dragPreview == null ? null : blocks.find((block) => block.id === dragPreview.blockId) ?? null;
 
   useEffect(() => {
-    if (!allBlocksSelected || !blocksSelectionRef.current) {
+    if (!allBlocksSelected) {
+      // 전체 선택 해제 시 남아있는 selection 클리어
+      const selection = window.getSelection();
+      if (selection && blocksSelectionRef.current?.contains(selection.anchorNode)) {
+        selection.removeAllRanges();
+      }
+      return;
+    }
+
+    if (!blocksSelectionRef.current) {
       return;
     }
 
@@ -95,6 +105,7 @@ export function DocumentCanvas() {
               <BlockCard
                 block={block}
                 isSelected={selectedBlockId === block.id}
+                isBlockSelected={blockSelected && selectedBlockId === block.id}
                 isAllSelected={allBlocksSelected}
                 isAlternate={index % 2 === 1}
                 isDragging={dragState?.activeId === block.id}
