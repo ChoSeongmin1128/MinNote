@@ -112,6 +112,10 @@ pub fn delete_document(
   })
 }
 
+pub fn empty_trash(repository: &mut impl AppRepository) -> Result<(), AppError> {
+  repository.empty_trash()
+}
+
 pub fn restore_document_from_trash(
   repository: &mut impl AppRepository,
   document_id: &str,

@@ -1,7 +1,7 @@
 import { FileSearch, Plus, RotateCcw, Search, Settings2, Trash2, X } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { SidebarDocumentMenu } from './SidebarDocumentMenu';
-import { createDocument, openDocument, restoreDocumentFromTrash, setSearchQuery } from '../controllers/appController';
+import { createDocument, emptyTrash, openDocument, restoreDocumentFromTrash, setSearchQuery } from '../controllers/appController';
 import { getVisibleDocumentTitle } from '../lib/documentTitle';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
@@ -27,6 +27,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const searchQuery = useWorkspaceStore((state) => state.searchQuery);
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const setSettingsOpen = useWorkspaceStore((state) => state.setSettingsOpen);
+  const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
 
   const visibleDocuments = useMemo(
     () => (searchQuery.trim() ? searchResults : documents),
@@ -126,6 +127,38 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </button>
             </div>
           ))}
+          <div className="trash-empty-row">
+            {confirmEmptyTrash ? (
+              <>
+                <span className="trash-empty-confirm-label">정말 비울까요?</span>
+                <button
+                  className="ghost-button trash-empty-cancel"
+                  type="button"
+                  onClick={() => setConfirmEmptyTrash(false)}
+                >
+                  취소
+                </button>
+                <button
+                  className="ghost-button trash-empty-confirm"
+                  type="button"
+                  onClick={() => {
+                    setConfirmEmptyTrash(false);
+                    void emptyTrash();
+                  }}
+                >
+                  비우기
+                </button>
+              </>
+            ) : (
+              <button
+                className="ghost-button trash-empty-button"
+                type="button"
+                onClick={() => setConfirmEmptyTrash(true)}
+              >
+                휴지통 비우기
+              </button>
+            )}
+          </div>
         </div>
       )}
 

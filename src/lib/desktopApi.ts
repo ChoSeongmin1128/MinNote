@@ -108,6 +108,9 @@ export const desktopApi = {
   restoreDocumentBlocks(documentId: string, blocks: BlockRestoreDto[]) {
     return call<DocumentDto>('restore_document_blocks', { documentId, blocks });
   },
+  emptyTrash() {
+    return call<void>('empty_trash');
+  },
   restoreDocumentFromTrash(documentId: string) {
     return call<BootstrapPayload>('restore_document_from_trash', { documentId });
   },

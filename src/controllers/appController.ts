@@ -3,6 +3,7 @@ export {
   openDocument,
   commitDocumentTitle,
   deleteDocument,
+  emptyTrash,
   restoreDocumentFromTrash,
   setDocumentBlockTintOverride,
   flushCurrentDocument,

@@ -300,6 +300,44 @@ button {
   opacity: 1;
 }
 
+.trash-empty-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 2px;
+}
+
+.trash-empty-button {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  padding: 3px 6px;
+}
+
+.trash-empty-button:hover {
+  color: var(--danger);
+}
+
+.trash-empty-confirm-label {
+  flex: 1;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+.trash-empty-cancel {
+  font-size: 0.75rem;
+  padding: 3px 6px;
+}
+
+.trash-empty-confirm {
+  font-size: 0.75rem;
+  padding: 3px 6px;
+  color: var(--danger);
+}
+
+.trash-empty-confirm:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
 .sidebar-footer {
   margin-top: auto;
   border-top: 1px solid var(--border);

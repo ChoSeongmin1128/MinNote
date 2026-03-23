@@ -163,6 +163,11 @@ pub fn restore_document_blocks(
 }
 
 #[tauri::command]
+pub fn empty_trash(state: State<'_, AppState>) -> Result<(), String> {
+  with_repository(state, services::empty_trash)
+}
+
+#[tauri::command]
 pub fn restore_document_from_trash(
   state: State<'_, AppState>,
   document_id: String,

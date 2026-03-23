@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, MoonStar, MonitorCog, SunMedium, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { BlockTintPreview } from './BlockTintPreview';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import {
@@ -9,8 +9,6 @@ import {
 } from '../controllers/appController';
 import type { ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
-
-const DELETE_ALL_CONFIRM_TEXT = '모든 문서 삭제';
 
 const THEME_OPTIONS: Array<{ id: ThemeMode; label: string; icon: typeof MonitorCog }> = [
   { id: 'system', label: '자동', icon: MonitorCog },
@@ -27,10 +25,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const icloudSyncEnabled = useWorkspaceStore((state) => state.icloudSyncEnabled);
-  const [confirmValue, setConfirmValue] = useState('');
   const [isConfirmOpen, setConfirmOpen] = useState(false);
-
-  const isDeleteEnabled = useMemo(() => confirmValue.trim() === DELETE_ALL_CONFIRM_TEXT, [confirmValue]);
 
   if (!isOpen) {
     return null;
@@ -118,40 +113,24 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               전체 문서 삭제
             </button>
           ) : (
-            <div className="danger-confirm">
-              <p className="document-menu-option-description">
-                계속하려면 <strong>{DELETE_ALL_CONFIRM_TEXT}</strong>를 정확히 입력해 주세요.
-              </p>
-              <input
-                className="search-input"
-                value={confirmValue}
-                onChange={(event) => setConfirmValue(event.target.value)}
-                placeholder={DELETE_ALL_CONFIRM_TEXT}
-              />
-              <div className="danger-confirm-actions">
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => {
-                    setConfirmValue('');
-                    setConfirmOpen(false);
-                  }}
-                >
-                  취소
-                </button>
-                <button
-                  className="document-menu-danger"
-                  type="button"
-                  disabled={!isDeleteEnabled}
-                  onClick={() => {
-                    void deleteAllDocuments();
-                    setConfirmValue('');
-                    setConfirmOpen(false);
-                  }}
-                >
-                  전체 문서 삭제 실행
-                </button>
-              </div>
+            <div className="danger-confirm-actions">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setConfirmOpen(false)}
+              >
+                취소
+              </button>
+              <button
+                className="document-menu-danger"
+                type="button"
+                onClick={() => {
+                  void deleteAllDocuments();
+                  setConfirmOpen(false);
+                }}
+              >
+                전체 문서 삭제 실행
+              </button>
             </div>
           )}
         </div>

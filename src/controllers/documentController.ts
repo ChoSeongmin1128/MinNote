@@ -111,6 +111,16 @@ export async function deleteDocument(documentId: string) {
   }
 }
 
+export async function emptyTrash() {
+  try {
+    await desktopApi.emptyTrash();
+    clearError();
+    useWorkspaceStore.getState().setTrashDocuments([]);
+  } catch (error) {
+    reportWorkspaceError(error, '휴지통을 비우지 못했습니다.');
+  }
+}
+
 export async function restoreDocumentFromTrash(documentId: string) {
   try {
     const payload = await desktopApi.restoreDocumentFromTrash(documentId);

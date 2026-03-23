@@ -196,6 +196,25 @@ impl DocumentRepository for SqliteStore {
     Ok(())
   }
 
+  fn empty_trash(&mut self) -> Result<(), AppError> {
+    let trash_ids: Vec<String> = self
+      .connection
+      .prepare("SELECT id FROM documents WHERE deleted_at IS NOT NULL")?
+      .query_map([], |row| row.get::<_, String>(0))?
+      .collect::<Result<Vec<_>, _>>()?;
+
+    for id in &trash_ids {
+      self.connection.execute(
+        &format!("DELETE FROM {SEARCH_INDEX_TABLE} WHERE document_id = ?1"),
+        params![id],
+      )?;
+    }
+
+    self.connection.execute("DELETE FROM documents WHERE deleted_at IS NOT NULL", [])?;
+
+    Ok(())
+  }
+
   fn delete_all_documents(&mut self) -> Result<(), AppError> {
     self.connection.execute(&format!("DELETE FROM {SEARCH_INDEX_TABLE}"), [])?;
     self.connection.execute("DELETE FROM documents", [])?;

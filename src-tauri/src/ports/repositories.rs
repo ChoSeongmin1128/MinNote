@@ -11,6 +11,7 @@ pub trait DocumentRepository {
   fn delete_document(&mut self, document_id: &str) -> Result<(), AppError>;
   fn restore_document_from_trash(&mut self, document_id: &str) -> Result<Document, AppError>;
   fn purge_expired_trash(&mut self, cutoff_ms: i64) -> Result<(), AppError>;
+  fn empty_trash(&mut self) -> Result<(), AppError>;
   fn delete_all_documents(&mut self) -> Result<(), AppError>;
   fn set_document_block_tint_override(
     &mut self,
