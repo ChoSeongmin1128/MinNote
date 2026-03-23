@@ -48,7 +48,9 @@ export interface BootstrapPayload {
   currentDocument: DocumentDto | null;
   themeMode: ThemeMode;
   defaultBlockTintPreset: BlockTintPreset;
+  defaultBlockKind: BlockKind;
   icloudSyncEnabled: boolean;
+  menuBarIconEnabled: boolean;
 }
 
 export interface SearchResultDto extends DocumentSummaryDto {

@@ -4,10 +4,12 @@ import { BlockTintPreview } from './BlockTintPreview';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import {
   deleteAllDocuments,
+  setDefaultBlockKind,
   setDefaultBlockTintPreset,
+  setMenuBarIconEnabled,
   setThemeMode,
 } from '../controllers/appController';
-import type { ThemeMode } from '../lib/types';
+import type { BlockKind, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { checkForUpdate, type UpdateStatus } from '../lib/appUpdater';
 
@@ -15,6 +17,12 @@ const THEME_OPTIONS: Array<{ id: ThemeMode; label: string; icon: typeof MonitorC
   { id: 'system', label: '자동', icon: MonitorCog },
   { id: 'light', label: '라이트', icon: SunMedium },
   { id: 'dark', label: '다크', icon: MoonStar },
+];
+
+const BLOCK_KIND_OPTIONS: Array<{ id: BlockKind; label: string }> = [
+  { id: 'markdown', label: '마크다운' },
+  { id: 'text', label: '텍스트' },
+  { id: 'code', label: '코드' },
 ];
 
 interface SettingsModalProps {
@@ -25,6 +33,8 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
+  const defaultBlockKind = useWorkspaceStore((state) => state.defaultBlockKind);
+  const menuBarIconEnabled = useWorkspaceStore((state) => state.menuBarIconEnabled);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
   const installerRef = useRef<{ install(): Promise<void>; relaunch(): Promise<void> } | null>(null);
@@ -38,10 +48,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <button className="modal-backdrop" type="button" aria-label="설정 닫기" onClick={onClose} />
       <section className="settings-modal" role="dialog" aria-modal="true" aria-label="전체 설정">
         <div className="settings-modal-header">
-          <div>
-            <h2 className="settings-title">전체 설정</h2>
-            <p className="settings-description">앱 전체 기본값과 위험 작업을 관리합니다.</p>
-          </div>
+          <h2 className="settings-title">전체 설정</h2>
           <button className="icon-button" type="button" aria-label="설정 닫기" onClick={onClose}>
             <X size={16} />
           </button>
@@ -50,7 +57,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">테마</span>
-            <span className="document-menu-option-description">앱 전체 색상 모드를 제어합니다.</span>
           </div>
           <div className="settings-segmented">
             {THEME_OPTIONS.map((option) => {
@@ -72,8 +78,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
         <div className="settings-section">
           <div className="settings-section-header">
+            <span className="settings-section-title">기본 블록 종류</span>
+          </div>
+          <div className="settings-segmented">
+            {BLOCK_KIND_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                className={`settings-segmented-option${defaultBlockKind === option.id ? ' is-active' : ''}`}
+                type="button"
+                onClick={() => void setDefaultBlockKind(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-header">
             <span className="settings-section-title">기본 블록 색상쌍</span>
-            <span className="document-menu-option-description">override가 없는 문서에 적용됩니다.</span>
           </div>
           <div className="document-menu-options">
             {BLOCK_TINT_PRESETS.map((preset) => (
@@ -88,6 +111,28 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 {defaultBlockTintPreset === preset.id ? <Check size={14} /> : null}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <span className="settings-section-title">메뉴바 아이콘</span>
+          </div>
+          <div className="settings-segmented">
+            <button
+              className={`settings-segmented-option${!menuBarIconEnabled ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => void setMenuBarIconEnabled(false)}
+            >
+              꺼짐
+            </button>
+            <button
+              className={`settings-segmented-option${menuBarIconEnabled ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => void setMenuBarIconEnabled(true)}
+            >
+              켜짐
+            </button>
           </div>
         </div>
 
@@ -109,15 +154,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">업데이트</span>
-            <span className="document-menu-option-description">
-              {updateStatus.state === 'idle' && '최신 버전을 확인합니다.'}
-              {updateStatus.state === 'checking' && '확인 중...'}
-              {updateStatus.state === 'up-to-date' && '최신 버전입니다.'}
-              {updateStatus.state === 'available' && `새 버전 ${updateStatus.version} 이 있습니다.`}
-              {updateStatus.state === 'downloading' && `다운로드 중... ${updateStatus.percent}%`}
-              {updateStatus.state === 'ready' && '설치 완료. 재시작하면 적용됩니다.'}
-              {updateStatus.state === 'error' && updateStatus.message}
-            </span>
+            {updateStatus.state !== 'idle' && (
+              <span className="document-menu-option-description">
+                {updateStatus.state === 'checking' && '확인 중...'}
+                {updateStatus.state === 'up-to-date' && '최신 버전입니다.'}
+                {updateStatus.state === 'available' && `새 버전 ${updateStatus.version}이 있습니다.`}
+                {updateStatus.state === 'downloading' && `다운로드 중... ${updateStatus.percent}%`}
+                {updateStatus.state === 'ready' && '설치 완료. 재시작하면 적용됩니다.'}
+                {updateStatus.state === 'error' && updateStatus.message}
+              </span>
+            )}
           </div>
           <div className="settings-update-actions">
             {updateStatus.state !== 'ready' && (
@@ -159,7 +205,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="settings-section danger-zone">
           <div className="settings-section-header">
             <span className="settings-section-title">Danger Zone</span>
-            <span className="document-menu-option-description">모든 문서를 즉시 삭제합니다.</span>
           </div>
           {!isConfirmOpen ? (
             <button className="document-menu-danger" type="button" onClick={() => setConfirmOpen(true)}>

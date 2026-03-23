@@ -29,6 +29,8 @@ export {
   setSearchQuery,
   setThemeMode,
   setDefaultBlockTintPreset,
+  setDefaultBlockKind,
   setIcloudSyncEnabled,
+  setMenuBarIconEnabled,
   deleteAllDocuments,
 } from './workspaceController';

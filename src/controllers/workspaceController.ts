@@ -1,6 +1,6 @@
 import { toDocumentSummaryVm, toDocumentVm, toSearchResultVm } from '../adapters/documentAdapter';
 import { desktopApi } from '../lib/desktopApi';
-import type { BlockTintPreset, ThemeMode } from '../lib/types';
+import type { BlockKind, BlockTintPreset, ThemeMode } from '../lib/types';
 import { clearAllDocumentSync } from '../services/documentSync';
 import { enqueueSyncMutation } from '../services/syncBoundary';
 import { useWorkspaceStore } from '../stores/workspaceStore';
@@ -28,6 +28,8 @@ export async function bootstrapApp() {
     workspace.setThemeMode(payload.themeMode);
     workspace.setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
     workspace.setIcloudSyncEnabled(payload.icloudSyncEnabled);
+    workspace.setMenuBarIconEnabled(payload.menuBarIconEnabled);
+    workspace.setDefaultBlockKind(payload.defaultBlockKind);
     setCurrentDocument(payload.currentDocument ? toDocumentVm(payload.currentDocument) : null);
   } catch (error) {
     workspace.setError(normalizeErrorMessage(error, '초기화에 실패했습니다.'));
@@ -100,6 +102,24 @@ export async function setIcloudSyncEnabled(enabled: boolean) {
     });
   } catch (error) {
     reportWorkspaceError(error, 'iCloud 동기화 설정을 변경하지 못했습니다.');
+  }
+}
+
+export async function setDefaultBlockKind(kind: BlockKind) {
+  try {
+    const result = await desktopApi.setDefaultBlockKind(kind);
+    useWorkspaceStore.getState().setDefaultBlockKind(result);
+  } catch (error) {
+    reportWorkspaceError(error, '기본 블록 종류를 변경하지 못했습니다.');
+  }
+}
+
+export async function setMenuBarIconEnabled(enabled: boolean) {
+  try {
+    const result = await desktopApi.setMenuBarIconEnabled(enabled);
+    useWorkspaceStore.getState().setMenuBarIconEnabled(result);
+  } catch (error) {
+    reportWorkspaceError(error, '메뉴바 아이콘 설정을 변경하지 못했습니다.');
   }
 }
 

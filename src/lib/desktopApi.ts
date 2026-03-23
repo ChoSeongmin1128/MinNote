@@ -118,6 +118,12 @@ export const desktopApi = {
   setIcloudSyncEnabled(enabled: boolean) {
     return call<boolean>('set_icloud_sync_enabled', { enabled });
   },
+  setMenuBarIconEnabled(enabled: boolean) {
+    return call<boolean>('set_menu_bar_icon_enabled', { enabled });
+  },
+  setDefaultBlockKind(kind: BlockKind) {
+    return call<BlockKind>('set_default_block_kind', { kind });
+  },
   applyRemoteDocuments(documents: RemoteDocumentDto[]) {
     return call<BootstrapPayload>('apply_remote_documents', { documents });
   },

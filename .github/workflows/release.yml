@@ -56,10 +56,12 @@ jobs:
           cp .build/x86_64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-x86_64-apple-darwin
 
       - name: Build and release
+        id: tauri_build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # TODO: Apple Developer Program 승인 후 추가
           # APPLE_ID: ${{ secrets.APPLE_ID }}
           # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
@@ -71,3 +73,39 @@ jobs:
             MinNote ${{ github.ref_name }} 업데이트
           releaseDraft: false
           prerelease: false
+
+      - name: Upload updater assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          BUNDLE_DIR="src-tauri/target/release/bundle/macos"
+          SIG_FILE="$BUNDLE_DIR/MinNote.app.tar.gz.sig"
+
+          if [ ! -f "$SIG_FILE" ]; then
+            echo "Signature file not found, skipping updater assets upload"
+            exit 0
+          fi
+
+          SIGNATURE=$(cat "$SIG_FILE")
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$TAG/MinNote_aarch64.app.tar.gz"
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg notes "MinNote $TAG 업데이트" \
+            --arg pub_date "$PUB_DATE" \
+            --arg sig "$SIGNATURE" \
+            --arg url "$DOWNLOAD_URL" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-aarch64": { signature: $sig, url: $url }
+              }
+            }' > latest.json
+
+          gh release upload "$TAG" "$SIG_FILE#MinNote_aarch64.app.tar.gz.sig" --clobber
+          gh release upload "$TAG" latest.json --clobber

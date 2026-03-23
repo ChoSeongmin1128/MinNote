@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { AlertCircle, LoaderCircle, PanelLeft, Plus } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { DocumentCanvas } from './components/DocumentCanvas';
@@ -43,6 +44,15 @@ function App() {
   useEffect(() => {
     void bootstrapApp();
   }, []);
+
+  useEffect(() => {
+    const unlisten = listen('tray-open-settings', () => {
+      setSettingsOpen(true);
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [setSettingsOpen]);
 
   useEffect(() => {
     document.documentElement.dataset.themeMode = themeMode;

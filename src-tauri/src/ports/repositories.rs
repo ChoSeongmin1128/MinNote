@@ -57,6 +57,8 @@ pub trait AppStateRepository {
   fn set_theme_mode(&mut self, theme_mode: ThemeMode) -> Result<(), AppError>;
   fn set_default_block_tint_preset(&mut self, preset: BlockTintPreset) -> Result<(), AppError>;
   fn set_icloud_sync_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
+  fn set_menu_bar_icon_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
+  fn set_default_block_kind(&mut self, kind: BlockKind) -> Result<(), AppError>;
 }
 
 pub trait RemoteSyncRepository {

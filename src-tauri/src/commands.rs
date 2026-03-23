@@ -5,6 +5,7 @@ use crate::application::services;
 use crate::domain::models::{BlockKind, BlockTintPreset, ThemeMode};
 use crate::error::AppError;
 use crate::state::AppState;
+use crate::build_tray_icon;
 
 fn with_repository<T>(
   state: State<'_, AppState>,
@@ -234,6 +235,41 @@ pub fn set_icloud_sync_enabled(
     sync.start(&app_handle, &db_path, &state_path)?;
   } else {
     sync.stop();
+  }
+
+  Ok(enabled)
+}
+
+#[tauri::command]
+pub fn set_default_block_kind(
+  state: State<'_, AppState>,
+  kind: BlockKind,
+) -> Result<BlockKind, String> {
+  with_repository(state, |repository| services::set_default_block_kind(repository, kind))
+}
+
+#[tauri::command]
+pub fn set_menu_bar_icon_enabled(
+  state: State<'_, AppState>,
+  app_handle: tauri::AppHandle,
+  enabled: bool,
+) -> Result<bool, String> {
+  with_repository(state.clone(), |repository| {
+    services::set_menu_bar_icon_enabled(repository, enabled)
+  })?;
+
+  let mut tray_guard = state
+    .tray_icon
+    .lock()
+    .map_err(|_| "tray lock failed".to_string())?;
+
+  if enabled {
+    if tray_guard.is_none() {
+      let tray = build_tray_icon(&app_handle).map_err(|e| e.to_string())?;
+      *tray_guard = Some(tray);
+    }
+  } else {
+    *tray_guard = None;
   }
 
   Ok(enabled)

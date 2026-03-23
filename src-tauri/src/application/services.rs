@@ -42,7 +42,9 @@ pub fn bootstrap_app(repository: &mut impl AppRepository) -> Result<BootstrapPay
     current_document,
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
+    default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
+    menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
   })
 }
 
@@ -108,7 +110,9 @@ pub fn delete_document(
     current_document,
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
+    default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
+    menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
   })
 }
 
@@ -140,7 +144,9 @@ pub fn restore_document_from_trash(
     current_document,
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
+    default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
+    menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
   })
 }
 
@@ -164,7 +170,9 @@ pub fn delete_all_documents(repository: &mut impl AppRepository) -> Result<Boots
     current_document: Some(current_document),
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
+    default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
+    menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
   })
 }
 
@@ -280,6 +288,22 @@ pub fn set_icloud_sync_enabled(
 ) -> Result<bool, AppError> {
   repository.set_icloud_sync_enabled(enabled)?;
   Ok(enabled)
+}
+
+pub fn set_menu_bar_icon_enabled(
+  repository: &mut impl AppRepository,
+  enabled: bool,
+) -> Result<bool, AppError> {
+  repository.set_menu_bar_icon_enabled(enabled)?;
+  Ok(enabled)
+}
+
+pub fn set_default_block_kind(
+  repository: &mut impl AppRepository,
+  kind: BlockKind,
+) -> Result<BlockKind, AppError> {
+  repository.set_default_block_kind(kind.clone())?;
+  Ok(kind)
 }
 
 pub fn apply_remote_documents(

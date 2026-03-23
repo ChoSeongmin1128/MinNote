@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { BlockTintPreset, ICloudSyncStatus, ThemeMode } from '../lib/types';
+import type { BlockKind, BlockTintPreset, ICloudSyncStatus, ThemeMode } from '../lib/types';
 import type { DocumentSummaryVm, SearchResultVm } from '../adapters/documentAdapter';
 import type { CodeLanguageId } from '../lib/blockOptions';
 
@@ -11,9 +11,11 @@ interface WorkspaceState {
   isBootstrapping: boolean;
   error: string | null;
   defaultBlockTintPreset: BlockTintPreset;
+  defaultBlockKind: BlockKind;
   themeMode: ThemeMode;
   icloudSyncEnabled: boolean;
   icloudSyncStatus: ICloudSyncStatus;
+  menuBarIconEnabled: boolean;
   isSettingsOpen: boolean;
   isSidebarOpen: boolean;
   lastCodeLanguage: CodeLanguageId;
@@ -26,9 +28,11 @@ interface WorkspaceState {
   setIsBootstrapping: (value: boolean) => void;
   setError: (value: string | null) => void;
   setDefaultBlockTintPreset: (preset: BlockTintPreset) => void;
+  setDefaultBlockKind: (kind: BlockKind) => void;
   setThemeMode: (themeMode: ThemeMode) => void;
   setIcloudSyncEnabled: (value: boolean) => void;
   setIcloudSyncStatus: (status: ICloudSyncStatus) => void;
+  setMenuBarIconEnabled: (value: boolean) => void;
   setSettingsOpen: (isOpen: boolean) => void;
   setSidebarOpen: (isOpen: boolean) => void;
   setLastCodeLanguage: (language: CodeLanguageId) => void;
@@ -46,9 +50,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   isBootstrapping: true,
   error: null,
   defaultBlockTintPreset: 'mist',
+  defaultBlockKind: 'markdown' as BlockKind,
   themeMode: 'system',
   icloudSyncEnabled: false,
   icloudSyncStatus: { state: 'disabled', lastSyncAt: null, errorMessage: null },
+  menuBarIconEnabled: false,
   isSettingsOpen: false,
   isSidebarOpen: false,
   lastCodeLanguage: 'javascript' as CodeLanguageId,
@@ -71,9 +77,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setIsBootstrapping: (isBootstrapping) => set({ isBootstrapping }),
   setError: (error) => set({ error }),
   setDefaultBlockTintPreset: (defaultBlockTintPreset) => set({ defaultBlockTintPreset }),
+  setDefaultBlockKind: (defaultBlockKind) => set({ defaultBlockKind }),
   setThemeMode: (themeMode) => set({ themeMode }),
   setIcloudSyncEnabled: (icloudSyncEnabled) => set({ icloudSyncEnabled }),
   setIcloudSyncStatus: (icloudSyncStatus) => set({ icloudSyncStatus }),
+  setMenuBarIconEnabled: (menuBarIconEnabled) => set({ menuBarIconEnabled }),
   setSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
   setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
   setLastCodeLanguage: (lastCodeLanguage) => set({ lastCodeLanguage }),

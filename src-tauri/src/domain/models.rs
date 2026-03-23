@@ -132,5 +132,7 @@ pub struct SearchResult {
 pub struct AppSettings {
   pub theme_mode: ThemeMode,
   pub default_block_tint_preset: BlockTintPreset,
+  pub default_block_kind: BlockKind,
   pub icloud_sync_enabled: bool,
+  pub menu_bar_icon_enabled: bool,
 }

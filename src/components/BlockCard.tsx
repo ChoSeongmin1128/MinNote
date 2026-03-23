@@ -320,7 +320,7 @@ export function BlockCard({
             focusNonce={focusNonce}
             onFocus={handleBlockFocus}
             onSelectionVisualChange={setMarkdownSelectionState}
-            onCreateBelow={() => void createBlockBelow(block.id)}
+            onCreateBelow={() => void createBlockBelow(block.id, useWorkspaceStore.getState().defaultBlockKind)}
             onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
             onNavigateNext={(caret) => focusNextBlock(block.id, caret)}
             onDeleteIfEmpty={handleDeleteIfEmpty}
@@ -337,7 +337,7 @@ export function BlockCard({
             focusPlacement={focusPlacement}
             focusNonce={focusNonce}
             onFocus={handleBlockFocus}
-            onCreateBelow={() => void createBlockBelow(block.id)}
+            onCreateBelow={() => void createBlockBelow(block.id, useWorkspaceStore.getState().defaultBlockKind)}
             onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
             onNavigateNext={(caret) => focusNextBlock(block.id, caret)}
             onDeleteIfEmpty={handleDeleteIfEmpty}
@@ -353,7 +353,7 @@ export function BlockCard({
             focusPlacement={focusPlacement}
             focusNonce={focusNonce}
             onFocus={handleBlockFocus}
-            onCreateBelow={() => void createBlockBelow(block.id)}
+            onCreateBelow={() => void createBlockBelow(block.id, useWorkspaceStore.getState().defaultBlockKind)}
             onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
             onNavigateNext={(caret) => focusNextBlock(block.id, caret)}
             onDeleteIfEmpty={handleDeleteIfEmpty}
