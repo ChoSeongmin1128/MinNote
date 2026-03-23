@@ -780,6 +780,28 @@ button {
   gap: 10px;
 }
 
+@keyframes block-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.97) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes block-exit {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
 .block-card {
   position: relative;
   display: flex;
@@ -792,7 +814,9 @@ button {
   -webkit-backdrop-filter: blur(12px);
   padding: 12px 14px 12px 34px;
   box-shadow: 0 1px 3px color-mix(in srgb, CanvasText 3%, transparent);
-  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease, opacity 200ms ease;
+  animation: block-enter 280ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  transform-origin: top center;
 }
 
 .block-card.is-alternate {
@@ -843,6 +867,11 @@ button {
     ),
     color-mix(in srgb, var(--bg-hover) 72%, transparent);
   opacity: 0.74;
+}
+
+.block-card.is-exiting {
+  animation: block-exit 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
 }
 
 .block-card-code {

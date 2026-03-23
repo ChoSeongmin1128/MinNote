@@ -68,6 +68,7 @@ export function BlockCard({
 }: BlockCardProps) {
   const [typeMenuAnchor, setTypeMenuAnchor] = useState<DOMRect | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isExiting, setIsExiting] = useState(false);
   const blockCardRef = useRef<HTMLElement | null>(null);
   const [markdownSelectionState, setMarkdownSelectionState] = useState({
     hasSelection: false,
@@ -120,10 +121,13 @@ export function BlockCard({
     }
   }, [block.id, block.kind, onMenuClose]);
 
-  const handleDeleteIfEmpty = useCallback(() => {
+  const handleDeleteWithAnimation = useCallback(() => {
     setContextMenuPosition(null);
-    void deleteBlock(block.id);
+    setIsExiting(true);
+    setTimeout(() => void deleteBlock(block.id), 180);
   }, [block.id]);
+
+  const handleDeleteIfEmpty = handleDeleteWithAnimation;
 
   const handleLanguageChange = useCallback((language: CodeLanguageId) => {
     setContextMenuPosition(null);
@@ -178,7 +182,7 @@ export function BlockCard({
     <section
       ref={blockCardRef}
       data-block-card-id={block.id}
-      className={`block-card block-card-${block.kind}${isSelected ? ' is-selected' : ''}${isBlockSelected ? ' is-block-selected' : ''}${markdownSelectionState.hasSelection ? ' has-editor-selection' : ''}${markdownSelectionState.isWholeBlockSelected ? ' is-markdown-select-all' : ''}${isAllSelected ? ' is-all-selected' : ''}${isAlternate ? ' is-alternate' : ''}${isDragging ? ' is-dragging' : ''}`}
+      className={`block-card block-card-${block.kind}${isSelected ? ' is-selected' : ''}${isBlockSelected ? ' is-block-selected' : ''}${markdownSelectionState.hasSelection ? ' has-editor-selection' : ''}${markdownSelectionState.isWholeBlockSelected ? ' is-markdown-select-all' : ''}${isAllSelected ? ' is-all-selected' : ''}${isAlternate ? ' is-alternate' : ''}${isDragging ? ' is-dragging' : ''}${isExiting ? ' is-exiting' : ''}`}
       onPointerEnter={() => {
         void preloadBlockCardEditor(block.kind);
       }}
@@ -235,7 +239,7 @@ export function BlockCard({
           aria-label="블록 삭제"
           onClick={(event) => {
             event.stopPropagation();
-            void deleteBlock(block.id);
+            handleDeleteWithAnimation();
           }}
         >
           <Trash2 size={14} />
