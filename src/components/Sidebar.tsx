@@ -51,24 +51,19 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       </div>
 
       <div className="search-shell">
-        <label className="hint-text" htmlFor="document-search">
-          문서 검색
-        </label>
-        <div className="row">
-          <Search size={16} />
+        <div className="search-row">
+          <Search size={14} className="search-icon" />
           <input
             id="document-search"
             className="search-input"
-            placeholder="제목 또는 본문 검색"
+            placeholder="검색"
             value={searchQuery}
             onChange={(event) => void setSearchQuery(event.target.value)}
           />
         </div>
-        {searchQuery.trim() ? (
-          <span className="search-meta">{searchResults.length}개 검색 결과</span>
-        ) : (
-          <span className="search-meta">{documents.length}개 문서</span>
-        )}
+        <span className="search-meta">
+          {searchQuery.trim() ? `${searchResults.length}개 결과` : `${documents.length}개 문서`}
+        </span>
       </div>
 
       <div className="document-list">
@@ -98,12 +93,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             >
               <div className="document-card-header">
                 <span className="document-card-title">{getVisibleDocumentTitle(document.title)}</span>
-                <div className="document-card-meta">
-                  <span className="document-meta">{formatTimestamp(document.updatedAt)}</span>
-                  <SidebarDocumentMenu documentId={document.id} />
-                </div>
+                <SidebarDocumentMenu documentId={document.id} />
               </div>
-              <span className="document-preview">{document.preview || ' '}</span>
+              <div className="document-card-sub">
+                <span className="document-meta">{formatTimestamp(document.updatedAt)}</span>
+                <span className="document-preview">{document.preview || ''}</span>
+              </div>
             </div>
           ))
         )}

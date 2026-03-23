@@ -88,13 +88,19 @@ button {
 }
 
 .sidebar-header,
-.document-card-header,
 .workspace-header,
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.document-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .brand {
@@ -124,7 +130,27 @@ button {
 .search-shell {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
   gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 0 8px;
+  transition: border-color 120ms ease;
+}
+
+.search-row:focus-within {
+  border-color: var(--border);
+}
+
+.search-row .search-icon {
+  flex-shrink: 0;
+  color: var(--text-soft);
 }
 
 .search-input,
@@ -137,8 +163,11 @@ button {
 }
 
 .search-input {
-  border-radius: 9px;
-  padding: 10px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 7px 0;
+  font-size: 0.85rem;
 }
 
 .search-input:focus,
@@ -158,18 +187,23 @@ button {
   display: flex;
   width: 100%;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   border: none;
   border-radius: 9px;
   background: transparent;
   color: inherit;
-  padding: 10px 12px;
+  padding: 8px 10px;
   text-align: left;
+  cursor: pointer;
+  transition: background-color 100ms ease;
 }
 
-.document-card:hover,
-.document-card.is-active {
+.document-card:hover {
   background: var(--bg-hover);
+}
+
+.document-card.is-active {
+  background: var(--bg-strong);
 }
 
 .document-card:focus-visible {
@@ -178,24 +212,39 @@ button {
 }
 
 .document-card-title {
+  overflow: hidden;
+  font-size: 0.88rem;
   font-weight: 600;
   letter-spacing: -0.02em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .document-card-meta {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
+}
+
+.document-card-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.document-card-sub .document-meta {
+  flex-shrink: 0;
+  font-size: 0.74rem;
 }
 
 .document-preview {
-  display: -webkit-box;
   overflow: hidden;
-  min-height: 1.2em;
   color: var(--text-soft);
-  font-size: 0.82rem;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+  font-size: 0.74rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .sidebar-footer {
