@@ -154,7 +154,8 @@ extension SyncEngine: CKSyncEngineDelegate {
           emitMessage(StatusMessage(state: "idle", lastSyncAt: now))
         }
       }
-      if let failed = e.failedRecordSaves.first, let error = failed.error {
+      if let failed = e.failedRecordSaves.first {
+        let error = failed.error
         await MainActor.run {
           emitMessage(ErrorMessage(message: "업로드 실패: \(error.localizedDescription)"))
         }

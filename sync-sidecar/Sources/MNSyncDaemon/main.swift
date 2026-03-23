@@ -7,9 +7,10 @@ final class SyncCoordinator {
   func run() async {
     // stdin을 한 줄씩 읽어 메시지 처리
     let stdin = FileHandle.standardInput
-    for await line in stdin.bytes.lines {
-      guard let data = line.data(using: .utf8),
-            let message = try? JSONDecoder().decode(IncomingMessage.self, from: data)
+    do {
+    for try await line in stdin.bytes.lines {
+      let data = Data(line.utf8)
+      guard let message = try? JSONDecoder().decode(IncomingMessage.self, from: data)
       else {
         fputs("warn: unrecognized message: \(line)\n", stderr)
         continue
@@ -32,6 +33,9 @@ final class SyncCoordinator {
         return
       }
     }
+    } catch {
+      fputs("stdin error: \(error)\n", stderr)
+    }
   }
 
   private func handleStart(_ payload: IncomingMessage.StartPayload) async {
@@ -49,8 +53,8 @@ final class SyncCoordinator {
 }
 
 // 메인 엔트리포인트
-let coordinator = SyncCoordinator()
 Task { @MainActor in
+  let coordinator = SyncCoordinator()
   await coordinator.run()
 }
 RunLoop.main.run()
