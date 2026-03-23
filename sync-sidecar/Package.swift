@@ -7,7 +7,10 @@ let package = Package(
   targets: [
     .executableTarget(
       name: "MNSyncDaemon",
-      path: "Sources/MNSyncDaemon"
+      path: "Sources/MNSyncDaemon",
+      swiftSettings: [
+        .unsafeFlags(["-strict-concurrency=minimal"])
+      ]
     )
   ]
 )

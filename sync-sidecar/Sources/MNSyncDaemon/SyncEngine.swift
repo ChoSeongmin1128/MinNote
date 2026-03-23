@@ -94,7 +94,7 @@ extension SyncEngine: CKSyncEngineDelegate {
 
     let db = await MainActor.run { self.localDB }
 
-    return CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pendingChanges) { recordID in
+    return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pendingChanges) { recordID in
       let docId = recordID.recordName
       guard let document = await db.fetchDocument(id: docId) else { return nil }
       let blocks = await db.fetchBlocks(documentId: docId)
@@ -134,7 +134,7 @@ extension SyncEngine: CKSyncEngineDelegate {
         }
       }
       if !remoteDocuments.isEmpty {
-        await MainActor.run {
+        await MainActor.run { [remoteDocuments] in
           emitMessage(RemoteChangedMessage(documents: remoteDocuments))
         }
       }
@@ -154,7 +154,7 @@ extension SyncEngine: CKSyncEngineDelegate {
           emitMessage(StatusMessage(state: "idle", lastSyncAt: now))
         }
       }
-      if let error = e.sendChangesError {
+      if let failed = e.failedRecordSaves.first, let error = failed.error {
         await MainActor.run {
           emitMessage(ErrorMessage(message: "업로드 실패: \(error.localizedDescription)"))
         }

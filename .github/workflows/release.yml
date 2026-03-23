@@ -40,6 +40,18 @@ jobs:
       #     security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
       #     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
+      - name: Build Swift sidecar (arm64)
+        run: |
+          cd sync-sidecar
+          swift build -c release --arch arm64
+          cp .build/arm64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-aarch64-apple-darwin
+
+      - name: Build Swift sidecar (x86_64)
+        run: |
+          cd sync-sidecar
+          swift build -c release --arch x86_64
+          cp .build/x86_64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-x86_64-apple-darwin
+
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
