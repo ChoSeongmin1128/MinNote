@@ -97,35 +97,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">iCloud 동기화</span>
-            <span className="document-menu-option-description">
-              {icloudSyncEnabled
-                ? icloudSyncStatus.state === 'syncing'
-                  ? '동기화 중...'
-                  : icloudSyncStatus.lastSyncAt
-                    ? `마지막 동기화: ${new Date(icloudSyncStatus.lastSyncAt).toLocaleString('ko-KR')}`
-                    : '대기 중'
-                : 'iCloud를 통해 모든 기기에서 노트를 동기화합니다.'}
-            </span>
+            <span className="document-menu-option-description">추후 지원 예정</span>
           </div>
-          <div className="settings-segmented">
-            <button
-              className={`settings-segmented-option${!icloudSyncEnabled ? ' is-active' : ''}`}
-              type="button"
-              onClick={() => void setIcloudSyncEnabled(false)}
-            >
+          <div className="settings-segmented" style={{ opacity: 0.4, pointerEvents: 'none' }}>
+            <button className="settings-segmented-option is-active" type="button" disabled>
               꺼짐
             </button>
-            <button
-              className={`settings-segmented-option${icloudSyncEnabled ? ' is-active' : ''}`}
-              type="button"
-              onClick={() => void setIcloudSyncEnabled(true)}
-            >
+            <button className="settings-segmented-option" type="button" disabled>
               켜짐
             </button>
           </div>
-          {icloudSyncStatus.state === 'error' && icloudSyncStatus.errorMessage && (
-            <span className="settings-error-message">{icloudSyncStatus.errorMessage}</span>
-          )}
         </div>
 
         <div className="settings-section">
