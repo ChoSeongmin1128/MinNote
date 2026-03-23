@@ -26,6 +26,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build Swift sidecar (arm64)
+        run: |
+          cd sync-sidecar
+          swift build -c release --arch arm64
+          cp .build/arm64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-aarch64-apple-darwin
+
+      - name: Build Swift sidecar (x86_64)
+        run: |
+          cd sync-sidecar
+          swift build -c release --arch x86_64
+          cp .build/x86_64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-x86_64-apple-darwin
+
       # TODO: Apple Developer Program 승인 후 아래 주석 해제
       # - name: Import Apple certificate
       #   env:
