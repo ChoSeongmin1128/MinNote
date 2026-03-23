@@ -109,6 +109,10 @@ export async function flushDocumentSaves(documentId: string) {
     }
   }
 
+  if (pending.length === 0) {
+    return null;
+  }
+
   return desktopApi.flushDocument(documentId);
 }
 

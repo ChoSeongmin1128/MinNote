@@ -1306,15 +1306,6 @@ button {
   background: color-mix(in srgb, Highlight 28%, transparent);
 }
 
-.markdown-blocknote-shell .bn-block-group > .bn-block-outer:last-child:not(:first-child) .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before {
-  display: none;
-}
-
-.markdown-blocknote-shell .bn-block-group > .bn-block-outer:last-child:not(:first-child) .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child) {
-  min-height: 0;
-  line-height: 0;
-  padding: 0;
-}
 
 .plain-editor {
   position: relative;

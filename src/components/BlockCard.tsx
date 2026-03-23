@@ -346,15 +346,13 @@ export function BlockCard({
         ) : null}
 
         {block.kind === 'text' ? (
-          <MarkdownBlockEditor
+          <PlainTextBlockEditor
             ref={editorRef}
-            blockId={block.id}
-            content={block.content}
-            isSelected={isSelected}
+            mode="text"
+            value={block.content}
             focusPlacement={focusPlacement}
             focusNonce={focusNonce}
             onFocus={handleBlockFocus}
-            onSelectionVisualChange={setMarkdownSelectionState}
             onCreateBelow={() => void createBlockBelow(block.id)}
             onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
             onNavigateNext={(caret) => focusNextBlock(block.id, caret)}

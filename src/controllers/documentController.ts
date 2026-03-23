@@ -28,7 +28,9 @@ export async function flushCurrentDocument() {
   useDocumentSessionStore.getState().setIsFlushing(true);
   try {
     const updatedAt = await flushDocumentSaves(currentDocument.id);
-    updateTouchedDocument(touchDocument(currentDocument, updatedAt));
+    if (updatedAt !== null) {
+      updateTouchedDocument(touchDocument(currentDocument, updatedAt));
+    }
   } finally {
     useDocumentSessionStore.getState().setIsFlushing(false);
   }

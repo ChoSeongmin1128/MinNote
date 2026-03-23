@@ -104,11 +104,9 @@ export function DocumentMenu() {
                         {preset.label}
                         {isGlobalDefault ? <span className="preset-badge">기본값</span> : null}
                       </span>
-                      <span className="document-menu-option-description">
-                        {isFollowingDefault && isGlobalDefault
-                          ? '현재 전역 기본값을 추종 중'
-                          : preset.description}
-                      </span>
+                      {isFollowingDefault && isGlobalDefault ? (
+                        <span className="document-menu-option-description">현재 전역 기본값을 추종 중</span>
+                      ) : null}
                     </span>
                     {isActive ? <Check size={14} /> : null}
                   </button>

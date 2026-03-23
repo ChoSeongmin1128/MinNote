@@ -84,10 +84,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 onClick={() => void setDefaultBlockTintPreset(preset.id)}
               >
                 <BlockTintPreview preset={preset.id} />
-                <span className="document-menu-option-copy">
-                  <span className="document-menu-option-title">{preset.label}</span>
-                  <span className="document-menu-option-description">{preset.description}</span>
-                </span>
+                <span className="document-menu-option-title">{preset.label}</span>
                 {defaultBlockTintPreset === preset.id ? <Check size={14} /> : null}
               </button>
             ))}
