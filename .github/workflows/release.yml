@@ -42,6 +42,7 @@ jobs:
 
       - name: Build Swift sidecar (arm64)
         run: |
+          mkdir -p src-tauri/binaries
           cd sync-sidecar
           swift build -c release --arch arm64
           cp .build/arm64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-aarch64-apple-darwin
