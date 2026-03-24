@@ -12,6 +12,20 @@ export type UpdateStatus =
 
 type StatusCallback = (status: UpdateStatus) => void;
 
+function normalizeUpdateError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (
+    message.includes('latest.json')
+    || message.includes('404')
+    || message.includes('Not Found')
+  ) {
+    return '업데이트 메타데이터를 찾지 못했습니다. 릴리스에 latest.json이 업로드되어 있는지 확인해 주세요.';
+  }
+
+  return message || '업데이트 확인 중 오류가 발생했습니다.';
+}
+
 export async function checkForUpdate(onStatus: StatusCallback) {
   onStatus({ state: 'checking' });
 
@@ -54,7 +68,7 @@ export async function checkForUpdate(onStatus: StatusCallback) {
   } catch (error) {
     onStatus({
       state: 'error',
-      message: error instanceof Error ? error.message : '업데이트 확인 중 오류가 발생했습니다.',
+      message: normalizeUpdateError(error),
     });
   }
 }
