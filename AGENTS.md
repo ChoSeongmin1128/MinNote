@@ -13,6 +13,14 @@
 - 이 저장소는 `pnpm`을 사용합니다. 패키지 매니저와 명령 예시는 `pnpm` 기준으로 다룹니다.
 - 이 저장소는 `macOS 단독` 개발 전제를 가집니다.
 
+## Versioning
+- 버전 작업을 할 때는 아래 파일을 항상 함께 확인하고 같은 버전으로 맞춥니다.
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`의 `name = "minnote"` 패키지 항목
+- 버전 변경 작업을 사용자에게 보고하거나 문서화할 때는 위 체크리스트를 빠뜨리지 않고 명시합니다.
+
 ## Routing
 - 커밋 메시지, 브랜치 이름, PR 제목/본문, 변경 요약 형식이 필요할 때는 `git-workflow` skill을 먼저 참고합니다.
 - 로컬 개발 환경, 실행/빌드 전제, 패키지 매니저 정책이 필요할 때는 `desktop-env` skill을 먼저 참고합니다.
