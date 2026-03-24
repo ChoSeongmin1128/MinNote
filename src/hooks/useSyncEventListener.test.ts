@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, renderHook } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({
-  subscribe: vi.fn<[], Promise<() => void>>(),
+  subscribe: vi.fn(),
   handleSyncEventMessage: vi.fn(),
 }));
 

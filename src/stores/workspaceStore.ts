@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { BlockKind, BlockTintPreset, ICloudSyncStatus, ThemeMode } from '../lib/types';
 import type { DocumentSummaryVm, SearchResultVm } from '../application/models/document';
 import type { CodeLanguageId } from '../lib/codeLanguageRegistry';
@@ -17,7 +18,8 @@ interface WorkspaceState {
   icloudSyncStatus: ICloudSyncStatus;
   menuBarIconEnabled: boolean;
   isSettingsOpen: boolean;
-  isSidebarOpen: boolean;
+  desktopSidebarExpanded: boolean;
+  mobileSidebarOpen: boolean;
   lastCodeLanguage: CodeLanguageId;
   setDocuments: (documents: DocumentSummaryVm[]) => void;
   setTrashDocuments: (documents: DocumentSummaryVm[]) => void;
@@ -34,7 +36,8 @@ interface WorkspaceState {
   setIcloudSyncStatus: (status: ICloudSyncStatus) => void;
   setMenuBarIconEnabled: (value: boolean) => void;
   setSettingsOpen: (isOpen: boolean) => void;
-  setSidebarOpen: (isOpen: boolean) => void;
+  setDesktopSidebarExpanded: (isExpanded: boolean) => void;
+  setMobileSidebarOpen: (isOpen: boolean) => void;
   setLastCodeLanguage: (language: CodeLanguageId) => void;
 }
 
@@ -42,7 +45,8 @@ function sortDocuments(documents: DocumentSummaryVm[]) {
   return [...documents].sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
+export const useWorkspaceStore = create<WorkspaceState>()(
+  persist((set) => ({
   documents: [],
   trashDocuments: [],
   searchResults: [],
@@ -56,7 +60,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   icloudSyncStatus: { state: 'disabled', lastSyncAt: null, errorMessage: null },
   menuBarIconEnabled: false,
   isSettingsOpen: false,
-  isSidebarOpen: false,
+  desktopSidebarExpanded: true,
+  mobileSidebarOpen: false,
   lastCodeLanguage: 'javascript' as CodeLanguageId,
   setDocuments: (documents) => set({ documents: sortDocuments(documents) }),
   setTrashDocuments: (trashDocuments) => set({ trashDocuments }),
@@ -83,6 +88,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setIcloudSyncStatus: (icloudSyncStatus) => set({ icloudSyncStatus }),
   setMenuBarIconEnabled: (menuBarIconEnabled) => set({ menuBarIconEnabled }),
   setSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
-  setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
+  setDesktopSidebarExpanded: (desktopSidebarExpanded) => set({ desktopSidebarExpanded }),
+  setMobileSidebarOpen: (mobileSidebarOpen) => set({ mobileSidebarOpen }),
   setLastCodeLanguage: (lastCodeLanguage) => set({ lastCodeLanguage }),
-}));
+}), {
+    name: 'workspace-ui',
+    storage: createJSONStorage(() => localStorage),
+    partialize: (state) => ({
+      desktopSidebarExpanded: state.desktopSidebarExpanded,
+    }),
+  }),
+);

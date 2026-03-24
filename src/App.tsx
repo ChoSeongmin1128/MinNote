@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { AlertCircle, LoaderCircle, PanelLeft, Plus } from 'lucide-react';
-import { bootstrapApp, createDocument } from './app/actions';
+import { AlertCircle, LoaderCircle, PanelLeft } from 'lucide-react';
+import { bootstrapApp } from './app/actions';
+import { DocumentMenu } from './components/DocumentMenu';
 import { Sidebar } from './components/Sidebar';
 import { DocumentCanvas } from './components/DocumentCanvas';
 import { SettingsModal } from './components/SettingsModal';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
+import { useIsMobileViewport } from './hooks/useIsMobileViewport';
 import { useSyncEventListener } from './hooks/useSyncEventListener';
 import { useWorkspaceStore } from './stores/workspaceStore';
 import { useDocumentSessionStore } from './stores/documentSessionStore';
@@ -35,8 +37,11 @@ function App() {
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const isSettingsOpen = useWorkspaceStore((state) => state.isSettingsOpen);
   const setSettingsOpen = useWorkspaceStore((state) => state.setSettingsOpen);
-  const isSidebarOpen = useWorkspaceStore((state) => state.isSidebarOpen);
-  const setSidebarOpen = useWorkspaceStore((state) => state.setSidebarOpen);
+  const desktopSidebarExpanded = useWorkspaceStore((state) => state.desktopSidebarExpanded);
+  const mobileSidebarOpen = useWorkspaceStore((state) => state.mobileSidebarOpen);
+  const setDesktopSidebarExpanded = useWorkspaceStore((state) => state.setDesktopSidebarExpanded);
+  const setMobileSidebarOpen = useWorkspaceStore((state) => state.setMobileSidebarOpen);
+  const isMobileViewport = useIsMobileViewport();
 
   useAppShortcuts();
   useSyncEventListener();
@@ -61,13 +66,23 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        isMobileViewport={isMobileViewport}
+        desktopSidebarExpanded={desktopSidebarExpanded}
+        mobileSidebarOpen={mobileSidebarOpen}
+        onExpandDesktop={() => setDesktopSidebarExpanded(true)}
+        onCollapseDesktop={() => setDesktopSidebarExpanded(false)}
+        onOpenMobile={() => setMobileSidebarOpen(true)}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+      />
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />
       <main className="workspace">
         <header className="workspace-header">
-          <button className="icon-button" type="button" onClick={() => setSidebarOpen(!isSidebarOpen)} aria-label="사이드바 토글">
-            <PanelLeft size={16} />
-          </button>
+          {isMobileViewport ? (
+            <button className="icon-button" type="button" onClick={() => setMobileSidebarOpen(true)} aria-label="사이드바 열기">
+              <PanelLeft size={16} />
+            </button>
+          ) : null}
           <div className="workspace-heading">
             {currentDocument ? (
               <span className="workspace-status">
@@ -75,10 +90,7 @@ function App() {
               </span>
             ) : null}
           </div>
-          <button className="ghost-button" type="button" onClick={() => void createDocument()}>
-            <Plus size={16} />
-            새 문서
-          </button>
+          {currentDocument ? <DocumentMenu /> : null}
         </header>
 
         {isBootstrapping ? (

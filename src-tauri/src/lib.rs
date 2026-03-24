@@ -14,6 +14,9 @@ use state::AppState;
 use tauri::{Emitter, Manager};
 use tauri::menu::{MenuBuilder, PredefinedMenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder, TrayIconEvent};
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+
+pub(crate) const TRAY_ID: &str = "minnote-tray";
 
 #[cfg(target_os = "macos")]
 pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
@@ -53,7 +56,7 @@ pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon>
     .text("quit", "종료")
     .build()?;
 
-  TrayIconBuilder::with_id("minnote-tray")
+  TrayIconBuilder::with_id(TRAY_ID)
     .icon(icon)
     .tooltip("MinNote")
     .menu(&menu)
@@ -101,6 +104,7 @@ pub fn run() {
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_shell::init())
+    .plugin(tauri_plugin_window_state::Builder::default().build())
     .setup(|app| {
       let app_dir = app.path().app_data_dir().expect("failed to resolve app data directory");
       fs::create_dir_all(&app_dir).expect("failed to create app data directory");
@@ -137,14 +141,8 @@ pub fn run() {
         }
       }
 
-      if menu_bar_icon_enabled {
-        if let Some(managed_state) = app.try_state::<AppState>() {
-          if let Ok(tray) = build_tray_icon(app.handle()) {
-            if let Ok(mut tray_guard) = managed_state.tray_icon.lock() {
-              *tray_guard = Some(tray);
-            }
-          }
-        }
+      if menu_bar_icon_enabled && app.tray_by_id(TRAY_ID).is_none() {
+        let _ = build_tray_icon(app.handle());
       }
 
       #[cfg(target_os = "macos")]
@@ -162,14 +160,11 @@ pub fn run() {
     })
     .on_window_event(|window, event| {
       if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-        if let Some(state) = window.app_handle().try_state::<AppState>() {
-          let tray_enabled = state.tray_icon.lock()
-            .map(|guard| guard.is_some())
-            .unwrap_or(false);
-          if tray_enabled {
-            api.prevent_close();
-            let _ = window.hide();
-          }
+        let tray_enabled = window.app_handle().tray_by_id(TRAY_ID).is_some();
+        if tray_enabled {
+          let _ = window.app_handle().save_window_state(StateFlags::all());
+          api.prevent_close();
+          let _ = window.hide();
         }
       }
     })

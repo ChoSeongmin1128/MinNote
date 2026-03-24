@@ -1,10 +1,21 @@
-import { Check, MoreHorizontal, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { deleteDocument, setDocumentBlockTintOverride } from '../app/actions';
 import { BlockTintPreview } from './BlockTintPreview';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
+import { SegmentedSelector } from './SegmentedSelector';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
+
+const DOCUMENT_TINT_MODE_OPTIONS = [
+  { value: 'default', label: '기본값 사용' },
+  { value: 'custom', label: '문서별 설정' },
+] as const;
+
+const DOCUMENT_TINT_OPTIONS = BLOCK_TINT_PRESETS.map((preset) => ({
+  value: preset.id,
+  label: preset.label,
+}));
 
 export function DocumentMenu() {
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
@@ -61,58 +72,34 @@ export function DocumentMenu() {
           <div className="document-menu-section">
             <div className="document-menu-section-header">
               <span className="document-menu-label">문서 색상쌍</span>
-              <button
-                className={`document-menu-toggle${isFollowingDefault ? ' is-active' : ''}`}
-                type="button"
-                aria-pressed={isFollowingDefault}
-                onClick={() => {
-                  if (isFollowingDefault) {
-                    void setDocumentBlockTintOverride(defaultBlockTintPreset);
-                    return;
-                  }
-
-                  void setDocumentBlockTintOverride(null);
-                }}
-              >
-                기본값 사용
-              </button>
             </div>
-            <span className="document-menu-status">
-              {isFollowingDefault
-                ? `현재 전역 기본값 ${BLOCK_TINT_PRESETS.find((preset) => preset.id === defaultBlockTintPreset)?.label ?? ''}을 추종 중`
-                : '문서 전용 색상쌍을 사용 중'}
-            </span>
-            <div className="document-menu-options">
-              {BLOCK_TINT_PRESETS.map((preset) => {
-                const isGlobalDefault = defaultBlockTintPreset === preset.id;
-                const isActive = selectedPreset === preset.id;
+            <SegmentedSelector
+              ariaLabel="문서 색상쌍 모드 선택"
+              value={isFollowingDefault ? 'default' : 'custom'}
+              options={DOCUMENT_TINT_MODE_OPTIONS}
+              onChange={(nextValue) => {
+                if (nextValue === 'default') {
+                  return setDocumentBlockTintOverride(null);
+                }
 
-                return (
-                  <button
-                    key={preset.id}
-                    className={`document-menu-option${isActive ? ' is-active' : ''}`}
-                    type="button"
-                    disabled={isFollowingDefault}
-                    onClick={() => {
-                      void setDocumentBlockTintOverride(preset.id);
-                      setIsOpen(false);
-                    }}
-                  >
-                    <BlockTintPreview preset={preset.id} />
-                    <span className="document-menu-option-copy">
-                      <span className="document-menu-option-title">
-                        {preset.label}
-                        {isGlobalDefault ? <span className="preset-badge">기본값</span> : null}
-                      </span>
-                      {isFollowingDefault && isGlobalDefault ? (
-                        <span className="document-menu-option-description">현재 전역 기본값을 추종 중</span>
-                      ) : null}
-                    </span>
-                    {isActive ? <Check size={14} /> : null}
-                  </button>
-                );
-              })}
-            </div>
+                return setDocumentBlockTintOverride(defaultBlockTintPreset);
+              }}
+            />
+            <SegmentedSelector
+              ariaLabel="문서 색상쌍 선택"
+              value={selectedPreset}
+              layout="palette"
+              columns={2}
+              disabled={isFollowingDefault}
+              options={DOCUMENT_TINT_OPTIONS}
+              onChange={(nextValue) => setDocumentBlockTintOverride(nextValue)}
+              renderOption={(option) => (
+                <span className="tint-selector-card">
+                  <BlockTintPreview className="tint-selector-preview" preset={option.value} />
+                  <span className="tint-selector-label">{option.label}</span>
+                </span>
+              )}
+            />
           </div>
 
           <div className="document-menu-divider" />

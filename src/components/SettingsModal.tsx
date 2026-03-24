@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, MoonStar, MonitorCog, RefreshCw, SunMedium, X } from 'lucide-react';
+import { AlertTriangle, MoonStar, MonitorCog, RefreshCw, SunMedium, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
   deleteAllDocuments,
@@ -9,6 +9,7 @@ import {
 } from '../app/actions';
 import { BlockTintPreview } from './BlockTintPreview';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
+import { SegmentedSelector } from './SegmentedSelector';
 import type { BlockKind, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { checkForUpdate, type UpdateStatus } from '../lib/appUpdater';
@@ -24,6 +25,21 @@ const BLOCK_KIND_OPTIONS: Array<{ id: BlockKind; label: string }> = [
   { id: 'text', label: '텍스트' },
   { id: 'code', label: '코드' },
 ];
+
+const MENU_BAR_OPTIONS = [
+  { value: 'off', label: '꺼짐' },
+  { value: 'on', label: '켜짐' },
+] as const;
+
+const ICLOUD_OPTIONS = [
+  { value: 'off', label: '꺼짐' },
+  { value: 'on', label: '켜짐' },
+] as const;
+
+const BLOCK_TINT_OPTIONS = BLOCK_TINT_PRESETS.map((preset) => ({
+  value: preset.id,
+  label: preset.label,
+}));
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -58,82 +74,63 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <div className="settings-section-header">
             <span className="settings-section-title">테마</span>
           </div>
-          <div className="settings-segmented">
-            {THEME_OPTIONS.map((option) => {
-              const Icon = option.icon;
-              return (
-                <button
-                  key={option.id}
-                  className={`settings-segmented-option${themeMode === option.id ? ' is-active' : ''}`}
-                  type="button"
-                  onClick={() => void setThemeMode(option.id)}
-                >
-                  <Icon size={14} />
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
+          <SegmentedSelector
+            ariaLabel="테마 선택"
+            value={themeMode}
+            options={THEME_OPTIONS.map((option) => ({
+              value: option.id,
+              label: option.label,
+              icon: option.icon,
+            }))}
+            onChange={(nextValue) => setThemeMode(nextValue)}
+          />
         </div>
 
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">기본 블록 종류</span>
           </div>
-          <div className="settings-segmented">
-            {BLOCK_KIND_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                className={`settings-segmented-option${defaultBlockKind === option.id ? ' is-active' : ''}`}
-                type="button"
-                onClick={() => void setDefaultBlockKind(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedSelector
+            ariaLabel="기본 블록 종류 선택"
+            value={defaultBlockKind}
+            options={BLOCK_KIND_OPTIONS.map((option) => ({
+              value: option.id,
+              label: option.label,
+            }))}
+            onChange={(nextValue) => setDefaultBlockKind(nextValue)}
+          />
         </div>
 
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">기본 블록 색상쌍</span>
           </div>
-          <div className="document-menu-options">
-            {BLOCK_TINT_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                className={`document-menu-option${defaultBlockTintPreset === preset.id ? ' is-active' : ''}`}
-                type="button"
-                onClick={() => void setDefaultBlockTintPreset(preset.id)}
-              >
-                <BlockTintPreview preset={preset.id} />
-                <span className="document-menu-option-title">{preset.label}</span>
-                {defaultBlockTintPreset === preset.id ? <Check size={14} /> : null}
-              </button>
-            ))}
-          </div>
+          <SegmentedSelector
+            ariaLabel="기본 블록 색상쌍 선택"
+            value={defaultBlockTintPreset}
+            layout="palette"
+            columns={3}
+            options={BLOCK_TINT_OPTIONS}
+            onChange={(nextValue) => setDefaultBlockTintPreset(nextValue)}
+            renderOption={(option) => (
+              <span className="tint-selector-card">
+                <BlockTintPreview className="tint-selector-preview" preset={option.value} />
+                <span className="tint-selector-label">{option.label}</span>
+              </span>
+            )}
+          />
         </div>
 
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">메뉴바 아이콘</span>
           </div>
-          <div className="settings-segmented">
-            <button
-              className={`settings-segmented-option${!menuBarIconEnabled ? ' is-active' : ''}`}
-              type="button"
-              onClick={() => void setMenuBarIconEnabled(false)}
-            >
-              꺼짐
-            </button>
-            <button
-              className={`settings-segmented-option${menuBarIconEnabled ? ' is-active' : ''}`}
-              type="button"
-              onClick={() => void setMenuBarIconEnabled(true)}
-            >
-              켜짐
-            </button>
-          </div>
+          <SegmentedSelector
+            ariaLabel="메뉴바 아이콘 선택"
+            value={menuBarIconEnabled ? 'on' : 'off'}
+            options={MENU_BAR_OPTIONS}
+            onChange={(nextValue) => setMenuBarIconEnabled(nextValue === 'on')}
+          />
         </div>
 
         <div className="settings-section">
@@ -141,14 +138,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <span className="settings-section-title">iCloud 동기화</span>
             <span className="document-menu-option-description">추후 지원 예정</span>
           </div>
-          <div className="settings-segmented" style={{ opacity: 0.4, pointerEvents: 'none' }}>
-            <button className="settings-segmented-option is-active" type="button" disabled>
-              꺼짐
-            </button>
-            <button className="settings-segmented-option" type="button" disabled>
-              켜짐
-            </button>
-          </div>
+          <SegmentedSelector
+            ariaLabel="iCloud 동기화 선택"
+            value="off"
+            options={ICLOUD_OPTIONS}
+            disabled
+            onChange={() => {}}
+          />
         </div>
 
         <div className="settings-section">

@@ -8,6 +8,7 @@
   "permissions": [
     "core:default",
     "shell:allow-execute",
-    "shell:allow-stdin-write"
+    "shell:allow-stdin-write",
+    "window-state:default"
   ]
 }

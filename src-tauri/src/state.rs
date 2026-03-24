@@ -8,7 +8,6 @@ use crate::sync::SyncManager;
 pub struct AppState {
   pub repository: Mutex<SqliteStore>,
   pub sync_manager: Mutex<SyncManager>,
-  pub tray_icon: Mutex<Option<tauri::tray::TrayIcon>>,
   pub db_path: PathBuf,
   pub sync_state_path: PathBuf,
 }
@@ -24,7 +23,6 @@ impl AppState {
     Ok(Self {
       repository: Mutex::new(repository),
       sync_manager: Mutex::new(SyncManager::new()),
-      tray_icon: Mutex::new(None),
       db_path: db_path.to_path_buf(),
       sync_state_path,
     })

@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { commitDocumentTitle, moveBlock } from '../app/actions';
 import { BlockCard } from './BlockCard';
 import { BlockGhostPreview } from './BlockGhostPreview';
-import { DocumentMenu } from './DocumentMenu';
 import { getEditableDocumentTitle } from '../lib/documentTitle';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
@@ -237,7 +236,6 @@ export function DocumentCanvas() {
       >
         <div className="document-head">
           <DocumentTitleInput key={`${currentDocument.id}:${currentDocument.title ?? ''}`} title={currentDocument.title} />
-          <DocumentMenu />
         </div>
 
         <div ref={blocksSelectionRef}>
