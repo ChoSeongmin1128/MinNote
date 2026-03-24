@@ -94,6 +94,18 @@ export function createWorkspaceUseCases({
     }
   }
 
+  async function setDefaultDocumentSurfaceTonePreset(
+    preset: Parameters<BackendPort['setDefaultDocumentSurfaceTonePreset']>[0],
+  ) {
+    try {
+      const nextPreset = await backend.setDefaultDocumentSurfaceTonePreset(preset);
+      workspace.clearError();
+      workspace.setDefaultDocumentSurfaceTonePreset(nextPreset);
+    } catch (error) {
+      workspace.setError(normalizeErrorMessage(error, '기본 문서 배경 톤을 변경하지 못했습니다.'));
+    }
+  }
+
   async function setIcloudSyncEnabled(enabled: boolean) {
     try {
       const result = await backend.setIcloudSyncEnabled(enabled);
@@ -179,6 +191,7 @@ export function createWorkspaceUseCases({
     setSearchQuery,
     setThemeMode,
     setDefaultBlockTintPreset,
+    setDefaultDocumentSurfaceTonePreset,
     setIcloudSyncEnabled,
     setDefaultBlockKind,
     setMenuBarIconEnabled,

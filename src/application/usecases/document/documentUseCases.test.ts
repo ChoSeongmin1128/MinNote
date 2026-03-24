@@ -10,6 +10,7 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     currentDocument: null,
     themeMode: 'light',
     defaultBlockTintPreset: 'mist',
+    defaultDocumentSurfaceTonePreset: 'default',
     defaultBlockKind,
     icloudSyncEnabled: false,
     menuBarIconEnabled: false,
@@ -50,6 +51,7 @@ function createWorkspaceGateway() {
     clearError: vi.fn(),
     setError: vi.fn(),
     setDefaultBlockTintPreset: vi.fn(),
+    setDefaultDocumentSurfaceTonePreset: vi.fn(),
     setDefaultBlockKind: vi.fn(),
     setThemeMode: vi.fn(),
     setIcloudSyncEnabled: vi.fn(),
@@ -80,6 +82,7 @@ describe('document usecases', () => {
 
     expect(documentSync.clearDocumentSync).toHaveBeenCalledWith('doc-1');
     expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('code');
+    expect(workspace.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
   });
 
   it('keeps current document while still syncing default block kind during restore', async () => {
@@ -87,6 +90,7 @@ describe('document usecases', () => {
       id: 'current-doc',
       title: null,
       blockTintOverride: null,
+      documentSurfaceToneOverride: null,
       preview: '',
       updatedAt: 1,
       lastOpenedAt: 1,
@@ -109,6 +113,7 @@ describe('document usecases', () => {
     await useCases.restoreDocumentFromTrash('trash-doc');
 
     expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('text');
+    expect(workspace.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
     expect(session.setCurrentDocument).not.toHaveBeenCalled();
   });
 });

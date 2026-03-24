@@ -10,6 +10,7 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     currentDocument: null,
     themeMode: 'dark',
     defaultBlockTintPreset: 'ocean-sand',
+    defaultDocumentSurfaceTonePreset: 'default',
     defaultBlockKind,
     icloudSyncEnabled: true,
     menuBarIconEnabled: true,
@@ -50,6 +51,7 @@ function createWorkspaceGateway() {
     clearError: vi.fn(),
     setError: vi.fn(),
     setDefaultBlockTintPreset: vi.fn(),
+    setDefaultDocumentSurfaceTonePreset: vi.fn(),
     setDefaultBlockKind: vi.fn(),
     setThemeMode: vi.fn(),
     setIcloudSyncEnabled: vi.fn(),
@@ -87,6 +89,7 @@ describe('workspace usecases', () => {
     await useCases.bootstrapApp();
 
     expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('code');
+    expect(workspace.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
     expect(workspace.setSearchResults).toHaveBeenCalledWith([]);
     expect(workspace.setSearchQuery).toHaveBeenCalledWith('');
   });
@@ -118,6 +121,7 @@ describe('workspace usecases', () => {
     await useCases.deleteAllDocuments();
 
     expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('text');
+    expect(workspace.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
     expect(workspace.setSettingsOpen).toHaveBeenCalledWith(false);
     expect(syncMutation.enqueue).toHaveBeenCalledWith({ kind: 'documents-reset' });
   });
@@ -125,11 +129,30 @@ describe('workspace usecases', () => {
 
 describe('handleSyncEventMessage (remote-changed)', () => {
   function createDocument(id: string): DocumentVm {
-    return { id, title: null, blockTintOverride: null, preview: '', updatedAt: 0, lastOpenedAt: 0, blockCount: 0, blocks: [] };
+    return {
+      id,
+      title: null,
+      blockTintOverride: null,
+      documentSurfaceToneOverride: null,
+      preview: '',
+      updatedAt: 0,
+      lastOpenedAt: 0,
+      blockCount: 0,
+      blocks: [],
+    };
   }
 
   function createSummary(id: string): DocumentSummaryVm {
-    return { id, title: null, blockTintOverride: null, preview: '', updatedAt: 0, lastOpenedAt: 0, blockCount: 0 };
+    return {
+      id,
+      title: null,
+      blockTintOverride: null,
+      documentSurfaceToneOverride: null,
+      preview: '',
+      updatedAt: 0,
+      lastOpenedAt: 0,
+      blockCount: 0,
+    };
   }
 
   function createUseCasesWithRemote(currentDocument: DocumentVm | null, payload: WorkspaceBootstrapState) {

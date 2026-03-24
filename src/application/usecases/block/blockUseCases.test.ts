@@ -7,6 +7,7 @@ function createCurrentDocument(): DocumentVm {
     id: 'doc-1',
     title: null,
     blockTintOverride: null,
+    documentSurfaceToneOverride: null,
     preview: '',
     updatedAt: 100,
     lastOpenedAt: 100,

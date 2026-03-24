@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { BlockKind, BlockTintPreset, ICloudSyncStatus, ThemeMode } from '../lib/types';
+import type {
+  BlockKind,
+  BlockTintPreset,
+  DocumentSurfaceTonePreset,
+  ICloudSyncStatus,
+  ThemeMode,
+} from '../lib/types';
 import type { DocumentSummaryVm, SearchResultVm } from '../application/models/document';
 import type { CodeLanguageId } from '../lib/codeLanguageRegistry';
 
@@ -12,6 +18,7 @@ interface WorkspaceState {
   isBootstrapping: boolean;
   error: string | null;
   defaultBlockTintPreset: BlockTintPreset;
+  defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
   themeMode: ThemeMode;
   icloudSyncEnabled: boolean;
@@ -30,6 +37,7 @@ interface WorkspaceState {
   setIsBootstrapping: (value: boolean) => void;
   setError: (value: string | null) => void;
   setDefaultBlockTintPreset: (preset: BlockTintPreset) => void;
+  setDefaultDocumentSurfaceTonePreset: (preset: DocumentSurfaceTonePreset) => void;
   setDefaultBlockKind: (kind: BlockKind) => void;
   setThemeMode: (themeMode: ThemeMode) => void;
   setIcloudSyncEnabled: (value: boolean) => void;
@@ -54,6 +62,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   isBootstrapping: true,
   error: null,
   defaultBlockTintPreset: 'mist',
+  defaultDocumentSurfaceTonePreset: 'default',
   defaultBlockKind: 'markdown' as BlockKind,
   themeMode: 'system',
   icloudSyncEnabled: false,
@@ -82,6 +91,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   setIsBootstrapping: (isBootstrapping) => set({ isBootstrapping }),
   setError: (error) => set({ error }),
   setDefaultBlockTintPreset: (defaultBlockTintPreset) => set({ defaultBlockTintPreset }),
+  setDefaultDocumentSurfaceTonePreset: (defaultDocumentSurfaceTonePreset) => set({ defaultDocumentSurfaceTonePreset }),
   setDefaultBlockKind: (defaultBlockKind) => set({ defaultBlockKind }),
   setThemeMode: (themeMode) => set({ themeMode }),
   setIcloudSyncEnabled: (icloudSyncEnabled) => set({ icloudSyncEnabled }),

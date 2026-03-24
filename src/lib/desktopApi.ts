@@ -5,6 +5,7 @@ import type {
   BlockRestoreDto,
   BlockTintPreset,
   BootstrapPayload,
+  DocumentSurfaceTonePreset,
   DocumentDto,
   DocumentSummaryDto,
   RemoteDocumentDto,
@@ -103,8 +104,20 @@ export const desktopApi = {
   setDefaultBlockTintPreset(preset: BlockTintPreset) {
     return call<BlockTintPreset>('set_default_block_tint_preset', { preset });
   },
+  setDefaultDocumentSurfaceTonePreset(preset: DocumentSurfaceTonePreset) {
+    return call<DocumentSurfaceTonePreset>('set_default_document_surface_tone_preset', { preset });
+  },
   setDocumentBlockTintOverride(documentId: string, blockTintOverride: BlockTintPreset | null) {
     return call<DocumentDto>('set_document_block_tint_override', { documentId, blockTintOverride });
+  },
+  setDocumentSurfaceToneOverride(
+    documentId: string,
+    documentSurfaceToneOverride: DocumentSurfaceTonePreset | null,
+  ) {
+    return call<DocumentDto>('set_document_surface_tone_override', {
+      documentId,
+      documentSurfaceToneOverride,
+    });
   },
   restoreDocumentBlocks(documentId: string, blocks: BlockRestoreDto[]) {
     return call<DocumentDto>('restore_document_blocks', { documentId, blocks });

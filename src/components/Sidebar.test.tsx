@@ -37,6 +37,7 @@ describe('Sidebar', () => {
           id: 'doc-1',
           title: '첫 문서',
           blockTintOverride: null,
+          documentSurfaceToneOverride: null,
           preview: '미리보기',
           updatedAt: Date.now(),
           lastOpenedAt: Date.now(),

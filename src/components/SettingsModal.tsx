@@ -4,11 +4,14 @@ import {
   deleteAllDocuments,
   setDefaultBlockKind,
   setDefaultBlockTintPreset,
+  setDefaultDocumentSurfaceTonePreset,
   setMenuBarIconEnabled,
   setThemeMode,
 } from '../app/actions';
 import { BlockTintPreview } from './BlockTintPreview';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
+import { DOCUMENT_SURFACE_TONE_PRESETS } from '../lib/documentSurfaceTone';
+import { DocumentSurfacePreview } from './DocumentSurfacePreview';
 import { SegmentedSelector } from './SegmentedSelector';
 import type { BlockKind, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
@@ -41,6 +44,11 @@ const BLOCK_TINT_OPTIONS = BLOCK_TINT_PRESETS.map((preset) => ({
   label: preset.label,
 }));
 
+const DOCUMENT_SURFACE_TONE_OPTIONS = DOCUMENT_SURFACE_TONE_PRESETS.map((preset) => ({
+  value: preset.id,
+  label: preset.label,
+}));
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -49,6 +57,7 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
+  const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
   const defaultBlockKind = useWorkspaceStore((state) => state.defaultBlockKind);
   const menuBarIconEnabled = useWorkspaceStore((state) => state.menuBarIconEnabled);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
@@ -115,6 +124,26 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             renderOption={(option) => (
               <span className="tint-selector-card">
                 <BlockTintPreview className="tint-selector-preview" preset={option.value} />
+                <span className="tint-selector-label">{option.label}</span>
+              </span>
+            )}
+          />
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <span className="settings-section-title">기본 문서 배경 톤</span>
+          </div>
+          <SegmentedSelector
+            ariaLabel="기본 문서 배경 톤 선택"
+            value={defaultDocumentSurfaceTonePreset}
+            layout="palette"
+            columns={3}
+            options={DOCUMENT_SURFACE_TONE_OPTIONS}
+            onChange={(nextValue) => setDefaultDocumentSurfaceTonePreset(nextValue)}
+            renderOption={(option) => (
+              <span className="tint-selector-card">
+                <DocumentSurfacePreview className="surface-selector-preview" preset={option.value} />
                 <span className="tint-selector-label">{option.label}</span>
               </span>
             )}

@@ -29,6 +29,9 @@ export const workspaceGateway: WorkspaceGateway = {
   setDefaultBlockTintPreset(preset) {
     useWorkspaceStore.getState().setDefaultBlockTintPreset(preset);
   },
+  setDefaultDocumentSurfaceTonePreset(preset) {
+    useWorkspaceStore.getState().setDefaultDocumentSurfaceTonePreset(preset);
+  },
   setDefaultBlockKind(kind) {
     useWorkspaceStore.getState().setDefaultBlockKind(kind);
   },

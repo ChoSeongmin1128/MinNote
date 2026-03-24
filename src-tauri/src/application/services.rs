@@ -1,7 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, RemoteBlockJson, RemoteDocumentDto, SearchResultDto};
-use crate::domain::models::{BlockKind, BlockTintPreset, ThemeMode};
+use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, ThemeMode};
 use crate::error::AppError;
 use crate::ports::models::RestoreBlockInput;
 use crate::ports::repositories::AppRepository;
@@ -43,6 +43,7 @@ pub fn bootstrap_app(repository: &mut impl AppRepository) -> Result<BootstrapPay
     current_document,
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
+    default_document_surface_tone_preset: settings.default_document_surface_tone_preset,
     default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
     menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
@@ -111,6 +112,7 @@ pub fn delete_document(
     current_document,
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
+    default_document_surface_tone_preset: settings.default_document_surface_tone_preset,
     default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
     menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
@@ -145,6 +147,7 @@ pub fn restore_document_from_trash(
     current_document,
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
+    default_document_surface_tone_preset: settings.default_document_surface_tone_preset,
     default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
     menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
@@ -171,6 +174,7 @@ pub fn delete_all_documents(repository: &mut impl AppRepository) -> Result<Boots
     current_document: Some(current_document),
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
+    default_document_surface_tone_preset: settings.default_document_surface_tone_preset,
     default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
     menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
@@ -196,6 +200,14 @@ pub fn set_default_block_tint_preset(
   preset: BlockTintPreset,
 ) -> Result<BlockTintPreset, AppError> {
   repository.set_default_block_tint_preset(preset.clone())?;
+  Ok(preset)
+}
+
+pub fn set_default_document_surface_tone_preset(
+  repository: &mut impl AppRepository,
+  preset: DocumentSurfaceTonePreset,
+) -> Result<DocumentSurfaceTonePreset, AppError> {
+  repository.set_default_document_surface_tone_preset(preset.clone())?;
   Ok(preset)
 }
 
@@ -310,6 +322,18 @@ pub fn set_menu_bar_icon_enabled(
   Ok(enabled)
 }
 
+pub fn set_document_surface_tone_override(
+  repository: &mut impl AppRepository,
+  document_id: &str,
+  document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
+) -> Result<DocumentDto, AppError> {
+  let document = repository.set_document_surface_tone_override(
+    document_id,
+    document_surface_tone_override,
+  )?;
+  hydrate_document(repository, document_id, Some(document))
+}
+
 pub fn set_default_block_kind(
   repository: &mut impl AppRepository,
   kind: BlockKind,
@@ -327,11 +351,16 @@ pub fn apply_remote_documents(
       .block_tint_override
       .as_deref()
       .map(crate::domain::models::BlockTintPreset::from_str);
+    let document_surface_tone = remote
+      .document_surface_tone_override
+      .as_deref()
+      .map(crate::domain::models::DocumentSurfaceTonePreset::from_str);
 
     let document = repository.upsert_document_from_remote(
       &remote.id,
       remote.title,
       block_tint,
+      document_surface_tone,
       remote.created_at,
       remote.updated_at,
       remote.deleted_at,
@@ -393,7 +422,15 @@ fn hydrate_document(
 mod tests {
   use super::*;
 
-  use crate::domain::models::{AppSettings, Block, BlockTintPreset, Document, DocumentSummary, ThemeMode};
+  use crate::domain::models::{
+    AppSettings,
+    Block,
+    BlockTintPreset,
+    Document,
+    DocumentSummary,
+    DocumentSurfaceTonePreset,
+    ThemeMode,
+  };
   use crate::ports::models::RestoreBlockInput;
   use crate::ports::repositories::{AppStateRepository, BlockRepository, DocumentRepository, RemoteSyncRepository};
 
@@ -413,6 +450,7 @@ mod tests {
         id: "doc-1".to_string(),
         title: Some("Doc".to_string()),
         block_tint_override: Some(BlockTintPreset::Mist),
+        document_surface_tone_override: Some(DocumentSurfaceTonePreset::Paper),
         created_at: 1,
         updated_at: 2,
         last_opened_at: 3,
@@ -433,6 +471,7 @@ mod tests {
         id: document.id.clone(),
         title: document.title.clone(),
         block_tint_override: document.block_tint_override.clone(),
+        document_surface_tone_override: document.document_surface_tone_override.clone(),
         preview: "Hello".to_string(),
         updated_at: document.updated_at,
         last_opened_at: document.last_opened_at,
@@ -443,6 +482,7 @@ mod tests {
         settings: AppSettings {
           theme_mode: ThemeMode::Dark,
           default_block_tint_preset: BlockTintPreset::OceanSand,
+          default_document_surface_tone_preset: DocumentSurfaceTonePreset::Paper,
           default_block_kind,
           icloud_sync_enabled: true,
           menu_bar_icon_enabled: false,
@@ -477,6 +517,11 @@ mod tests {
       &mut self,
       _document_id: &str,
       _block_tint_override: Option<BlockTintPreset>,
+    ) -> Result<Document, AppError> { unimplemented!() }
+    fn set_document_surface_tone_override(
+      &mut self,
+      _document_id: &str,
+      _document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
     ) -> Result<Document, AppError> { unimplemented!() }
     fn mark_document_opened(&mut self, _document_id: &str) -> Result<Document, AppError> {
       Ok(self.current_document.clone())
@@ -517,6 +562,10 @@ mod tests {
     fn get_app_settings(&self) -> Result<AppSettings, AppError> { Ok(self.settings.clone()) }
     fn set_theme_mode(&mut self, _theme_mode: ThemeMode) -> Result<(), AppError> { Ok(()) }
     fn set_default_block_tint_preset(&mut self, _preset: BlockTintPreset) -> Result<(), AppError> { Ok(()) }
+    fn set_default_document_surface_tone_preset(
+      &mut self,
+      _preset: DocumentSurfaceTonePreset,
+    ) -> Result<(), AppError> { Ok(()) }
     fn set_icloud_sync_enabled(&mut self, _enabled: bool) -> Result<(), AppError> { Ok(()) }
     fn set_menu_bar_icon_enabled(&mut self, _enabled: bool) -> Result<(), AppError> { Ok(()) }
     fn set_default_block_kind(&mut self, _kind: BlockKind) -> Result<(), AppError> { Ok(()) }
@@ -528,6 +577,7 @@ mod tests {
       _id: &str,
       _title: Option<String>,
       _block_tint_override: Option<BlockTintPreset>,
+      _document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
       _created_at: i64,
       _updated_at: i64,
       _deleted_at: Option<i64>,

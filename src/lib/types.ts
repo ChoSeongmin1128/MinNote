@@ -7,6 +7,13 @@ export type BlockTintPreset =
   | 'mint-plum'
   | 'ocean-sand'
   | 'violet-lime';
+export type DocumentSurfaceTonePreset =
+  | 'default'
+  | 'paper'
+  | 'sand'
+  | 'sage'
+  | 'slate'
+  | 'dusk';
 export type ThemeMode = 'system' | 'light' | 'dark';
 
 export type JsonValue =
@@ -32,6 +39,7 @@ export interface DocumentSummaryDto {
   id: string;
   title: string | null;
   blockTintOverride: BlockTintPreset | null;
+  documentSurfaceToneOverride: DocumentSurfaceTonePreset | null;
   preview: string;
   updatedAt: number;
   lastOpenedAt: number;
@@ -48,6 +56,7 @@ export interface BootstrapPayload {
   currentDocument: DocumentDto | null;
   themeMode: ThemeMode;
   defaultBlockTintPreset: BlockTintPreset;
+  defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
   icloudSyncEnabled: boolean;
   menuBarIconEnabled: boolean;
@@ -78,6 +87,7 @@ export interface RemoteDocumentDto {
   id: string;
   title: string | null;
   blockTintOverride: string | null;
+  documentSurfaceToneOverride: string | null;
   blocksJson: string;
   createdAt: number;
   updatedAt: number;

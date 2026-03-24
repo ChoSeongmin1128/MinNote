@@ -1,7 +1,7 @@
 use super::*;
 
 const DOCUMENT_COLUMNS: &str =
-  "id, title, block_tint_override, created_at, updated_at, last_opened_at, deleted_at";
+  "id, title, block_tint_override, document_surface_tone_override, created_at, updated_at, last_opened_at, deleted_at";
 
 fn map_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<Document> {
   Ok(Document {
@@ -10,10 +10,13 @@ fn map_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<Document> {
     block_tint_override: row
       .get::<_, Option<String>>(2)?
       .map(|value| BlockTintPreset::from_str(&value)),
-    created_at: row.get(3)?,
-    updated_at: row.get(4)?,
-    last_opened_at: row.get(5)?,
-    deleted_at: row.get(6)?,
+    document_surface_tone_override: row
+      .get::<_, Option<String>>(3)?
+      .map(|value| DocumentSurfaceTonePreset::from_str(&value)),
+    created_at: row.get(4)?,
+    updated_at: row.get(5)?,
+    last_opened_at: row.get(6)?,
+    deleted_at: row.get(7)?,
   })
 }
 
@@ -58,6 +61,7 @@ impl DocumentRepository for SqliteStore {
           id: document.id,
           title: document.title,
           block_tint_override: document.block_tint_override,
+          document_surface_tone_override: document.document_surface_tone_override,
           preview,
           updated_at: document.updated_at,
           last_opened_at: document.last_opened_at,
@@ -93,6 +97,7 @@ impl DocumentRepository for SqliteStore {
           id: document.id,
           title: document.title,
           block_tint_override: document.block_tint_override,
+          document_surface_tone_override: document.document_surface_tone_override,
           preview,
           updated_at: document.updated_at,
           last_opened_at: document.last_opened_at,
@@ -121,6 +126,7 @@ impl DocumentRepository for SqliteStore {
       id: Self::new_id(),
       title: Some(unique_title),
       block_tint_override: None,
+      document_surface_tone_override: None,
       created_at: now,
       updated_at: now,
       last_opened_at: now,
@@ -128,10 +134,11 @@ impl DocumentRepository for SqliteStore {
     };
 
     self.connection.execute(
-      "INSERT INTO documents (id, title, block_tint_override, created_at, updated_at, last_opened_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+      "INSERT INTO documents (id, title, block_tint_override, document_surface_tone_override, created_at, updated_at, last_opened_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
       params![
         document.id,
         document.title,
+        Option::<String>::None,
         Option::<String>::None,
         document.created_at,
         document.updated_at,
@@ -234,6 +241,19 @@ impl DocumentRepository for SqliteStore {
     self.touch_document_internal(document_id, false)
   }
 
+  fn set_document_surface_tone_override(
+    &mut self,
+    document_id: &str,
+    document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
+  ) -> Result<Document, AppError> {
+    let value = document_surface_tone_override.map(|preset| preset.as_str().to_string());
+    self.connection.execute(
+      "UPDATE documents SET document_surface_tone_override = ?1 WHERE id = ?2",
+      params![value, document_id],
+    )?;
+    self.touch_document_internal(document_id, false)
+  }
+
   fn mark_document_opened(&mut self, document_id: &str) -> Result<Document, AppError> {
     self.touch_document_internal(document_id, true)
   }
@@ -278,6 +298,7 @@ impl DocumentRepository for SqliteStore {
             id: document.id,
             title: document.title,
             block_tint_override: document.block_tint_override,
+            document_surface_tone_override: document.document_surface_tone_override,
             preview,
             updated_at: document.updated_at,
             last_opened_at: document.last_opened_at,

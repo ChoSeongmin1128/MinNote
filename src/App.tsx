@@ -35,6 +35,7 @@ function App() {
   const isBootstrapping = useWorkspaceStore((state) => state.isBootstrapping);
   const error = useWorkspaceStore((state) => state.error);
   const themeMode = useWorkspaceStore((state) => state.themeMode);
+  const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
   const isSettingsOpen = useWorkspaceStore((state) => state.isSettingsOpen);
   const setSettingsOpen = useWorkspaceStore((state) => state.setSettingsOpen);
   const desktopSidebarExpanded = useWorkspaceStore((state) => state.desktopSidebarExpanded);
@@ -64,8 +65,11 @@ function App() {
     document.documentElement.style.colorScheme = themeMode === 'system' ? 'light dark' : themeMode;
   }, [themeMode]);
 
+  const appSurfaceTone =
+    currentDocument?.documentSurfaceToneOverride ?? defaultDocumentSurfaceTonePreset;
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-surface-tone={appSurfaceTone}>
       <Sidebar
         isMobileViewport={isMobileViewport}
         desktopSidebarExpanded={desktopSidebarExpanded}

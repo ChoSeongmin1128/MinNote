@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, RemoteDocumentDto, SearchResultDto};
 use crate::application::services;
-use crate::domain::models::{BlockKind, BlockTintPreset, ThemeMode};
+use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, ThemeMode};
 use crate::error::AppError;
 use crate::state::AppState;
 use crate::{TRAY_ID, build_tray_icon};
@@ -172,6 +172,16 @@ pub fn set_default_block_tint_preset(
 }
 
 #[tauri::command]
+pub fn set_default_document_surface_tone_preset(
+  state: State<'_, AppState>,
+  preset: DocumentSurfaceTonePreset,
+) -> Result<DocumentSurfaceTonePreset, String> {
+  with_repository(state, |repository| {
+    services::set_default_document_surface_tone_preset(repository, preset)
+  })
+}
+
+#[tauri::command]
 pub fn set_document_block_tint_override(
   state: State<'_, AppState>,
   document_id: String,
@@ -179,6 +189,23 @@ pub fn set_document_block_tint_override(
 ) -> Result<DocumentDto, String> {
   let result = with_repository(state.clone(), |repository| {
     services::set_document_block_tint_override(repository, &document_id, block_tint_override)
+  })?;
+  state.notify_sync_changed(&document_id);
+  Ok(result)
+}
+
+#[tauri::command]
+pub fn set_document_surface_tone_override(
+  state: State<'_, AppState>,
+  document_id: String,
+  document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
+) -> Result<DocumentDto, String> {
+  let result = with_repository(state.clone(), |repository| {
+    services::set_document_surface_tone_override(
+      repository,
+      &document_id,
+      document_surface_tone_override,
+    )
   })?;
   state.notify_sync_changed(&document_id);
   Ok(result)

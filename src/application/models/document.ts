@@ -1,6 +1,6 @@
 import type { CodeLanguageId } from '../../lib/codeLanguageRegistry';
 import { getBlockPlainText } from '../../lib/markdown';
-import type { BlockKind, BlockTintPreset } from '../../lib/types';
+import type { BlockKind, BlockTintPreset, DocumentSurfaceTonePreset } from '../../lib/types';
 
 interface BlockVmBase {
   id: string;
@@ -35,6 +35,7 @@ export interface DocumentSummaryVm {
   id: string;
   title: string | null;
   blockTintOverride: BlockTintPreset | null;
+  documentSurfaceToneOverride: DocumentSurfaceTonePreset | null;
   preview: string;
   updatedAt: number;
   lastOpenedAt: number;
@@ -62,6 +63,7 @@ export function summarizeDocument(document: DocumentVm): DocumentSummaryVm {
     id: document.id,
     title: document.title,
     blockTintOverride: document.blockTintOverride,
+    documentSurfaceToneOverride: document.documentSurfaceToneOverride,
     preview: document.blocks
       .map((block) => getBlockPlainText(block.kind, block.content))
       .find((text) => text.trim().length > 0) ?? '',

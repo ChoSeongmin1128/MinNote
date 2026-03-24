@@ -41,6 +41,7 @@ export function applyBootstrapPayloadState(
   workspace.setTrashDocuments(payload.trashDocuments);
   workspace.setThemeMode(payload.themeMode);
   workspace.setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
+  workspace.setDefaultDocumentSurfaceTonePreset(payload.defaultDocumentSurfaceTonePreset);
   workspace.setDefaultBlockKind(payload.defaultBlockKind);
   workspace.setIcloudSyncEnabled(payload.icloudSyncEnabled);
   workspace.setMenuBarIconEnabled(payload.menuBarIconEnabled);

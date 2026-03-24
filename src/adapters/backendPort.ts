@@ -59,9 +59,17 @@ export const backendPort: BackendPort = {
   setDefaultBlockTintPreset(preset) {
     return desktopApi.setDefaultBlockTintPreset(preset);
   },
+  setDefaultDocumentSurfaceTonePreset(preset) {
+    return desktopApi.setDefaultDocumentSurfaceTonePreset(preset);
+  },
   async setDocumentBlockTintOverride(documentId, blockTintOverride) {
     return mapDocumentDtoToVm(
       await desktopApi.setDocumentBlockTintOverride(documentId, blockTintOverride),
+    );
+  },
+  async setDocumentSurfaceToneOverride(documentId, documentSurfaceToneOverride) {
+    return mapDocumentDtoToVm(
+      await desktopApi.setDocumentSurfaceToneOverride(documentId, documentSurfaceToneOverride),
     );
   },
   async restoreDocumentBlocks(documentId, blocks) {

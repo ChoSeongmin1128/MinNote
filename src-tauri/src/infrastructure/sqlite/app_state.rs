@@ -19,6 +19,10 @@ impl AppStateRepository for SqliteStore {
       .get_state_value("default_block_tint_preset")?
       .map(|value| BlockTintPreset::from_str(&value))
       .unwrap_or(BlockTintPreset::Mist);
+    let default_document_surface_tone_preset = self
+      .get_state_value("default_document_surface_tone_preset")?
+      .map(|value| DocumentSurfaceTonePreset::from_str(&value))
+      .unwrap_or(DocumentSurfaceTonePreset::Default);
     let icloud_sync_enabled = self
       .get_state_value("icloud_sync_enabled")?
       .map(|value| value == "true")
@@ -35,6 +39,7 @@ impl AppStateRepository for SqliteStore {
     Ok(AppSettings {
       theme_mode,
       default_block_tint_preset,
+      default_document_surface_tone_preset,
       default_block_kind,
       icloud_sync_enabled,
       menu_bar_icon_enabled,
@@ -48,6 +53,14 @@ impl AppStateRepository for SqliteStore {
 
   fn set_default_block_tint_preset(&mut self, preset: BlockTintPreset) -> Result<(), AppError> {
     self.set_state_value("default_block_tint_preset", preset.as_str())?;
+    Ok(())
+  }
+
+  fn set_default_document_surface_tone_preset(
+    &mut self,
+    preset: DocumentSurfaceTonePreset,
+  ) -> Result<(), AppError> {
+    self.set_state_value("default_document_surface_tone_preset", preset.as_str())?;
     Ok(())
   }
 

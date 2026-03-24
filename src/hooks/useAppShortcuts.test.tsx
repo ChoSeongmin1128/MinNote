@@ -24,6 +24,7 @@ function createDocument(): DocumentVm {
     id: 'doc-1',
     title: 'Test',
     blockTintOverride: null,
+    documentSurfaceToneOverride: null,
     preview: '',
     updatedAt: 1,
     lastOpenedAt: 1,

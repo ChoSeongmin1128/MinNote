@@ -1,4 +1,9 @@
-import type { BlockKind, BlockTintPreset, ThemeMode } from '../../lib/types';
+import type {
+  BlockKind,
+  BlockTintPreset,
+  DocumentSurfaceTonePreset,
+  ThemeMode,
+} from '../../lib/types';
 import type { DocumentSummaryVm, DocumentVm } from './document';
 
 export interface WorkspaceBootstrapState {
@@ -7,6 +12,7 @@ export interface WorkspaceBootstrapState {
   currentDocument: DocumentVm | null;
   themeMode: ThemeMode;
   defaultBlockTintPreset: BlockTintPreset;
+  defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
   icloudSyncEnabled: boolean;
   menuBarIconEnabled: boolean;

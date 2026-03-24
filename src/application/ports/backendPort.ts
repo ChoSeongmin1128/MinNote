@@ -1,6 +1,7 @@
 import type {
   BlockKind,
   BlockTintPreset,
+  DocumentSurfaceTonePreset,
   RemoteDocumentDto,
   ThemeMode,
 } from '../../lib/types';
@@ -25,7 +26,14 @@ export interface BackendPort {
   flushDocument(documentId: string): Promise<number>;
   setThemeMode(themeMode: ThemeMode): Promise<ThemeMode>;
   setDefaultBlockTintPreset(preset: BlockTintPreset): Promise<BlockTintPreset>;
+  setDefaultDocumentSurfaceTonePreset(
+    preset: DocumentSurfaceTonePreset,
+  ): Promise<DocumentSurfaceTonePreset>;
   setDocumentBlockTintOverride(documentId: string, blockTintOverride: BlockTintPreset | null): Promise<DocumentVm>;
+  setDocumentSurfaceToneOverride(
+    documentId: string,
+    documentSurfaceToneOverride: DocumentSurfaceTonePreset | null,
+  ): Promise<DocumentVm>;
   restoreDocumentBlocks(documentId: string, blocks: RestoreBlockInput[]): Promise<DocumentVm>;
   emptyTrash(): Promise<void>;
   restoreDocumentFromTrash(documentId: string): Promise<WorkspaceBootstrapState>;

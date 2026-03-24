@@ -150,12 +150,10 @@ export function Sidebar({
 
         <div className="sidebar-panel" aria-hidden={!isPanelVisible}>
           <div className="sidebar-header">
-            <div className="brand">
-              <span className="brand-title">MinNote</span>
-            </div>
-            <div className="row">
-              <button className="icon-button" type="button" onClick={() => void createDocument()} aria-label="새 문서 만들기">
+            <div className="row sidebar-header-row">
+              <button className="ghost-button sidebar-create-button" type="button" onClick={() => void createDocument()}>
                 <Plus size={16} />
+                새 문서
               </button>
               {isMobileViewport ? (
                 <button className="icon-button sidebar-close-button" type="button" onClick={onCloseMobile} aria-label="사이드바 닫기">
@@ -177,9 +175,6 @@ export function Sidebar({
                 onChange={(event) => void setSearchQuery(event.target.value)}
               />
             </div>
-            <span className="search-meta">
-              {searchQuery.trim() ? `${searchResults.length}개 결과` : `${documents.length}개 문서`}
-            </span>
           </div>
 
           <div className="document-list">

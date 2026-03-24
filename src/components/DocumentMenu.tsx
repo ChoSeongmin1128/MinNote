@@ -1,8 +1,10 @@
 import { MoreHorizontal, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { deleteDocument, setDocumentBlockTintOverride } from '../app/actions';
+import { deleteDocument, setDocumentBlockTintOverride, setDocumentSurfaceToneOverride } from '../app/actions';
 import { BlockTintPreview } from './BlockTintPreview';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
+import { DOCUMENT_SURFACE_TONE_PRESETS } from '../lib/documentSurfaceTone';
+import { DocumentSurfacePreview } from './DocumentSurfacePreview';
 import { SegmentedSelector } from './SegmentedSelector';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
@@ -17,9 +19,15 @@ const DOCUMENT_TINT_OPTIONS = BLOCK_TINT_PRESETS.map((preset) => ({
   label: preset.label,
 }));
 
+const DOCUMENT_SURFACE_TONE_OPTIONS = DOCUMENT_SURFACE_TONE_PRESETS.map((preset) => ({
+  value: preset.id,
+  label: preset.label,
+}));
+
 export function DocumentMenu() {
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
+  const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -54,6 +62,8 @@ export function DocumentMenu() {
 
   const isFollowingDefault = currentDocument.blockTintOverride == null;
   const selectedPreset = currentDocument.blockTintOverride ?? defaultBlockTintPreset;
+  const isFollowingDefaultSurfaceTone = currentDocument.documentSurfaceToneOverride == null;
+  const selectedSurfaceTone = currentDocument.documentSurfaceToneOverride ?? defaultDocumentSurfaceTonePreset;
 
   return (
     <div className="document-menu" ref={rootRef}>
@@ -75,6 +85,7 @@ export function DocumentMenu() {
             </div>
             <SegmentedSelector
               ariaLabel="문서 색상쌍 모드 선택"
+              motionStyle="subtle"
               value={isFollowingDefault ? 'default' : 'custom'}
               options={DOCUMENT_TINT_MODE_OPTIONS}
               onChange={(nextValue) => {
@@ -87,6 +98,7 @@ export function DocumentMenu() {
             />
             <SegmentedSelector
               ariaLabel="문서 색상쌍 선택"
+              motionStyle="subtle"
               value={selectedPreset}
               layout="palette"
               columns={2}
@@ -95,7 +107,54 @@ export function DocumentMenu() {
               onChange={(nextValue) => setDocumentBlockTintOverride(nextValue)}
               renderOption={(option) => (
                 <span className="tint-selector-card">
-                  <BlockTintPreview className="tint-selector-preview" preset={option.value} />
+                  <BlockTintPreview
+                    className="tint-selector-preview"
+                    preset={option.value}
+                    variant="swatches"
+                  />
+                  <span className="tint-selector-label">{option.label}</span>
+                </span>
+              )}
+            />
+          </div>
+
+          <div className="document-menu-section">
+            <div className="document-menu-section-header">
+              <span className="document-menu-label">문서 배경 톤</span>
+            </div>
+            <SegmentedSelector
+              ariaLabel="문서 배경 톤 모드 선택"
+              motionStyle="subtle"
+              value={isFollowingDefaultSurfaceTone ? 'default' : 'custom'}
+              options={DOCUMENT_TINT_MODE_OPTIONS}
+              onChange={(nextValue) => {
+                if (nextValue === 'default') {
+                  return setDocumentSurfaceToneOverride(null);
+                }
+
+                return setDocumentSurfaceToneOverride(
+                  defaultDocumentSurfaceTonePreset === 'default'
+                    ? 'paper'
+                    : defaultDocumentSurfaceTonePreset,
+                );
+              }}
+            />
+            <SegmentedSelector
+              ariaLabel="문서 배경 톤 선택"
+              motionStyle="subtle"
+              value={selectedSurfaceTone}
+              layout="palette"
+              columns={2}
+              disabled={isFollowingDefaultSurfaceTone}
+              options={DOCUMENT_SURFACE_TONE_OPTIONS}
+              onChange={(nextValue) => setDocumentSurfaceToneOverride(nextValue)}
+              renderOption={(option) => (
+                <span className="tint-selector-card">
+                  <DocumentSurfacePreview
+                    className="surface-selector-preview"
+                    preset={option.value}
+                    variant="surface"
+                  />
                   <span className="tint-selector-label">{option.label}</span>
                 </span>
               )}

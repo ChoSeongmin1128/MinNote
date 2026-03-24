@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "MinNote",
-        "width": 1280,
-        "height": 820,
+        "width": 1180,
+        "height": 860,
         "minWidth": 450,
         "minHeight": 400,
         "resizable": true,

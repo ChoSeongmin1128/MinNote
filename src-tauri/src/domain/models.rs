@@ -62,6 +62,44 @@ impl BlockTintPreset {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum DocumentSurfaceTonePreset {
+  Default,
+  Paper,
+  Fog,
+  Sand,
+  Sage,
+  Slate,
+  Dusk,
+}
+
+impl DocumentSurfaceTonePreset {
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      Self::Default => "default",
+      Self::Paper => "paper",
+      Self::Fog => "fog",
+      Self::Sand => "sand",
+      Self::Sage => "sage",
+      Self::Slate => "slate",
+      Self::Dusk => "dusk",
+    }
+  }
+
+  pub fn from_str(value: &str) -> Self {
+    match value {
+      "default" => Self::Default,
+      "fog" => Self::Fog,
+      "sand" => Self::Sand,
+      "sage" => Self::Sage,
+      "slate" => Self::Slate,
+      "dusk" => Self::Dusk,
+      _ => Self::Default,
+    }
+  }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ThemeMode {
   System,
@@ -92,6 +130,7 @@ pub struct Document {
   pub id: String,
   pub title: Option<String>,
   pub block_tint_override: Option<BlockTintPreset>,
+  pub document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
   pub created_at: i64,
   pub updated_at: i64,
   pub last_opened_at: i64,
@@ -116,6 +155,7 @@ pub struct DocumentSummary {
   pub id: String,
   pub title: Option<String>,
   pub block_tint_override: Option<BlockTintPreset>,
+  pub document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
   pub preview: String,
   pub updated_at: i64,
   pub last_opened_at: i64,
@@ -132,6 +172,7 @@ pub struct SearchResult {
 pub struct AppSettings {
   pub theme_mode: ThemeMode,
   pub default_block_tint_preset: BlockTintPreset,
+  pub default_document_surface_tone_preset: DocumentSurfaceTonePreset,
   pub default_block_kind: BlockKind,
   pub icloud_sync_enabled: bool,
   pub menu_bar_icon_enabled: bool,

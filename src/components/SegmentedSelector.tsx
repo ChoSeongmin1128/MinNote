@@ -31,6 +31,7 @@ interface SegmentedSelectorProps<T extends string> {
   options: readonly SegmentedSelectorOption<T>[];
   onChange: (value: T) => void | Promise<void>;
   layout?: 'inline' | 'palette';
+  motionStyle?: 'liquid' | 'subtle';
   columns?: number;
   disabled?: boolean;
   renderOption?: (
@@ -63,6 +64,7 @@ export function SegmentedSelector<T extends string>({
   options,
   onChange,
   layout = 'inline',
+  motionStyle = 'liquid',
   columns = 3,
   disabled = false,
   renderOption,
@@ -77,6 +79,7 @@ export function SegmentedSelector<T extends string>({
   const [isAnimating, setIsAnimating] = useState(false);
   const [transformOrigin, setTransformOrigin] = useState('center center');
   const isPalette = layout === 'palette';
+  const isSubtle = motionStyle === 'subtle';
   const lastPropValueRef = useRef(value);
 
   const thumbX = useMotionValue(0);
@@ -174,23 +177,25 @@ export function SegmentedSelector<T extends string>({
     const verticalBias = distance === 0 ? 0 : deltaY / distance;
     const dominantX = maxAbs(horizontalBias, 0.35);
     const dominantY = maxAbs(verticalBias, 0.16);
-    const expansion = 0.08 + normalizedDistance * (isPalette ? 0.08 : 0.12);
-    const flatten = 0.03 + normalizedDistance * 0.02;
-    const directionalShift = (12 + normalizedDistance * 18) * envelope;
+    const motionFactor = isSubtle ? 0.42 : 1;
+    const expansion = (0.08 + normalizedDistance * (isPalette ? 0.08 : 0.12)) * motionFactor;
+    const flatten = (0.03 + normalizedDistance * 0.02) * motionFactor;
+    const directionalShift = (12 + normalizedDistance * 18) * envelope * motionFactor;
 
     thumbScaleX.set(1 + expansion * dominantX * envelope);
     thumbScaleY.set(1 + (dominantY * 0.05 + flatten) * rebound);
-    thumbRotate.set((horizontalBias * 1.5 + verticalBias * 0.8) * envelope);
+    thumbRotate.set((horizontalBias * 1.5 + verticalBias * 0.8) * envelope * motionFactor);
     thumbShift.set(horizontalBias * directionalShift);
-    thumbBlur.set(1.6 + envelope * (6 + normalizedDistance * 5));
-    thumbGlow.set(0.1 + envelope * (0.18 + normalizedDistance * 0.18));
-    thumbBrightness.set(0.01 + envelope * (0.03 + normalizedDistance * 0.05));
-    thumbTintOpacity.set(0.05 + envelope * (0.12 + normalizedDistance * 0.12));
-    thumbHighlightOpacity.set(0.12 + envelope * (0.2 + normalizedDistance * 0.16));
-    thumbShadowOpacity.set(0.08 + envelope * (0.12 + normalizedDistance * 0.12));
-    thumbRadius.set((isPalette ? 16 : 13) + envelope * (isPalette ? 5 : 3));
+    thumbBlur.set((1.6 + envelope * (6 + normalizedDistance * 5)) * motionFactor);
+    thumbGlow.set((0.1 + envelope * (0.18 + normalizedDistance * 0.18)) * motionFactor);
+    thumbBrightness.set((0.01 + envelope * (0.03 + normalizedDistance * 0.05)) * motionFactor);
+    thumbTintOpacity.set((0.05 + envelope * (0.12 + normalizedDistance * 0.12)) * motionFactor);
+    thumbHighlightOpacity.set((0.12 + envelope * (0.2 + normalizedDistance * 0.16)) * motionFactor);
+    thumbShadowOpacity.set((0.08 + envelope * (0.12 + normalizedDistance * 0.12)) * motionFactor);
+    thumbRadius.set((isPalette ? 16 : 13) + envelope * (isPalette ? 5 : 3) * motionFactor);
   }, [
     isPalette,
+    isSubtle,
     thumbBlur,
     thumbBrightness,
     thumbGlow,
@@ -230,7 +235,7 @@ export function SegmentedSelector<T extends string>({
       animate(thumbWidth, toRect.width, { type: 'spring', stiffness: 380, damping: 30, mass: 0.9 }),
       animate(thumbHeight, toRect.height, { type: 'spring', stiffness: 380, damping: 30, mass: 0.9 }),
       animate(0, 1, {
-        duration: 0.42,
+        duration: isSubtle ? 0.28 : 0.42,
         ease: [0.22, 1, 0.36, 1],
         onUpdate: (progress) => {
           updateLiquidFrame(progress, fromRect, toRect);
@@ -244,6 +249,7 @@ export function SegmentedSelector<T extends string>({
     ];
   }, [
     applyThumbRect,
+    isSubtle,
     resetLiquid,
     stopAnimations,
     thumbHeight,
@@ -455,14 +461,14 @@ export function SegmentedSelector<T extends string>({
     <div
       ref={groupRef}
       aria-label={ariaLabel}
-      className={`segmented-selector${isPalette ? ' is-palette' : ' is-inline'}${disabled ? ' is-disabled' : ''}`}
+      className={`segmented-selector${isPalette ? ' is-palette' : ' is-inline'}${disabled ? ' is-disabled' : ''}${isSubtle ? ' is-subtle' : ''}`}
       role="radiogroup"
       style={{ '--segmented-columns': columns } as CSSProperties}
     >
       {hasThumb ? (
         <motion.div
           aria-hidden="true"
-          className={`segmented-selector-thumb${isAnimating ? ' is-animating' : ''}${isPalette ? ' is-palette' : ''}`}
+          className={`segmented-selector-thumb${isAnimating ? ' is-animating' : ''}${isPalette ? ' is-palette' : ''}${isSubtle ? ' is-subtle' : ''}`}
           style={{
             x: thumbX,
             y: thumbY,

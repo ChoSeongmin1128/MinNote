@@ -1,4 +1,4 @@
-use crate::domain::models::{AppSettings, Block, BlockKind, BlockTintPreset, Document, DocumentSummary, SearchResult, ThemeMode};
+use crate::domain::models::{AppSettings, Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode};
 use crate::error::AppError;
 use crate::ports::models::RestoreBlockInput;
 
@@ -18,6 +18,11 @@ pub trait DocumentRepository {
     &mut self,
     document_id: &str,
     block_tint_override: Option<BlockTintPreset>,
+  ) -> Result<Document, AppError>;
+  fn set_document_surface_tone_override(
+    &mut self,
+    document_id: &str,
+    document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
   ) -> Result<Document, AppError>;
   fn mark_document_opened(&mut self, document_id: &str) -> Result<Document, AppError>;
   fn search_documents(&self, query: &str) -> Result<Vec<SearchResult>, AppError>;
@@ -57,6 +62,7 @@ pub trait AppStateRepository {
   fn get_app_settings(&self) -> Result<AppSettings, AppError>;
   fn set_theme_mode(&mut self, theme_mode: ThemeMode) -> Result<(), AppError>;
   fn set_default_block_tint_preset(&mut self, preset: BlockTintPreset) -> Result<(), AppError>;
+  fn set_default_document_surface_tone_preset(&mut self, preset: DocumentSurfaceTonePreset) -> Result<(), AppError>;
   fn set_icloud_sync_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
   fn set_menu_bar_icon_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
   fn set_default_block_kind(&mut self, kind: BlockKind) -> Result<(), AppError>;
@@ -68,6 +74,7 @@ pub trait RemoteSyncRepository {
     id: &str,
     title: Option<String>,
     block_tint_override: Option<crate::domain::models::BlockTintPreset>,
+    document_surface_tone_override: Option<crate::domain::models::DocumentSurfaceTonePreset>,
     created_at: i64,
     updated_at: i64,
     deleted_at: Option<i64>,

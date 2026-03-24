@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::domain::models::{Block, BlockKind, BlockTintPreset, Document, DocumentSummary, SearchResult, ThemeMode};
+use crate::domain::models::{Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode};
 use crate::error::AppError;
 
 #[derive(Debug, Serialize)]
@@ -21,6 +21,7 @@ pub struct DocumentSummaryDto {
   pub id: String,
   pub title: Option<String>,
   pub block_tint_override: Option<BlockTintPreset>,
+  pub document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
   pub preview: String,
   pub updated_at: i64,
   pub last_opened_at: i64,
@@ -33,6 +34,7 @@ pub struct DocumentDto {
   pub id: String,
   pub title: Option<String>,
   pub block_tint_override: Option<BlockTintPreset>,
+  pub document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
   pub preview: String,
   pub updated_at: i64,
   pub last_opened_at: i64,
@@ -56,6 +58,7 @@ pub struct BootstrapPayload {
   pub current_document: Option<DocumentDto>,
   pub theme_mode: ThemeMode,
   pub default_block_tint_preset: BlockTintPreset,
+  pub default_document_surface_tone_preset: DocumentSurfaceTonePreset,
   pub default_block_kind: BlockKind,
   pub icloud_sync_enabled: bool,
   pub menu_bar_icon_enabled: bool,
@@ -78,6 +81,7 @@ pub struct RemoteDocumentDto {
   pub id: String,
   pub title: Option<String>,
   pub block_tint_override: Option<String>,
+  pub document_surface_tone_override: Option<String>,
   pub blocks_json: String,
   pub created_at: i64,
   pub updated_at: i64,
@@ -118,6 +122,7 @@ impl From<DocumentSummary> for DocumentSummaryDto {
       id: value.id,
       title: value.title,
       block_tint_override: value.block_tint_override,
+      document_surface_tone_override: value.document_surface_tone_override,
       preview: value.preview,
       updated_at: value.updated_at,
       last_opened_at: value.last_opened_at,
@@ -132,6 +137,7 @@ impl DocumentDto {
       id: document.id,
       title: document.title,
       block_tint_override: document.block_tint_override,
+      document_surface_tone_override: document.document_surface_tone_override,
       preview,
       updated_at: document.updated_at,
       last_opened_at: document.last_opened_at,

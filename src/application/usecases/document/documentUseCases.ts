@@ -151,6 +151,23 @@ export function createDocumentUseCases({
     }
   }
 
+  async function setDocumentSurfaceToneOverride(
+    preset: Parameters<BackendPort['setDocumentSurfaceToneOverride']>[1],
+  ) {
+    try {
+      const currentDocument = session.getCurrentDocument();
+      if (!currentDocument) {
+        return;
+      }
+
+      const nextDocument = await backend.setDocumentSurfaceToneOverride(currentDocument.id, preset);
+      workspace.clearError();
+      updateDocumentState(session, workspace, nextDocument);
+    } catch (error) {
+      workspace.setError(normalizeErrorMessage(error, '문서 배경 톤을 변경하지 못했습니다.'));
+    }
+  }
+
   return {
     flushCurrentDocument,
     createDocument,
@@ -160,5 +177,6 @@ export function createDocumentUseCases({
     emptyTrash,
     restoreDocumentFromTrash,
     setDocumentBlockTintOverride,
+    setDocumentSurfaceToneOverride,
   };
 }
