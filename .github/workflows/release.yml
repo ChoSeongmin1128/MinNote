@@ -8,6 +8,7 @@ on:
 jobs:
   release_app:
     runs-on: macos-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
@@ -56,17 +57,35 @@ jobs:
           swift build -c release --arch x86_64
           cp .build/x86_64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-x86_64-apple-darwin
 
-      - name: Build notarized app bundle
+      - name: Build signed app bundle
         env:
           CI: true
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
         run: |
           pnpm tauri build --bundles app --verbose
+
+      - name: Notarize app bundle
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP_PATH="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name 'MinNote.app' -print -quit)"
+
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "MinNote.app not found for notarization"
+            exit 1
+          fi
+
+          xcrun notarytool submit "$APP_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          xcrun stapler staple "$APP_PATH"
 
       - name: Verify macOS app signing
         env:
@@ -169,6 +188,7 @@ jobs:
     runs-on:
       - self-hosted
       - macOS
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
