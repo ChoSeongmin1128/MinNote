@@ -203,6 +203,7 @@ pub fn run() {
       commands::empty_trash,
       commands::restore_document_from_trash,
       commands::set_icloud_sync_enabled,
+      commands::refresh_icloud_sync,
       commands::set_menu_bar_icon_enabled,
       commands::set_default_block_kind,
       commands::set_always_on_top_enabled,

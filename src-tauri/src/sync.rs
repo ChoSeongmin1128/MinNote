@@ -13,6 +13,7 @@ enum OutgoingMessage<'a> {
     #[serde(rename = "containerIdentifier")]
     container_identifier: &'a str,
   },
+  Refresh,
   NotifyChanged {
     #[serde(rename = "documentId")]
     document_id: &'a str,
@@ -110,6 +111,19 @@ impl SyncManager {
 
   pub fn notify_reset(&mut self) {
     let _ = self.send(&OutgoingMessage::NotifyReset);
+  }
+
+  pub fn refresh(
+    &mut self,
+    app_handle: &tauri::AppHandle,
+    db_path: &str,
+    state_path: &str,
+  ) -> Result<(), String> {
+    if self.is_running() {
+      return self.send(&OutgoingMessage::Refresh);
+    }
+
+    self.start(app_handle, db_path, state_path)
   }
 
   fn send<T: Serialize>(&mut self, message: &T) -> Result<(), String> {

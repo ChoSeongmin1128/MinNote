@@ -228,6 +228,41 @@ describe('handleSyncEventMessage (remote-changed)', () => {
 
     expect(session.setCurrentDocument).not.toHaveBeenCalled();
   });
+
+  it('stores an error when remote documents cannot be applied', async () => {
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const session = createSessionGateway();
+    const useCases = createWorkspaceUseCases({
+      backend: {
+        bootstrapApp: vi.fn(),
+        getWindowControlRuntimeState: vi.fn(),
+        searchDocuments: vi.fn(),
+        deleteAllDocuments: vi.fn(),
+        applyRemoteDocuments: vi.fn(async () => {
+          throw new Error('remote apply failed');
+        }),
+      } as never,
+      documentSync: { clearAllDocumentSync: vi.fn() } as never,
+      preferences: preferences as never,
+      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
+      session,
+      syncMutation: { enqueue: vi.fn() },
+      workspace,
+    });
+
+    await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
+
+    expect(preferences.setIcloudSyncStatus).toHaveBeenCalledWith({
+      state: 'error',
+      lastSyncAt: 10,
+      lastStatusAt: expect.any(Number),
+      lastFetchAt: 12,
+      lastSendAt: 13,
+      initialFetchCompleted: true,
+      errorMessage: 'remote apply failed',
+    });
+  });
 });
 
 describe('handleSyncEventMessage (status)', () => {

@@ -292,6 +292,27 @@ pub fn set_icloud_sync_enabled(
 }
 
 #[tauri::command]
+pub fn refresh_icloud_sync(
+  state: State<'_, AppState>,
+  app_handle: tauri::AppHandle,
+) -> Result<bool, String> {
+  let settings = with_repository(state.clone(), |repository| repository.get_app_settings())?;
+  if !settings.icloud_sync_enabled {
+    return Ok(false);
+  }
+
+  let db_path = state.db_path.to_str().unwrap_or_default().to_string();
+  let state_path = state.sync_state_path.to_str().unwrap_or_default().to_string();
+  let mut sync = state
+    .sync_manager
+    .lock()
+    .map_err(|_| "sync manager lock failed".to_string())?;
+
+  sync.refresh(&app_handle, &db_path, &state_path)?;
+  Ok(true)
+}
+
+#[tauri::command]
 pub fn set_default_block_kind(
   state: State<'_, AppState>,
   kind: BlockKind,

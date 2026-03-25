@@ -51,6 +51,9 @@ export function createPreferencesUseCases({
   async function setIcloudSyncEnabled(enabled: boolean) {
     try {
       const result = await backend.setIcloudSyncEnabled(enabled);
+      if (result) {
+        await backend.refreshIcloudSync();
+      }
       workspace.clearError();
       preferences.setIcloudSyncEnabled(result);
       preferences.setIcloudSyncStatus({
@@ -64,6 +67,15 @@ export function createPreferencesUseCases({
       });
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, 'iCloud 동기화 설정을 변경하지 못했습니다.'));
+    }
+  }
+
+  async function refreshIcloudSync() {
+    try {
+      return await backend.refreshIcloudSync();
+    } catch (error) {
+      workspace.setError(normalizeErrorMessage(error, 'iCloud 동기화를 새로고침하지 못했습니다.'));
+      throw error;
     }
   }
 
@@ -155,6 +167,7 @@ export function createPreferencesUseCases({
     setDefaultBlockTintPreset,
     setDefaultDocumentSurfaceTonePreset,
     setIcloudSyncEnabled,
+    refreshIcloudSync,
     setDefaultBlockKind,
     setMenuBarIconEnabled,
     setAlwaysOnTopEnabled,

@@ -20,6 +20,9 @@ final class SyncCoordinator {
       case .start(let payload):
         await handleStart(payload)
 
+      case .refresh:
+        await syncEngine?.refresh()
+
       case .notifyChanged(let payload):
         syncEngine?.notifyChanged(documentId: payload.documentId)
 

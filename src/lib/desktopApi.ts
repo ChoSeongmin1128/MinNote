@@ -135,6 +135,9 @@ export const desktopApi = {
   setIcloudSyncEnabled(enabled: boolean) {
     return call<boolean>('set_icloud_sync_enabled', { enabled });
   },
+  refreshIcloudSync() {
+    return call<boolean>('refresh_icloud_sync');
+  },
   setMenuBarIconEnabled(enabled: boolean) {
     return call<boolean>('set_menu_bar_icon_enabled', { enabled });
   },

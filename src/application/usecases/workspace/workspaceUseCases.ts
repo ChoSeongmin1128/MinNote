@@ -116,8 +116,17 @@ export function createWorkspaceUseCases({
       try {
         const payload = await backend.applyRemoteDocuments(message.documents);
         applyBootstrapPayloadState(preferences, workspace, session, payload, 'match-current');
-      } catch {
-        // 원격 적용 실패는 조용히 무시합니다.
+      } catch (error) {
+        const current = preferences.getIcloudSyncStatus();
+        preferences.setIcloudSyncStatus({
+          state: 'error',
+          lastSyncAt: current.lastSyncAt,
+          lastStatusAt: Date.now(),
+          lastFetchAt: current.lastFetchAt,
+          lastSendAt: current.lastSendAt,
+          initialFetchCompleted: current.initialFetchCompleted,
+          errorMessage: normalizeErrorMessage(error, '원격 문서를 반영하지 못했습니다.'),
+        });
       }
       return;
     }

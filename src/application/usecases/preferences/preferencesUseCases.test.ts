@@ -108,4 +108,23 @@ describe('preferences usecases', () => {
     expect(preferences.setGlobalShortcutError).toHaveBeenCalledWith('이미 다른 앱에서 사용 중입니다.');
     expect(preferences.setGlobalToggleShortcut).not.toHaveBeenCalledWith('Cmd+Shift+K');
   });
+
+  it('refreshes icloud sync immediately after enabling it', async () => {
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const backend = {
+      setIcloudSyncEnabled: vi.fn(async () => true),
+      refreshIcloudSync: vi.fn(async () => true),
+    };
+
+    const useCases = createPreferencesUseCases({
+      backend: backend as never,
+      preferences: preferences as never,
+      workspace: workspace as never,
+    });
+
+    await useCases.setIcloudSyncEnabled(true);
+
+    expect(backend.refreshIcloudSync).toHaveBeenCalledTimes(1);
+  });
 });

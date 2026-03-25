@@ -4,6 +4,7 @@ import Foundation
 
 enum IncomingMessage: Decodable {
   case start(StartPayload)
+  case refresh
   case notifyChanged(DocumentIdPayload)
   case notifyDeleted(DocumentIdPayload)
   case notifyReset
@@ -21,6 +22,7 @@ enum IncomingMessage: Decodable {
 
   private enum MessageType: String, Decodable {
     case start
+    case refresh
     case notifyChanged = "notify-changed"
     case notifyDeleted = "notify-deleted"
     case notifyReset = "notify-reset"
@@ -34,6 +36,7 @@ enum IncomingMessage: Decodable {
     let type = try container.decode(MessageType.self, forKey: .type)
     switch type {
     case .start:        self = .start(try StartPayload(from: decoder))
+    case .refresh:      self = .refresh
     case .notifyChanged: self = .notifyChanged(try DocumentIdPayload(from: decoder))
     case .notifyDeleted: self = .notifyDeleted(try DocumentIdPayload(from: decoder))
     case .notifyReset:  self = .notifyReset

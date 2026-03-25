@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
 import { appUseCases, syncEventPort } from '../app/runtime';
+import { useWorkspaceStore } from '../stores/workspaceStore';
 
 export function useSyncEventListener() {
+  const icloudSyncEnabled = useWorkspaceStore((state) => state.icloudSyncEnabled);
+
   useEffect(() => {
     let unlistenFn: (() => void) | null = null;
     let disposed = false;
@@ -13,6 +16,9 @@ export function useSyncEventListener() {
         fn();
       } else {
         unlistenFn = fn;
+        if (icloudSyncEnabled) {
+          void appUseCases.refreshIcloudSync();
+        }
       }
     });
 
@@ -20,5 +26,5 @@ export function useSyncEventListener() {
       disposed = true;
       unlistenFn?.();
     };
-  }, []);
+  }, [icloudSyncEnabled]);
 }

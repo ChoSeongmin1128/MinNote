@@ -71,6 +71,16 @@ final class SyncEngine: NSObject {
     }
   }
 
+  func refresh() async {
+    do {
+      emitCurrentStatus(state: "syncing")
+      try await engine?.fetchChanges()
+    } catch {
+      emitMessage(ErrorMessage(message: "동기화 새로고침 실패: \(error.localizedDescription)"))
+      emitCurrentStatus(state: "error")
+    }
+  }
+
   // MARK: - Private
 
   private func ensureZoneExists() async throws {
