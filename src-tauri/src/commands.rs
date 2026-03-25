@@ -313,6 +313,16 @@ pub fn refresh_icloud_sync(
 }
 
 #[tauri::command]
+pub fn confirm_app_shutdown(
+  state: State<'_, AppState>,
+  app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+  state.set_shutdown_confirmed(true);
+  app_handle.exit(0);
+  Ok(())
+}
+
+#[tauri::command]
 pub fn set_default_block_kind(
   state: State<'_, AppState>,
   kind: BlockKind,

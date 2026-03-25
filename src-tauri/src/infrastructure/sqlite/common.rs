@@ -21,6 +21,17 @@ impl SqliteStore {
     kind: BlockKind,
   ) -> Result<Block, AppError> {
     let now = Self::now();
+    Self::insert_empty_block_with_timestamps(connection, document_id, position, kind, now, now)
+  }
+
+  pub(crate) fn insert_empty_block_with_timestamps(
+    connection: &Connection,
+    document_id: &str,
+    position: i64,
+    kind: BlockKind,
+    created_at: i64,
+    updated_at: i64,
+  ) -> Result<Block, AppError> {
     let content = match kind {
       BlockKind::Markdown => String::new(),
       BlockKind::Code | BlockKind::Text => String::new(),
@@ -35,8 +46,8 @@ impl SqliteStore {
       content,
       search_text,
       language,
-      created_at: now,
-      updated_at: now,
+      created_at,
+      updated_at,
     };
 
     connection.execute(

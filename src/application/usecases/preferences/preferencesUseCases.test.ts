@@ -127,4 +127,31 @@ describe('preferences usecases', () => {
 
     expect(backend.refreshIcloudSync).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps icloud enabled in preferences when refresh fails after enabling', async () => {
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const backend = {
+      setIcloudSyncEnabled: vi.fn(async () => true),
+      refreshIcloudSync: vi.fn(async () => {
+        throw new Error('refresh failed');
+      }),
+    };
+
+    const useCases = createPreferencesUseCases({
+      backend: backend as never,
+      preferences: preferences as never,
+      workspace: workspace as never,
+    });
+
+    await useCases.setIcloudSyncEnabled(true);
+
+    expect(preferences.setIcloudSyncEnabled).toHaveBeenCalledWith(true);
+    expect(preferences.setIcloudSyncStatus).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        state: 'error',
+        errorMessage: 'refresh failed',
+      }),
+    );
+  });
 });

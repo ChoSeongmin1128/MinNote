@@ -229,6 +229,32 @@ describe('handleSyncEventMessage (remote-changed)', () => {
     expect(session.setCurrentDocument).not.toHaveBeenCalled();
   });
 
+  it('preserves runtime icloud sync status when remote documents are applied', async () => {
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const session = createSessionGateway(createDocument('doc-1'));
+    const payload = { ...createPayload('markdown'), documents: [createSummary('doc-1')], currentDocument: createDocument('doc-1') };
+    const useCases = createWorkspaceUseCases({
+      backend: {
+        bootstrapApp: vi.fn(),
+        getWindowControlRuntimeState: vi.fn(),
+        searchDocuments: vi.fn(),
+        deleteAllDocuments: vi.fn(),
+        applyRemoteDocuments: vi.fn(async () => payload),
+      } as never,
+      documentSync: { clearAllDocumentSync: vi.fn() } as never,
+      preferences: preferences as never,
+      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
+      session,
+      syncMutation: { enqueue: vi.fn() },
+      workspace,
+    });
+
+    await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
+
+    expect(preferences.setIcloudSyncStatus).not.toHaveBeenCalled();
+  });
+
   it('stores an error when remote documents cannot be applied', async () => {
     const workspace = createWorkspaceGateway();
     const preferences = createPreferencesGateway();

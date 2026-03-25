@@ -140,10 +140,6 @@ export function useAppShortcuts() {
       void pasteBlocks(text);
     };
 
-    const onBeforeUnload = () => {
-      void flushCurrentDocument();
-    };
-
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key === 'Backspace') {
         resetHoldState();
@@ -153,12 +149,10 @@ export function useAppShortcuts() {
     window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('keyup', onKeyUp, true);
     window.addEventListener('paste', onPaste, true);
-    window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('keyup', onKeyUp, true);
       window.removeEventListener('paste', onPaste, true);
-      window.removeEventListener('beforeunload', onBeforeUnload);
     };
   }, [
     allBlocksSelected,

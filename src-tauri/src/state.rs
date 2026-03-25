@@ -15,6 +15,7 @@ pub struct AppState {
   pub repository: Mutex<SqliteStore>,
   pub sync_manager: Mutex<SyncManager>,
   pub window_controls: Mutex<WindowControlState>,
+  pub shutdown_confirmed: Mutex<bool>,
   pub db_path: PathBuf,
   pub sync_state_path: PathBuf,
 }
@@ -31,6 +32,7 @@ impl AppState {
       repository: Mutex::new(repository),
       sync_manager: Mutex::new(SyncManager::new()),
       window_controls: Mutex::new(WindowControlState::default()),
+      shutdown_confirmed: Mutex::new(false),
       db_path: db_path.to_path_buf(),
       sync_state_path,
     })
@@ -79,6 +81,16 @@ impl AppState {
   pub fn set_global_shortcut_error(&self, error: Option<String>) {
     if let Ok(mut state) = self.window_controls.lock() {
       state.global_shortcut_error = error;
+    }
+  }
+
+  pub fn shutdown_confirmed(&self) -> bool {
+    self.shutdown_confirmed.lock().map(|state| *state).unwrap_or(false)
+  }
+
+  pub fn set_shutdown_confirmed(&self, confirmed: bool) {
+    if let Ok(mut state) = self.shutdown_confirmed.lock() {
+      *state = confirmed;
     }
   }
 }

@@ -3,13 +3,14 @@
 set -euo pipefail
 
 if [ "$#" -lt 3 ]; then
-  echo "usage: $0 <app-path> <output-dir> <version>"
+  echo "usage: $0 <app-path> <output-dir> <version> [arch]"
   exit 1
 fi
 
 APP_PATH="$1"
 OUTPUT_DIR="$2"
 VERSION="$3"
+ARCH="${4:-aarch64}"
 STAGING_DIR="$OUTPUT_DIR/dmg-staging"
 
 mkdir -p "$OUTPUT_DIR"
@@ -19,7 +20,7 @@ mkdir -p "$STAGING_DIR"
 cp -R "$APP_PATH" "$STAGING_DIR/MinNote.app"
 ln -s /Applications "$STAGING_DIR/Applications"
 
-FINAL_DMG="$OUTPUT_DIR/MinNote_${VERSION}_aarch64.dmg"
+FINAL_DMG="$OUTPUT_DIR/MinNote_${VERSION}_${ARCH}.dmg"
 rm -f "$FINAL_DMG"
 
 hdiutil create \

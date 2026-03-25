@@ -7,6 +7,7 @@ import type { SessionGateway } from '../../ports/sessionGateway';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
 
 export type CurrentDocumentStrategy = 'always' | 'if-missing' | 'match-current';
+export type SyncStatusStrategy = 'preserve' | 'reset';
 
 export function findBlock(document: DocumentVm, blockId: string) {
   return document.blocks.find((block) => block.id === blockId) ?? null;
@@ -38,6 +39,7 @@ export function applyBootstrapPayloadState(
   session: SessionGateway,
   payload: WorkspaceBootstrapState,
   currentDocumentStrategy: CurrentDocumentStrategy = 'always',
+  syncStatusStrategy: SyncStatusStrategy = 'preserve',
 ) {
   workspace.setDocuments(payload.documents);
   workspace.setTrashDocuments(payload.trashDocuments);
@@ -46,15 +48,17 @@ export function applyBootstrapPayloadState(
   preferences.setDefaultDocumentSurfaceTonePreset(payload.defaultDocumentSurfaceTonePreset);
   preferences.setDefaultBlockKind(payload.defaultBlockKind);
   preferences.setIcloudSyncEnabled(payload.icloudSyncEnabled);
-  preferences.setIcloudSyncStatus({
-    state: payload.icloudSyncEnabled ? 'syncing' : 'disabled',
-    lastSyncAt: null,
-    lastStatusAt: payload.icloudSyncEnabled ? Date.now() : null,
-    lastFetchAt: null,
-    lastSendAt: null,
-    initialFetchCompleted: false,
-    errorMessage: null,
-  });
+  if (syncStatusStrategy === 'reset') {
+    preferences.setIcloudSyncStatus({
+      state: payload.icloudSyncEnabled ? 'syncing' : 'disabled',
+      lastSyncAt: null,
+      lastStatusAt: payload.icloudSyncEnabled ? Date.now() : null,
+      lastFetchAt: null,
+      lastSendAt: null,
+      initialFetchCompleted: false,
+      errorMessage: null,
+    });
+  }
   preferences.setMenuBarIconEnabled(payload.menuBarIconEnabled);
   preferences.setAlwaysOnTopEnabled(payload.alwaysOnTopEnabled);
   preferences.setWindowOpacityPercent(payload.windowOpacityPercent);

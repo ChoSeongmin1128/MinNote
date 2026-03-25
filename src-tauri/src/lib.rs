@@ -19,6 +19,11 @@ use window_controls::{apply_window_preferences_with_settings, menu_bar_icon, reg
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 pub(crate) const TRAY_ID: &str = "minnote-tray";
+const APP_SHUTDOWN_REQUESTED_EVENT: &str = "app-shutdown-requested";
+
+fn emit_shutdown_request(app_handle: &tauri::AppHandle) {
+  let _ = app_handle.emit(APP_SHUTDOWN_REQUESTED_EVENT, ());
+}
 
 #[cfg(target_os = "macos")]
 pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
@@ -84,7 +89,7 @@ pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon>
             let _ = window.emit("tray-open-settings", ());
           }
         }
-        "quit" => app.exit(0),
+        "quit" => emit_shutdown_request(app),
         _ => {}
       }
     });
@@ -168,11 +173,20 @@ pub fn run() {
     })
     .on_window_event(|window, event| {
       if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        if let Some(state) = window.app_handle().try_state::<AppState>() {
+          if state.shutdown_confirmed() {
+            return;
+          }
+        }
+
         let tray_enabled = window.app_handle().tray_by_id(TRAY_ID).is_some();
         if tray_enabled {
           let _ = window.app_handle().save_window_state(StateFlags::all());
           api.prevent_close();
           let _ = window.hide();
+        } else {
+          api.prevent_close();
+          emit_shutdown_request(window.app_handle());
         }
       }
     })
@@ -204,6 +218,7 @@ pub fn run() {
       commands::restore_document_from_trash,
       commands::set_icloud_sync_enabled,
       commands::refresh_icloud_sync,
+      commands::confirm_app_shutdown,
       commands::set_menu_bar_icon_enabled,
       commands::set_default_block_kind,
       commands::set_always_on_top_enabled,
@@ -219,6 +234,17 @@ pub fn run() {
         // Dock 아이콘 클릭 → 항상 창 복원
         tauri::RunEvent::Reopen { .. } => {
           let _ = show_main_window(app);
+        }
+        tauri::RunEvent::ExitRequested { api, .. } => {
+          if let Some(state) = app.try_state::<AppState>() {
+            if state.shutdown_confirmed() {
+              state.set_shutdown_confirmed(false);
+              return;
+            }
+          }
+
+          api.prevent_exit();
+          emit_shutdown_request(app);
         }
         _ => {}
       }

@@ -91,6 +91,9 @@ export const backendPort: BackendPort = {
   refreshIcloudSync() {
     return desktopApi.refreshIcloudSync();
   },
+  confirmAppShutdown() {
+    return desktopApi.confirmAppShutdown();
+  },
   setMenuBarIconEnabled(enabled) {
     return desktopApi.setMenuBarIconEnabled(enabled);
   },

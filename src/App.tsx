@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { AlertCircle, LoaderCircle, PanelLeft } from 'lucide-react';
-import { bootstrapApp } from './app/actions';
+import { bootstrapApp, confirmAppShutdown, flushCurrentDocument } from './app/actions';
 import { AppUpdateButton } from './components/AppUpdateButton';
 import { DocumentMenu } from './components/DocumentMenu';
 import { Sidebar } from './components/Sidebar';
@@ -42,6 +42,7 @@ function App() {
   const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
   const isSettingsOpen = useWorkspaceStore((state) => state.isSettingsOpen);
   const setSettingsOpen = useWorkspaceStore((state) => state.setSettingsOpen);
+  const setWorkspaceError = useWorkspaceStore((state) => state.setError);
   const desktopSidebarExpanded = useWorkspaceStore((state) => state.desktopSidebarExpanded);
   const mobileSidebarOpen = useWorkspaceStore((state) => state.mobileSidebarOpen);
   const setDesktopSidebarExpanded = useWorkspaceStore((state) => state.setDesktopSidebarExpanded);
@@ -64,6 +65,34 @@ function App() {
       void unlisten.then((fn) => fn());
     };
   }, [setSettingsOpen]);
+
+  useEffect(() => {
+    let shuttingDown = false;
+
+    const unlisten = listen('app-shutdown-requested', async () => {
+      if (shuttingDown) {
+        return;
+      }
+
+      shuttingDown = true;
+      try {
+        await flushCurrentDocument();
+        await confirmAppShutdown();
+      } catch (shutdownError) {
+        const message =
+          shutdownError instanceof Error
+            ? shutdownError.message
+            : '종료 전에 변경 내용을 저장하지 못했습니다.';
+        setWorkspaceError(message);
+      } finally {
+        shuttingDown = false;
+      }
+    });
+
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [setWorkspaceError]);
 
   useEffect(() => {
     document.documentElement.dataset.themeMode = themeMode;

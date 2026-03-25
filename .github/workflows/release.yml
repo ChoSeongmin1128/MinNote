@@ -70,94 +70,73 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Build unsigned app bundle
+      - name: Build, sign, notarize, and package app bundles
         env:
           CI: true
-        run: |
-          pnpm tauri build --bundles app --no-sign --verbose
-
-      - name: Sign app bundle manually
-        env:
-          APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
-        run: |
-          APP_PATH="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name 'MinNote.app' -print -quit)"
-          ENTITLEMENTS_PATH="src-tauri/Entitlements.plist"
-
-          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-            echo "MinNote.app not found for signing"
-            exit 1
-          fi
-
-          xattr -crs "$APP_PATH"
-
-          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote-sync"
-          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
-          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH"
-
-      - name: Notarize app bundle
-        env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          APP_PATH="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name 'MinNote.app' -print -quit)"
-          APP_ZIP_PATH="MinNote.app.zip"
-
-          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-            echo "MinNote.app not found for notarization"
-            exit 1
-          fi
-
-          rm -f "$APP_ZIP_PATH"
-          ditto -c -k --keepParent --sequesterRsrc "$APP_PATH" "$APP_ZIP_PATH"
-
-          xcrun notarytool submit "$APP_ZIP_PATH" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait
-
-          xcrun stapler staple "$APP_PATH"
-
-      - name: Verify macOS app signing
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          APP_PATH="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name 'MinNote.app' -print -quit)"
-
-          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-            echo "MinNote.app not found after build"
-            exit 1
-          fi
-
-          SIGN_INFO="$(codesign -dv --verbose=4 "$APP_PATH" 2>&1)"
-          echo "$SIGN_INFO"
-
-          echo "$SIGN_INFO" | grep -q "Authority=Developer ID Application: SEONGMIN CHO ($APPLE_TEAM_ID)"
-          echo "$SIGN_INFO" | grep -q "TeamIdentifier=$APPLE_TEAM_ID"
-
-          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-          xcrun stapler validate "$APP_PATH"
-          spctl -a -vv -t exec "$APP_PATH"
-
-      - name: Package notarized app archive
-        run: |
-          APP_PATH="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name 'MinNote.app' -print -quit)"
-          tar -czf MinNote_aarch64.app.tar.gz -C "$(dirname "$APP_PATH")" "$(basename "$APP_PATH")"
-
-      - name: Sign updater archive
-        env:
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           unset TAURI_SIGNING_PRIVATE_KEY_PATH
-          pnpm exec tauri signer sign MinNote_aarch64.app.tar.gz
+          ENTITLEMENTS_PATH="src-tauri/Entitlements.plist"
+
+          for TARGET in aarch64-apple-darwin x86_64-apple-darwin
+          do
+            case "$TARGET" in
+              aarch64-apple-darwin) ARCH_LABEL="aarch64" ;;
+              x86_64-apple-darwin) ARCH_LABEL="x86_64" ;;
+            esac
+
+            pnpm exec tauri build --bundles app --target "$TARGET" --no-sign --verbose
+
+            APP_PATH="src-tauri/target/$TARGET/release/bundle/macos/MinNote.app"
+            APP_ZIP_PATH="MinNote_${ARCH_LABEL}.app.zip"
+            APP_TAR_PATH="MinNote_${ARCH_LABEL}.app.tar.gz"
+
+            if [ ! -d "$APP_PATH" ]; then
+              echo "MinNote.app not found for $TARGET"
+              exit 1
+            fi
+
+            xattr -crs "$APP_PATH"
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote-sync"
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH"
+
+            rm -f "$APP_ZIP_PATH"
+            ditto -c -k --keepParent --sequesterRsrc "$APP_PATH" "$APP_ZIP_PATH"
+
+            xcrun notarytool submit "$APP_ZIP_PATH" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+
+            xcrun stapler staple "$APP_PATH"
+
+            SIGN_INFO="$(codesign -dv --verbose=4 "$APP_PATH" 2>&1)"
+            echo "$SIGN_INFO"
+            echo "$SIGN_INFO" | grep -q "Authority=Developer ID Application: SEONGMIN CHO ($APPLE_TEAM_ID)"
+            echo "$SIGN_INFO" | grep -q "TeamIdentifier=$APPLE_TEAM_ID"
+
+            codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+            xcrun stapler validate "$APP_PATH"
+            spctl -a -vv -t exec "$APP_PATH"
+
+            tar -czf "$APP_TAR_PATH" -C "$(dirname "$APP_PATH")" "$(basename "$APP_PATH")"
+            pnpm exec tauri signer sign "$APP_TAR_PATH"
+          done
 
       - name: Upload notarized app artifact
         uses: actions/upload-artifact@v4
         with:
           name: notarized-app-bundle
-          path: MinNote_aarch64.app.tar.gz
+          path: |
+            MinNote_aarch64.app.tar.gz
+            MinNote_x86_64.app.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -186,38 +165,45 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-          APP_TAR_FILE="MinNote_aarch64.app.tar.gz"
-          SIG_FILE="MinNote_aarch64.app.tar.gz.sig"
+          ARM_APP_TAR_FILE="MinNote_aarch64.app.tar.gz"
+          ARM_SIG_FILE="MinNote_aarch64.app.tar.gz.sig"
+          X64_APP_TAR_FILE="MinNote_x86_64.app.tar.gz"
+          X64_SIG_FILE="MinNote_x86_64.app.tar.gz.sig"
 
-          if [ -z "$APP_TAR_FILE" ] || [ ! -f "$APP_TAR_FILE" ]; then
-            echo "App archive not found"
-            exit 1
-          fi
+          for FILE in "$ARM_APP_TAR_FILE" "$ARM_SIG_FILE" "$X64_APP_TAR_FILE" "$X64_SIG_FILE"
+          do
+            if [ ! -f "$FILE" ]; then
+              echo "Missing release asset: $FILE"
+              exit 1
+            fi
+          done
 
-          if [ -z "$SIG_FILE" ] || [ ! -f "$SIG_FILE" ]; then
-            echo "Signature file not found"
-            exit 1
-          fi
+          gh release upload "$TAG" "$ARM_APP_TAR_FILE#MinNote_aarch64.app.tar.gz" --clobber
+          gh release upload "$TAG" "$ARM_SIG_FILE#MinNote_aarch64.app.tar.gz.sig" --clobber
+          gh release upload "$TAG" "$X64_APP_TAR_FILE#MinNote_x86_64.app.tar.gz" --clobber
+          gh release upload "$TAG" "$X64_SIG_FILE#MinNote_x86_64.app.tar.gz.sig" --clobber
 
-          gh release upload "$TAG" "$APP_TAR_FILE#MinNote_aarch64.app.tar.gz" --clobber
-          gh release upload "$TAG" "$SIG_FILE#MinNote_aarch64.app.tar.gz.sig" --clobber
-
-          SIGNATURE="$(cat "$SIG_FILE")"
+          ARM_SIGNATURE="$(cat "$ARM_SIG_FILE")"
+          X64_SIGNATURE="$(cat "$X64_SIG_FILE")"
           PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$TAG/MinNote_aarch64.app.tar.gz"
+          ARM_DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$TAG/MinNote_aarch64.app.tar.gz"
+          X64_DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$TAG/MinNote_x86_64.app.tar.gz"
 
           jq -n \
             --arg version "$VERSION" \
             --arg notes "MinNote $TAG 업데이트" \
             --arg pub_date "$PUB_DATE" \
-            --arg sig "$SIGNATURE" \
-            --arg url "$DOWNLOAD_URL" \
+            --arg arm_sig "$ARM_SIGNATURE" \
+            --arg arm_url "$ARM_DOWNLOAD_URL" \
+            --arg x64_sig "$X64_SIGNATURE" \
+            --arg x64_url "$X64_DOWNLOAD_URL" \
             '{
               version: $version,
               notes: $notes,
               pub_date: $pub_date,
               platforms: {
-                "darwin-aarch64": { signature: $sig, url: $url }
+                "darwin-aarch64": { signature: $arm_sig, url: $arm_url },
+                "darwin-x86_64": { signature: $x64_sig, url: $x64_url }
               }
             }' > latest.json
 
@@ -261,8 +247,9 @@ jobs:
 
       - name: Extract notarized app bundle
         run: |
-          mkdir -p dist
-          tar -xzf MinNote_aarch64.app.tar.gz -C dist
+          mkdir -p dist/aarch64 dist/x86_64
+          tar -xzf MinNote_aarch64.app.tar.gz -C dist/aarch64
+          tar -xzf MinNote_x86_64.app.tar.gz -C dist/x86_64
 
       - name: Create signed and notarized DMG
         env:
@@ -273,26 +260,39 @@ jobs:
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
-          DMG_PATH="$(./scripts/create-dmg.sh dist/MinNote.app dist "$VERSION")"
-          codesign --force --sign "$APPLE_SIGNING_IDENTITY" "$DMG_PATH"
-          xcrun notarytool submit "$DMG_PATH" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait
-          xcrun stapler staple "$DMG_PATH"
-          echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
+          for ARCH in aarch64 x86_64
+          do
+            DMG_PATH="$(./scripts/create-dmg.sh "dist/$ARCH/MinNote.app" dist "$VERSION" "$ARCH")"
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY" "$DMG_PATH"
+            xcrun notarytool submit "$DMG_PATH" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+            xcrun stapler staple "$DMG_PATH"
+          done
 
       - name: Verify DMG
         run: |
-          xcrun stapler validate "$DMG_PATH"
-          spctl -a -vv -t open "$DMG_PATH"
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          for ARCH in aarch64 x86_64
+          do
+            DMG_PATH="dist/MinNote_${VERSION}_${ARCH}.dmg"
+            xcrun stapler validate "$DMG_PATH"
+            spctl -a -vv -t open "$DMG_PATH"
+          done
 
       - name: Upload DMG to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" "$DMG_PATH#$(basename "$DMG_PATH")" --clobber
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          gh release upload "${{ github.ref_name }}" \
+            "dist/MinNote_${VERSION}_aarch64.dmg#MinNote_${VERSION}_aarch64.dmg" \
+            "dist/MinNote_${VERSION}_x86_64.dmg#MinNote_${VERSION}_x86_64.dmg" \
+            --clobber
 
       - name: Publish GitHub release
         env:

@@ -26,6 +26,7 @@ export const undoBlockOperation = appUseCases.undoBlockOperation;
 export const redoBlockOperation = appUseCases.redoBlockOperation;
 
 export const bootstrapApp = appUseCases.bootstrapApp;
+export const confirmAppShutdown = appUseCases.confirmAppShutdown;
 export const setSearchQuery = appUseCases.setSearchQuery;
 export const setThemeMode = appUseCases.setThemeMode;
 export const setDefaultBlockTintPreset = appUseCases.setDefaultBlockTintPreset;

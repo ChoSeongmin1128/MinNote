@@ -3,8 +3,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, RemoteBlockJson, RemoteDocumentDto, SearchResultDto};
 use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, ThemeMode};
 use crate::error::AppError;
-use crate::ports::models::RestoreBlockInput;
+use crate::ports::models::{RemoteRestoreBlockInput, RestoreBlockInput};
 use crate::ports::repositories::AppRepository;
+
+#[cfg(test)]
+use crate::ports::models::RemoteDocumentApplyOutcome;
 
 fn now_ms() -> i64 {
   SystemTime::now()
@@ -396,7 +399,7 @@ pub fn apply_remote_documents(
       .as_deref()
       .map(crate::domain::models::DocumentSurfaceTonePreset::from_str);
 
-    let document = repository.upsert_document_from_remote(
+    let outcome = repository.upsert_document_from_remote(
       &remote.id,
       remote.title,
       block_tint,
@@ -406,28 +409,31 @@ pub fn apply_remote_documents(
       remote.deleted_at,
     )?;
 
-    // deleted_at이 없는 문서만 블록을 복원
-    if document.deleted_at.is_none() {
-      let remote_blocks: Vec<RemoteBlockJson> =
-        serde_json::from_str(&remote.blocks_json).unwrap_or_default();
-
-      let restore_inputs: Vec<RestoreBlockInput> = remote_blocks
-        .into_iter()
-        .map(|b| RestoreBlockInput {
-          id: b.id,
-          kind: crate::domain::models::BlockKind::from_str(&b.kind),
-          content: b.content,
-          language: b.language,
-          position: b.position,
-        })
-        .collect();
-
-      if !restore_inputs.is_empty() {
-        repository.restore_blocks(&remote.id, &restore_inputs)?;
-      }
-
-      repository.rebuild_search_index_for_document(&remote.id)?;
+    if !outcome.applied || outcome.document.deleted_at.is_some() {
+      continue;
     }
+
+    let remote_blocks: Vec<RemoteBlockJson> = serde_json::from_str(&remote.blocks_json)
+      .map_err(|error| AppError::validation(format!("원격 블록 데이터를 해석하지 못했습니다: {error}")))?;
+
+    let restore_inputs: Vec<RemoteRestoreBlockInput> = remote_blocks
+      .into_iter()
+      .map(|b| RemoteRestoreBlockInput {
+        id: b.id,
+        kind: crate::domain::models::BlockKind::from_str(&b.kind),
+        content: b.content,
+        language: b.language,
+        position: b.position,
+        created_at: b.created_at,
+        updated_at: b.updated_at,
+      })
+      .collect();
+
+    repository.restore_blocks_from_remote(
+      &remote.id,
+      &restore_inputs,
+      outcome.document.updated_at,
+    )?;
   }
 
   bootstrap_app(repository)
@@ -482,6 +488,8 @@ mod tests {
     trash_document_summaries: Vec<DocumentSummary>,
     last_opened_document_id: Option<String>,
     restored_inputs: Vec<Vec<RestoreBlockInput>>,
+    remote_restored_inputs: Vec<Vec<RemoteRestoreBlockInput>>,
+    next_remote_apply_outcome: Option<RemoteDocumentApplyOutcome>,
   }
 
   impl MockRepository {
@@ -536,6 +544,8 @@ mod tests {
         trash_document_summaries: vec![],
         last_opened_document_id: Some("doc-1".to_string()),
         restored_inputs: vec![],
+        remote_restored_inputs: vec![],
+        next_remote_apply_outcome: None,
       }
     }
   }
@@ -627,10 +637,21 @@ mod tests {
       _created_at: i64,
       _updated_at: i64,
       _deleted_at: Option<i64>,
-    ) -> Result<Document, AppError> {
-      Ok(self.current_document.clone())
+    ) -> Result<RemoteDocumentApplyOutcome, AppError> {
+      Ok(self.next_remote_apply_outcome.clone().unwrap_or(RemoteDocumentApplyOutcome {
+        document: self.current_document.clone(),
+        applied: true,
+      }))
     }
-    fn rebuild_search_index_for_document(&self, _document_id: &str) -> Result<(), AppError> { Ok(()) }
+    fn restore_blocks_from_remote(
+      &mut self,
+      _document_id: &str,
+      blocks: &[RemoteRestoreBlockInput],
+      _document_updated_at: i64,
+    ) -> Result<Vec<Block>, AppError> {
+      self.remote_restored_inputs.push(blocks.to_vec());
+      Ok(self.current_blocks.clone())
+    }
   }
 
   #[test]
@@ -700,5 +721,75 @@ mod tests {
     let error = set_window_opacity_percent(&mut repository, 40).expect_err("should fail");
 
     assert_eq!(error.to_string(), "창 투명도는 50%에서 100% 사이여야 합니다.");
+  }
+
+  #[test]
+  fn apply_remote_documents_restores_remote_block_timestamps() {
+    let mut repository = MockRepository::new(BlockKind::Markdown);
+
+    let _ = apply_remote_documents(
+      &mut repository,
+      vec![RemoteDocumentDto {
+        id: "doc-1".to_string(),
+        title: Some("Doc".to_string()),
+        block_tint_override: Some("mist".to_string()),
+        document_surface_tone_override: Some("paper".to_string()),
+        blocks_json: serde_json::json!([
+          {
+            "id": "remote-block-1",
+            "kind": "markdown",
+            "content": "# Hello",
+            "language": null,
+            "position": 0,
+            "createdAt": 111,
+            "updatedAt": 222
+          }
+        ])
+        .to_string(),
+        created_at: 10,
+        updated_at: 20,
+        deleted_at: None,
+      }],
+    )
+    .expect("remote apply should succeed");
+
+    assert_eq!(
+      repository.remote_restored_inputs,
+      vec![vec![RemoteRestoreBlockInput {
+        id: "remote-block-1".to_string(),
+        kind: BlockKind::Markdown,
+        content: "# Hello".to_string(),
+        language: None,
+        position: 0,
+        created_at: 111,
+        updated_at: 222,
+      }]],
+    );
+  }
+
+  #[test]
+  fn apply_remote_documents_skips_block_restore_when_remote_document_is_older() {
+    let mut repository = MockRepository::new(BlockKind::Markdown);
+    repository.next_remote_apply_outcome = Some(RemoteDocumentApplyOutcome {
+      document: repository.current_document.clone(),
+      applied: false,
+    });
+
+    let _ = apply_remote_documents(
+      &mut repository,
+      vec![RemoteDocumentDto {
+        id: "doc-1".to_string(),
+        title: Some("Doc".to_string()),
+        block_tint_override: Some("mist".to_string()),
+        document_surface_tone_override: Some("paper".to_string()),
+        blocks_json: "[]".to_string(),
+        created_at: 10,
+        updated_at: 20,
+        deleted_at: None,
+      }],
+    )
+    .expect("remote apply should succeed");
+
+    assert!(repository.remote_restored_inputs.is_empty());
   }
 }

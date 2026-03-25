@@ -1,9 +1,13 @@
 import { useEffect, useEffectEvent } from 'react';
-import { APP_UPDATE_CHECK_INTERVAL_MS, runUpdateCheck } from '../lib/appUpdater';
+import { APP_UPDATE_CHECK_INTERVAL_MS, runUpdateCheckFrom } from '../lib/appUpdater';
 
 export function useAppUpdater(enabled: boolean) {
-  const triggerUpdateCheck = useEffectEvent(() => {
-    void runUpdateCheck();
+  const triggerInitialCheck = useEffectEvent(() => {
+    void runUpdateCheckFrom('auto-initial');
+  });
+
+  const triggerIntervalCheck = useEffectEvent(() => {
+    void runUpdateCheckFrom('auto-interval');
   });
 
   useEffect(() => {
@@ -11,14 +15,14 @@ export function useAppUpdater(enabled: boolean) {
       return undefined;
     }
 
-    triggerUpdateCheck();
+    triggerInitialCheck();
 
     const timerId = window.setInterval(() => {
-      triggerUpdateCheck();
+      triggerIntervalCheck();
     }, APP_UPDATE_CHECK_INTERVAL_MS);
 
     return () => {
       window.clearInterval(timerId);
     };
-  }, [enabled, triggerUpdateCheck]);
+  }, [enabled, triggerInitialCheck, triggerIntervalCheck]);
 }

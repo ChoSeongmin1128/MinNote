@@ -106,6 +106,8 @@ pub struct RemoteBlockJson {
   pub content: String,
   pub language: Option<String>,
   pub position: i64,
+  pub created_at: i64,
+  pub updated_at: i64,
 }
 
 impl TryFrom<Block> for BlockDto {

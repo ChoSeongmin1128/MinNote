@@ -111,7 +111,7 @@ export function createDocumentUseCases({
       const payload = await backend.deleteDocument(documentId);
       workspace.clearError();
       documentSync.clearDocumentSync(documentId);
-      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
+      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always', 'preserve');
       workspace.setSettingsOpen(false);
       syncMutation.enqueue({ kind: 'document-deleted', documentId });
     } catch (error) {
@@ -133,7 +133,7 @@ export function createDocumentUseCases({
     try {
       const payload = await backend.restoreDocumentFromTrash(documentId);
       workspace.clearError();
-      applyBootstrapPayloadState(preferences, workspace, session, payload, 'if-missing');
+      applyBootstrapPayloadState(preferences, workspace, session, payload, 'if-missing', 'preserve');
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 복원하지 못했습니다.'));
     }

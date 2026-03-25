@@ -16,6 +16,32 @@ export function createPreferencesUseCases({
 }: PreferencesUseCaseDeps) {
   let opacityRequestToken = 0;
 
+  function debugIcloud(message: string, payload?: unknown) {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    if (payload === undefined) {
+      console.info(`[icloud] ${message}`);
+      return;
+    }
+
+    console.info(`[icloud] ${message}`, payload);
+  }
+
+  function setIcloudStatusError(message: string) {
+    const current = preferences.getIcloudSyncStatus();
+    preferences.setIcloudSyncStatus({
+      state: 'error',
+      lastSyncAt: current.lastSyncAt,
+      lastStatusAt: Date.now(),
+      lastFetchAt: current.lastFetchAt,
+      lastSendAt: current.lastSendAt,
+      initialFetchCompleted: current.initialFetchCompleted,
+      errorMessage: message,
+    });
+  }
+
   async function setThemeMode(themeMode: Parameters<BackendPort['setThemeMode']>[0]) {
     try {
       const nextThemeMode = await backend.setThemeMode(themeMode);
@@ -50,10 +76,9 @@ export function createPreferencesUseCases({
 
   async function setIcloudSyncEnabled(enabled: boolean) {
     try {
+      debugIcloud('toggle:requested', { enabled });
       const result = await backend.setIcloudSyncEnabled(enabled);
-      if (result) {
-        await backend.refreshIcloudSync();
-      }
+      debugIcloud('toggle:stored', { enabled: result });
       workspace.clearError();
       preferences.setIcloudSyncEnabled(result);
       preferences.setIcloudSyncStatus({
@@ -65,16 +90,37 @@ export function createPreferencesUseCases({
         initialFetchCompleted: false,
         errorMessage: null,
       });
+
+      if (result) {
+        try {
+          debugIcloud('refresh:requested-after-toggle');
+          await backend.refreshIcloudSync();
+          debugIcloud('refresh:completed-after-toggle');
+        } catch (error) {
+          const message = normalizeErrorMessage(error, 'iCloud 동기화를 새로고침하지 못했습니다.');
+          debugIcloud('refresh:error-after-toggle', { message });
+          setIcloudStatusError(message);
+          workspace.setError(message);
+        }
+      }
     } catch (error) {
+      debugIcloud('toggle:error', {
+        enabled,
+        message: normalizeErrorMessage(error, 'iCloud 동기화 설정을 변경하지 못했습니다.'),
+      });
       workspace.setError(normalizeErrorMessage(error, 'iCloud 동기화 설정을 변경하지 못했습니다.'));
     }
   }
 
   async function refreshIcloudSync() {
     try {
+      debugIcloud('refresh:requested');
       return await backend.refreshIcloudSync();
     } catch (error) {
-      workspace.setError(normalizeErrorMessage(error, 'iCloud 동기화를 새로고침하지 못했습니다.'));
+      const message = normalizeErrorMessage(error, 'iCloud 동기화를 새로고침하지 못했습니다.');
+      debugIcloud('refresh:error', { message });
+      setIcloudStatusError(message);
+      workspace.setError(message);
       throw error;
     }
   }

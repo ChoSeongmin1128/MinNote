@@ -30,7 +30,7 @@ import { DocumentSurfacePreview } from './DocumentSurfacePreview';
 import { SegmentedSelector } from './SegmentedSelector';
 import type { BlockKind, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
-import { applyPreparedUpdate, formatUpdateStatusMessage, runUpdateCheck } from '../lib/appUpdater';
+import { applyPreparedUpdate, formatUpdateStatusMessage, runUpdateCheckFrom } from '../lib/appUpdater';
 import { ShortcutCaptureField } from './ShortcutCaptureField';
 import {
   MAX_WINDOW_OPACITY_PERCENT,
@@ -434,7 +434,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 || appUpdateStatus.state === 'installing'
               }
               onClick={() => {
-                void runUpdateCheck();
+                void runUpdateCheckFrom('settings-manual');
               }}
             >
               <RefreshCw size={14} />

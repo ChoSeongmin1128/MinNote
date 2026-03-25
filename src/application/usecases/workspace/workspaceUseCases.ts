@@ -31,6 +31,19 @@ export function createWorkspaceUseCases({
   let searchTimer: number | null = null;
   let searchRequestToken = 0;
 
+  function debugIcloud(message: string, payload?: unknown) {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    if (payload === undefined) {
+      console.info(`[icloud] ${message}`);
+      return;
+    }
+
+    console.info(`[icloud] ${message}`, payload);
+  }
+
   async function bootstrapApp() {
     workspace.setIsBootstrapping(true);
     workspace.setError(null);
@@ -38,7 +51,7 @@ export function createWorkspaceUseCases({
     try {
       const payload = await backend.bootstrapApp();
       const runtimeState = await backend.getWindowControlRuntimeState();
-      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
+      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always', 'reset');
       applyWindowControlRuntimeState(preferences, runtimeState);
       workspace.setSearchResults([]);
       workspace.setSearchQuery('');
@@ -84,7 +97,7 @@ export function createWorkspaceUseCases({
       const payload = await backend.deleteAllDocuments();
       workspace.clearError();
       documentSync.clearAllDocumentSync();
-      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
+      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always', 'preserve');
       workspace.setSettingsOpen(false);
       syncMutation.enqueue({ kind: 'documents-reset' });
     } catch (error) {
@@ -93,6 +106,7 @@ export function createWorkspaceUseCases({
   }
 
   async function handleSyncEventMessage(message: SyncEventMessage) {
+    debugIcloud('handle-event', message);
     if (message.type === 'status') {
       const state = message.state === 'idle'
         ? 'idle'
@@ -109,15 +123,25 @@ export function createWorkspaceUseCases({
         initialFetchCompleted: message.initialFetchCompleted,
         errorMessage: null,
       });
+      debugIcloud('status:applied', {
+        state,
+        lastSyncAt: message.lastSyncAt ?? current.lastSyncAt,
+        lastFetchAt: message.lastFetchAt ?? current.lastFetchAt,
+        lastSendAt: message.lastSendAt ?? current.lastSendAt,
+        initialFetchCompleted: message.initialFetchCompleted,
+      });
       return;
     }
 
     if (message.type === 'remote-changed') {
       try {
+        debugIcloud('remote-changed:apply:start', { documents: message.documents.length });
         const payload = await backend.applyRemoteDocuments(message.documents);
-        applyBootstrapPayloadState(preferences, workspace, session, payload, 'match-current');
+        applyBootstrapPayloadState(preferences, workspace, session, payload, 'match-current', 'preserve');
+        debugIcloud('remote-changed:apply:done', { documents: message.documents.length });
       } catch (error) {
         const current = preferences.getIcloudSyncStatus();
+        const errorMessage = normalizeErrorMessage(error, '원격 문서를 반영하지 못했습니다.');
         preferences.setIcloudSyncStatus({
           state: 'error',
           lastSyncAt: current.lastSyncAt,
@@ -125,8 +149,9 @@ export function createWorkspaceUseCases({
           lastFetchAt: current.lastFetchAt,
           lastSendAt: current.lastSendAt,
           initialFetchCompleted: current.initialFetchCompleted,
-          errorMessage: normalizeErrorMessage(error, '원격 문서를 반영하지 못했습니다.'),
+          errorMessage,
         });
+        debugIcloud('remote-changed:apply:error', { message: errorMessage });
       }
       return;
     }
@@ -148,5 +173,6 @@ export function createWorkspaceUseCases({
     setSearchQuery,
     deleteAllDocuments,
     handleSyncEventMessage,
+    confirmAppShutdown: backend.confirmAppShutdown,
   };
 }

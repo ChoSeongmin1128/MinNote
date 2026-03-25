@@ -40,6 +40,7 @@ export interface BackendPort {
   restoreDocumentFromTrash(documentId: string): Promise<WorkspaceBootstrapState>;
   setIcloudSyncEnabled(enabled: boolean): Promise<boolean>;
   refreshIcloudSync(): Promise<boolean>;
+  confirmAppShutdown(): Promise<void>;
   setMenuBarIconEnabled(enabled: boolean): Promise<boolean>;
   setDefaultBlockKind(kind: BlockKind): Promise<BlockKind>;
   setAlwaysOnTopEnabled(enabled: boolean): Promise<boolean>;

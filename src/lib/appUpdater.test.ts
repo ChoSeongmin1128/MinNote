@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   APP_UPDATE_CHECK_TIMEOUT_MS,
+  APP_UPDATE_DOWNLOAD_TIMEOUT_MS,
   APP_UPDATE_INSTALL_TIMEOUT_MS,
   applyPreparedUpdate,
   __resetAppUpdaterForTests,
@@ -102,6 +103,49 @@ describe('runUpdateCheck', () => {
     expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
       state: 'error',
       message: '업데이트 응답 지연',
+    });
+  });
+
+  it('marks the updater as error when the updater check hangs longer than the watchdog', async () => {
+    vi.useFakeTimers();
+    checkMock.mockImplementationOnce(() => new Promise(() => {}));
+
+    const pending = runUpdateCheck();
+    await vi.advanceTimersByTimeAsync(APP_UPDATE_CHECK_TIMEOUT_MS + 1_001);
+    await pending;
+
+    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+      state: 'error',
+      message: '업데이트 응답 지연',
+    });
+  });
+
+  it('marks the updater as error when the download stalls and allows a retry', async () => {
+    vi.useFakeTimers();
+
+    checkMock
+      .mockResolvedValueOnce({
+        version: '1.1.0',
+        download: vi.fn(() => new Promise(() => {})),
+        install: vi.fn(),
+      })
+      .mockResolvedValueOnce(null);
+
+    const pending = runUpdateCheck();
+    await vi.advanceTimersByTimeAsync(APP_UPDATE_DOWNLOAD_TIMEOUT_MS + 1);
+    await pending;
+
+    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+      state: 'error',
+      message: '업데이트 다운로드 지연',
+    });
+
+    await runUpdateCheck();
+
+    expect(checkMock).toHaveBeenCalledTimes(2);
+    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+      state: 'idle',
+      message: '최신',
     });
   });
 

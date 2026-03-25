@@ -1,6 +1,6 @@
 use crate::domain::models::{AppSettings, Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode};
 use crate::error::AppError;
-use crate::ports::models::RestoreBlockInput;
+use crate::ports::models::{RemoteDocumentApplyOutcome, RemoteRestoreBlockInput, RestoreBlockInput};
 
 pub trait DocumentRepository {
   fn ensure_initial_document(&mut self) -> Result<(), AppError>;
@@ -81,8 +81,13 @@ pub trait RemoteSyncRepository {
     created_at: i64,
     updated_at: i64,
     deleted_at: Option<i64>,
-  ) -> Result<crate::domain::models::Document, AppError>;
-  fn rebuild_search_index_for_document(&self, document_id: &str) -> Result<(), AppError>;
+  ) -> Result<RemoteDocumentApplyOutcome, AppError>;
+  fn restore_blocks_from_remote(
+    &mut self,
+    document_id: &str,
+    blocks: &[RemoteRestoreBlockInput],
+    document_updated_at: i64,
+  ) -> Result<Vec<crate::domain::models::Block>, AppError>;
 }
 
 pub trait AppRepository: DocumentRepository + BlockRepository + AppStateRepository + RemoteSyncRepository {}
