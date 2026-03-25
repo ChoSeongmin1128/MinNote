@@ -10,26 +10,23 @@ fi
 APP_PATH="$1"
 OUTPUT_DIR="$2"
 VERSION="$3"
-WORK_DIR="$OUTPUT_DIR/create-dmg-work"
+STAGING_DIR="$OUTPUT_DIR/dmg-staging"
 
-mkdir -p "$WORK_DIR"
-rm -rf "$WORK_DIR"/*
+mkdir -p "$OUTPUT_DIR"
+rm -rf "$STAGING_DIR"
+mkdir -p "$STAGING_DIR"
 
-pnpm dlx create-dmg "$APP_PATH" "$WORK_DIR" \
-  --overwrite \
-  --window-size 720 420 \
-  --window-pos 240 180 \
-  --icon-size 128 \
-  --icon "MinNote.app" 190 210 \
-  --app-drop-link 520 210
-
-RAW_DMG="$(find "$WORK_DIR" -maxdepth 1 -type f -name '*.dmg' -print -quit)"
-
-if [ -z "$RAW_DMG" ] || [ ! -f "$RAW_DMG" ]; then
-  echo "create-dmg output not found"
-  exit 1
-fi
+cp -R "$APP_PATH" "$STAGING_DIR/MinNote.app"
+ln -s /Applications "$STAGING_DIR/Applications"
 
 FINAL_DMG="$OUTPUT_DIR/MinNote_${VERSION}_aarch64.dmg"
-mv "$RAW_DMG" "$FINAL_DMG"
+rm -f "$FINAL_DMG"
+
+hdiutil create \
+  -volname "MinNote" \
+  -srcfolder "$STAGING_DIR" \
+  -ov \
+  -format UDZO \
+  "$FINAL_DMG" >/dev/null
+
 echo "$FINAL_DMG"
