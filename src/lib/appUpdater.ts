@@ -34,31 +34,27 @@ function normalizeUpdateError(error: unknown) {
     || message.includes('404')
     || message.includes('Not Found')
   ) {
-    return '업데이트 메타데이터를 찾지 못했습니다. 릴리스에 latest.json이 업로드되어 있는지 확인해 주세요.';
+    return '메타데이터 없음';
   }
 
-  return message || '업데이트 확인 중 오류가 발생했습니다.';
+  return message || '오류';
 }
 
 export function formatUpdateStatusMessage(status: AppUpdateStatus) {
   if (status.state === 'checking') {
-    return '업데이트를 확인 중입니다.';
+    return '확인 중';
   }
 
   if (status.state === 'available_downloading') {
     if (typeof status.percent === 'number' && status.percent > 0) {
-      return `새 버전 ${status.version ?? ''} 다운로드 중... ${status.percent}%`.trim();
+      return `다운로드 중 ${status.percent}%`;
     }
 
-    return status.version
-      ? `새 버전 ${status.version} 다운로드 중입니다.`
-      : '새 버전을 다운로드 중입니다.';
+    return '다운로드 중';
   }
 
   if (status.state === 'ready_to_install') {
-    return status.version
-      ? `새 버전 ${status.version} 적용 준비가 완료되었습니다.`
-      : '업데이트 적용 준비가 완료되었습니다.';
+    return status.version ? `${status.version} 준비됨` : '준비됨';
   }
 
   return status.message;
@@ -98,7 +94,7 @@ async function performUpdateCheck() {
         state: 'idle',
         version: null,
         percent: null,
-        message: '최신 버전입니다.',
+        message: '최신',
         lastCheckedAt: checkedAt,
       });
       return;

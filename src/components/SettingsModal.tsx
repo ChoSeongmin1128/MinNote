@@ -68,22 +68,22 @@ function formatIcloudSyncDescription(
   status: { state: 'idle' | 'syncing' | 'error' | 'disabled'; lastSyncAt: number | null; errorMessage: string | null },
 ) {
   if (!enabled || status.state === 'disabled') {
-    return '동기화가 꺼져 있습니다.';
+    return '꺼짐';
   }
 
   if (status.state === 'error') {
-    return status.errorMessage ?? '동기화 중 오류가 발생했습니다.';
+    return status.errorMessage ?? '오류';
   }
 
   if (status.state === 'syncing') {
-    return 'iCloud와 동기화 중입니다.';
+    return '동기화 중';
   }
 
   if (status.lastSyncAt) {
     return `마지막 동기화 ${new Date(status.lastSyncAt).toLocaleString('ko-KR')}`;
   }
 
-  return 'iCloud 동기화가 켜져 있으며 변경 사항을 기다리는 중입니다.';
+  return '대기 중';
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {

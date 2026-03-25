@@ -42,7 +42,7 @@ describe('runUpdateCheck', () => {
 
     expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
       state: 'idle',
-      message: '최신 버전입니다.',
+      message: '최신',
     });
   });
 
@@ -75,7 +75,7 @@ describe('runUpdateCheck', () => {
 
     expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
       state: 'error',
-      message: '업데이트 메타데이터를 찾지 못했습니다. 릴리스에 latest.json이 업로드되어 있는지 확인해 주세요.',
+      message: '메타데이터 없음',
     });
   });
 
