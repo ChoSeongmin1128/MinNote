@@ -66,6 +66,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
         with:
           tagName: v__VERSION__
           releaseName: MinNote v__VERSION__
@@ -74,17 +75,37 @@ jobs:
           releaseDraft: false
           prerelease: false
 
+      - name: Verify macOS signing
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP_PATH="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name 'MinNote.app' -print -quit)"
+
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "MinNote.app not found after build"
+            exit 1
+          fi
+
+          SIGN_INFO="$(codesign -dv --verbose=4 "$APP_PATH" 2>&1)"
+          echo "$SIGN_INFO"
+
+          echo "$SIGN_INFO" | grep -q "Authority=Developer ID Application: SEONGMIN CHO ($APPLE_TEAM_ID)"
+          echo "$SIGN_INFO" | grep -q "TeamIdentifier=$APPLE_TEAM_ID"
+
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+
       - name: Upload updater assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-          BUNDLE_DIR="src-tauri/target/release/bundle/macos"
-          SIG_FILE="$BUNDLE_DIR/MinNote.app.tar.gz.sig"
+          SIG_FILE="$(find src-tauri/target -type f -name 'MinNote.app.tar.gz.sig' -print -quit)"
 
-          if [ ! -f "$SIG_FILE" ]; then
+          if [ -z "$SIG_FILE" ] || [ ! -f "$SIG_FILE" ]; then
             echo "Signature file not found, skipping updater assets upload"
+            find src-tauri/target -type f \( -name '*.app.tar.gz' -o -name '*.app.tar.gz.sig' \) -print || true
             exit 0
           fi
 
