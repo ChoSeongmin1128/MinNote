@@ -56,6 +56,7 @@ export function createPreferencesUseCases({
       preferences.setIcloudSyncStatus({
         state: result ? 'idle' : 'disabled',
         lastSyncAt: null,
+        lastStatusAt: result ? Date.now() : null,
         errorMessage: null,
       });
     } catch (error) {

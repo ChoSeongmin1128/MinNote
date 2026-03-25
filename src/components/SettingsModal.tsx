@@ -77,7 +77,12 @@ interface SettingsModalProps {
 
 function formatIcloudSyncDescription(
   enabled: boolean,
-  status: { state: 'idle' | 'syncing' | 'error' | 'disabled'; lastSyncAt: number | null; errorMessage: string | null },
+  status: {
+    state: 'idle' | 'syncing' | 'error' | 'disabled';
+    lastSyncAt: number | null;
+    lastStatusAt: number | null;
+    errorMessage: string | null;
+  },
 ) {
   if (!enabled || status.state === 'disabled') {
     return '꺼짐';
@@ -95,7 +100,11 @@ function formatIcloudSyncDescription(
     return `최근 동기화 ${formatCompactDateTime(status.lastSyncAt)}`;
   }
 
-  return '동기화 기록 없음';
+  if (status.lastStatusAt) {
+    return '연결됨';
+  }
+
+  return '기록 없음';
 }
 
 function formatCompactDateTime(value: number) {
@@ -120,7 +129,12 @@ function formatCompactDateTime(value: number) {
 
 function getIcloudSyncPresentation(
   enabled: boolean,
-  status: { state: 'idle' | 'syncing' | 'error' | 'disabled'; lastSyncAt: number | null; errorMessage: string | null },
+  status: {
+    state: 'idle' | 'syncing' | 'error' | 'disabled';
+    lastSyncAt: number | null;
+    lastStatusAt: number | null;
+    errorMessage: string | null;
+  },
 ) {
   const label = formatIcloudSyncDescription(enabled, status);
 
@@ -138,6 +152,10 @@ function getIcloudSyncPresentation(
 
   if (status.lastSyncAt) {
     return { label, tone: 'ready' as const, icon: CheckCircle2, spin: false };
+  }
+
+  if (status.lastStatusAt) {
+    return { label, tone: 'ready' as const, icon: Cloud, spin: false };
   }
 
   return { label, tone: 'muted' as const, icon: Cloud, spin: false };

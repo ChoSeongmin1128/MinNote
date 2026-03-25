@@ -77,7 +77,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   defaultBlockKind: 'markdown' as BlockKind,
   themeMode: 'system',
   icloudSyncEnabled: false,
-  icloudSyncStatus: { state: 'disabled', lastSyncAt: null, errorMessage: null },
+  icloudSyncStatus: { state: 'disabled', lastSyncAt: null, lastStatusAt: null, errorMessage: null },
   appUpdateStatus: { state: 'idle', version: null, percent: null, message: null, lastCheckedAt: null },
   menuBarIconEnabled: false,
   alwaysOnTopEnabled: false,

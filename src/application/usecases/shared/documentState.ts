@@ -49,6 +49,7 @@ export function applyBootstrapPayloadState(
   preferences.setIcloudSyncStatus({
     state: payload.icloudSyncEnabled ? 'idle' : 'disabled',
     lastSyncAt: null,
+    lastStatusAt: payload.icloudSyncEnabled ? Date.now() : null,
     errorMessage: null,
   });
   preferences.setMenuBarIconEnabled(payload.menuBarIconEnabled);

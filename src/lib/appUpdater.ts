@@ -4,6 +4,7 @@ import type { AppUpdateStatus } from './types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 
 export const APP_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+export const APP_UPDATE_CHECK_TIMEOUT_MS = 15 * 1000;
 
 type PreparedUpdateAction = (() => Promise<void>) | null;
 type DownloadProgressEvent =
@@ -50,6 +51,25 @@ function normalizeUpdateError(error: unknown) {
   }
 
   return message || '오류';
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(message));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
 }
 
 async function closeDownloadedUpdate() {
@@ -118,7 +138,11 @@ async function performUpdateCheck() {
   }));
 
   try {
-    const update = await check();
+    const update = await withTimeout(
+      check(),
+      APP_UPDATE_CHECK_TIMEOUT_MS,
+      '업데이트 응답 지연',
+    );
     const checkedAt = Date.now();
 
     if (!update) {

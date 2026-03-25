@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyPreparedUpdate, __resetAppUpdaterForTests, runUpdateCheck } from './appUpdater';
+import {
+  APP_UPDATE_CHECK_TIMEOUT_MS,
+  applyPreparedUpdate,
+  __resetAppUpdaterForTests,
+  runUpdateCheck,
+} from './appUpdater';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 
 const { checkMock, relaunchMock } = vi.hoisted(() => ({
@@ -16,6 +21,10 @@ vi.mock('@tauri-apps/plugin-process', () => ({
 }));
 
 describe('runUpdateCheck', () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     useWorkspaceStore.setState({
       appUpdateStatus: {
@@ -80,6 +89,20 @@ describe('runUpdateCheck', () => {
     expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
       state: 'error',
       message: '메타데이터 없음',
+    });
+  });
+
+  it('fails fast when update metadata lookup stalls', async () => {
+    vi.useFakeTimers();
+    checkMock.mockImplementationOnce(() => new Promise(() => {}));
+
+    const pending = runUpdateCheck();
+    await vi.advanceTimersByTimeAsync(APP_UPDATE_CHECK_TIMEOUT_MS + 1);
+    await pending;
+
+    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+      state: 'error',
+      message: '업데이트 응답 지연',
     });
   });
 

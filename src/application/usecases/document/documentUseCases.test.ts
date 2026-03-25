@@ -64,7 +64,12 @@ function createPreferencesGateway() {
     setDefaultBlockKind: vi.fn(),
     setThemeMode: vi.fn(),
     setIcloudSyncEnabled: vi.fn(),
-    getIcloudSyncStatus: vi.fn(() => ({ state: 'idle' as const, lastSyncAt: null, errorMessage: null })),
+    getIcloudSyncStatus: vi.fn(() => ({
+      state: 'idle' as const,
+      lastSyncAt: null,
+      lastStatusAt: null,
+      errorMessage: null,
+    })),
     setIcloudSyncStatus: vi.fn(),
     setMenuBarIconEnabled: vi.fn(),
     getAlwaysOnTopEnabled: vi.fn(() => false),

@@ -86,6 +86,7 @@ export type ICloudSyncState = 'idle' | 'syncing' | 'error' | 'disabled';
 export interface ICloudSyncStatus {
   state: ICloudSyncState;
   lastSyncAt: number | null;
+  lastStatusAt: number | null;
   errorMessage: string | null;
 }
 

@@ -102,6 +102,7 @@ export function createWorkspaceUseCases({
       preferences.setIcloudSyncStatus({
         state,
         lastSyncAt: message.lastSyncAt ?? null,
+        lastStatusAt: Date.now(),
         errorMessage: null,
       });
       return;
@@ -120,6 +121,7 @@ export function createWorkspaceUseCases({
     preferences.setIcloudSyncStatus({
       state: 'error',
       lastSyncAt: preferences.getIcloudSyncStatus().lastSyncAt,
+      lastStatusAt: Date.now(),
       errorMessage: message.message,
     });
   }
