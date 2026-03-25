@@ -1,16 +1,17 @@
 {
   "name": "minnote",
   "private": true,
-  "version": "0.9.9",
+  "version": "1.0.0",
   "packageManager": "pnpm@10.28.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 1420",
+    "sidecar:build": "./scripts/build-sidecar.sh",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "tauri:dev": "pnpm sidecar:build && tauri dev",
+    "tauri:build": "pnpm sidecar:build && tauri build",
     "test": "vitest",
     "test:run": "vitest run"
   },
