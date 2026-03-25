@@ -65,7 +65,34 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
-        run: pnpm tauri build --bundles app,dmg --verbose
+        run: |
+          for attempt in 1 2 3; do
+            echo "Build attempt ${attempt}/3"
+
+            rm -rf src-tauri/target/release/bundle/dmg
+            rm -rf src-tauri/target/release/bundle/macos/MinNote.app
+            rm -f src-tauri/target/release/bundle/macos/MinNote.app.tar.gz
+            rm -f src-tauri/target/release/bundle/macos/MinNote.app.tar.gz.sig
+            rm -f src-tauri/target/release/bundle/macos/MinNote_*.dmg
+
+            for mount in /Volumes/MinNote*; do
+              [ -e "$mount" ] || continue
+              hdiutil detach "$mount" || true
+            done
+
+            if pnpm tauri build --bundles app,dmg --verbose; then
+              exit 0
+            fi
+
+            status=$?
+            echo "Build attempt ${attempt} failed with exit code ${status}"
+
+            if [ "$attempt" -eq 3 ]; then
+              exit "$status"
+            fi
+
+            sleep $((attempt * 5))
+          done
 
       - name: Verify macOS signing
         env:
