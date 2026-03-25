@@ -1,6 +1,6 @@
 [package]
 name = "minnote"
-version = "1.0.2"
+version = "1.0.3"
 description = "MinNote desktop app"
 authors = ["seongmin"]
 license = ""
