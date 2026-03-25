@@ -101,13 +101,17 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           APP_PATH="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name 'MinNote.app' -print -quit)"
+          APP_ZIP_PATH="MinNote.app.zip"
 
           if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
             echo "MinNote.app not found for notarization"
             exit 1
           fi
 
-          xcrun notarytool submit "$APP_PATH" \
+          rm -f "$APP_ZIP_PATH"
+          ditto -c -k --keepParent --sequesterRsrc "$APP_PATH" "$APP_ZIP_PATH"
+
+          xcrun notarytool submit "$APP_ZIP_PATH" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
