@@ -66,6 +66,9 @@ pub trait AppStateRepository {
   fn set_icloud_sync_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
   fn set_menu_bar_icon_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
   fn set_default_block_kind(&mut self, kind: BlockKind) -> Result<(), AppError>;
+  fn set_always_on_top_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
+  fn set_window_opacity_percent(&mut self, percent: u8) -> Result<(), AppError>;
+  fn set_global_toggle_shortcut(&mut self, shortcut: Option<&str>) -> Result<(), AppError>;
 }
 
 pub trait RemoteSyncRepository {

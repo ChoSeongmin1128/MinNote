@@ -4,12 +4,16 @@ import {
   mapBootstrapPayloadToState,
   mapDocumentDtoToVm,
   mapSearchResultDtoToVm,
+  mapWindowControlRuntimeStateDto,
 } from './backendMappers';
 import { desktopApi } from '../lib/desktopApi';
 
 export const backendPort: BackendPort = {
   async bootstrapApp() {
     return mapBootstrapPayloadToState(await desktopApi.bootstrapApp());
+  },
+  async getWindowControlRuntimeState() {
+    return mapWindowControlRuntimeStateDto(await desktopApi.getWindowControlRuntimeState());
   },
   async searchDocuments(query) {
     return (await desktopApi.searchDocuments(query)).map(mapSearchResultDtoToVm);
@@ -89,6 +93,18 @@ export const backendPort: BackendPort = {
   },
   setDefaultBlockKind(kind) {
     return desktopApi.setDefaultBlockKind(kind);
+  },
+  setAlwaysOnTopEnabled(enabled) {
+    return desktopApi.setAlwaysOnTopEnabled(enabled);
+  },
+  previewWindowOpacityPercent(percent) {
+    return desktopApi.previewWindowOpacityPercent(percent);
+  },
+  setWindowOpacityPercent(percent) {
+    return desktopApi.setWindowOpacityPercent(percent);
+  },
+  setGlobalToggleShortcut(shortcut) {
+    return desktopApi.setGlobalToggleShortcut(shortcut);
   },
   async applyRemoteDocuments(documents) {
     return mapBootstrapPayloadToState(await desktopApi.applyRemoteDocuments(documents));

@@ -11,6 +11,7 @@ import type {
   RemoteDocumentDto,
   SearchResultDto,
   ThemeMode,
+  WindowControlRuntimeStateDto,
 } from './types';
 
 function normalizeError(error: unknown) {
@@ -52,6 +53,9 @@ async function call<T>(command: string, args?: Record<string, unknown>) {
 export const desktopApi = {
   bootstrapApp() {
     return call<BootstrapPayload>('bootstrap_app');
+  },
+  getWindowControlRuntimeState() {
+    return call<WindowControlRuntimeStateDto>('get_window_control_runtime_state');
   },
   listDocuments() {
     return call<DocumentSummaryDto[]>('list_documents');
@@ -136,6 +140,18 @@ export const desktopApi = {
   },
   setDefaultBlockKind(kind: BlockKind) {
     return call<BlockKind>('set_default_block_kind', { kind });
+  },
+  setAlwaysOnTopEnabled(enabled: boolean) {
+    return call<boolean>('set_always_on_top_enabled', { enabled });
+  },
+  previewWindowOpacityPercent(percent: number) {
+    return call<number>('preview_window_opacity_percent', { percent });
+  },
+  setWindowOpacityPercent(percent: number) {
+    return call<number>('set_window_opacity_percent', { percent });
+  },
+  setGlobalToggleShortcut(shortcut: string | null) {
+    return call<string | null>('set_global_toggle_shortcut', { shortcut });
   },
   applyRemoteDocuments(documents: RemoteDocumentDto[]) {
     return call<BootstrapPayload>('apply_remote_documents', { documents });

@@ -6,6 +6,7 @@ import { DocumentMenu } from './components/DocumentMenu';
 import { Sidebar } from './components/Sidebar';
 import { DocumentCanvas } from './components/DocumentCanvas';
 import { SettingsModal } from './components/SettingsModal';
+import { WindowMenu } from './components/WindowMenu';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
 import { useSyncEventListener } from './hooks/useSyncEventListener';
@@ -94,7 +95,10 @@ function App() {
               </span>
             ) : null}
           </div>
-          {currentDocument ? <DocumentMenu /> : null}
+          <div className="workspace-actions">
+            <WindowMenu />
+            {currentDocument ? <DocumentMenu /> : null}
+          </div>
         </header>
 
         {isBootstrapping ? (

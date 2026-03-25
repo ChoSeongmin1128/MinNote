@@ -24,6 +24,10 @@ interface WorkspaceState {
   icloudSyncEnabled: boolean;
   icloudSyncStatus: ICloudSyncStatus;
   menuBarIconEnabled: boolean;
+  alwaysOnTopEnabled: boolean;
+  windowOpacityPercent: number;
+  globalToggleShortcut: string | null;
+  globalShortcutError: string | null;
   isSettingsOpen: boolean;
   desktopSidebarExpanded: boolean;
   mobileSidebarOpen: boolean;
@@ -43,6 +47,10 @@ interface WorkspaceState {
   setIcloudSyncEnabled: (value: boolean) => void;
   setIcloudSyncStatus: (status: ICloudSyncStatus) => void;
   setMenuBarIconEnabled: (value: boolean) => void;
+  setAlwaysOnTopEnabled: (value: boolean) => void;
+  setWindowOpacityPercent: (value: number) => void;
+  setGlobalToggleShortcut: (value: string | null) => void;
+  setGlobalShortcutError: (value: string | null) => void;
   setSettingsOpen: (isOpen: boolean) => void;
   setDesktopSidebarExpanded: (isExpanded: boolean) => void;
   setMobileSidebarOpen: (isOpen: boolean) => void;
@@ -68,6 +76,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   icloudSyncEnabled: false,
   icloudSyncStatus: { state: 'disabled', lastSyncAt: null, errorMessage: null },
   menuBarIconEnabled: false,
+  alwaysOnTopEnabled: false,
+  windowOpacityPercent: 100,
+  globalToggleShortcut: 'Cmd+Shift+Space',
+  globalShortcutError: null,
   isSettingsOpen: false,
   desktopSidebarExpanded: true,
   mobileSidebarOpen: false,
@@ -97,6 +109,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   setIcloudSyncEnabled: (icloudSyncEnabled) => set({ icloudSyncEnabled }),
   setIcloudSyncStatus: (icloudSyncStatus) => set({ icloudSyncStatus }),
   setMenuBarIconEnabled: (menuBarIconEnabled) => set({ menuBarIconEnabled }),
+  setAlwaysOnTopEnabled: (alwaysOnTopEnabled) => set({ alwaysOnTopEnabled }),
+  setWindowOpacityPercent: (windowOpacityPercent) => set({ windowOpacityPercent }),
+  setGlobalToggleShortcut: (globalToggleShortcut) => set({ globalToggleShortcut }),
+  setGlobalShortcutError: (globalShortcutError) => set({ globalShortcutError }),
   setSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
   setDesktopSidebarExpanded: (desktopSidebarExpanded) => set({ desktopSidebarExpanded }),
   setMobileSidebarOpen: (mobileSidebarOpen) => set({ mobileSidebarOpen }),

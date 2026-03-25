@@ -31,6 +31,7 @@ interface SegmentedSelectorProps<T extends string> {
   options: readonly SegmentedSelectorOption<T>[];
   onChange: (value: T) => void | Promise<void>;
   layout?: 'inline' | 'palette';
+  tone?: 'settings' | 'popover';
   motionStyle?: 'liquid' | 'subtle';
   columns?: number;
   disabled?: boolean;
@@ -64,6 +65,7 @@ export function SegmentedSelector<T extends string>({
   options,
   onChange,
   layout = 'inline',
+  tone = 'settings',
   motionStyle = 'liquid',
   columns = 3,
   disabled = false,
@@ -80,6 +82,7 @@ export function SegmentedSelector<T extends string>({
   const [transformOrigin, setTransformOrigin] = useState('center center');
   const isPalette = layout === 'palette';
   const isSubtle = motionStyle === 'subtle';
+  const toneClassName = tone === 'popover' ? ' is-popover' : ' is-settings';
   const lastPropValueRef = useRef(value);
 
   const thumbX = useMotionValue(0);
@@ -461,14 +464,14 @@ export function SegmentedSelector<T extends string>({
     <div
       ref={groupRef}
       aria-label={ariaLabel}
-      className={`segmented-selector${isPalette ? ' is-palette' : ' is-inline'}${disabled ? ' is-disabled' : ''}${isSubtle ? ' is-subtle' : ''}`}
+      className={`segmented-selector${isPalette ? ' is-palette' : ' is-inline'}${toneClassName}${disabled ? ' is-disabled' : ''}${isSubtle ? ' is-subtle' : ''}`}
       role="radiogroup"
       style={{ '--segmented-columns': columns } as CSSProperties}
     >
       {hasThumb ? (
         <motion.div
           aria-hidden="true"
-          className={`segmented-selector-thumb${isAnimating ? ' is-animating' : ''}${isPalette ? ' is-palette' : ''}${isSubtle ? ' is-subtle' : ''}`}
+          className={`segmented-selector-thumb${isAnimating ? ' is-animating' : ''}${isPalette ? ' is-palette' : ''}${toneClassName}${isSubtle ? ' is-subtle' : ''}`}
           style={{
             x: thumbX,
             y: thumbY,

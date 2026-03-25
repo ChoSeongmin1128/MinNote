@@ -85,6 +85,7 @@ export function DocumentMenu() {
             </div>
             <SegmentedSelector
               ariaLabel="문서 색상쌍 모드 선택"
+              tone="popover"
               motionStyle="subtle"
               value={isFollowingDefault ? 'default' : 'custom'}
               options={DOCUMENT_TINT_MODE_OPTIONS}
@@ -98,6 +99,7 @@ export function DocumentMenu() {
             />
             <SegmentedSelector
               ariaLabel="문서 색상쌍 선택"
+              tone="popover"
               motionStyle="subtle"
               value={selectedPreset}
               layout="palette"
@@ -124,6 +126,7 @@ export function DocumentMenu() {
             </div>
             <SegmentedSelector
               ariaLabel="문서 배경 톤 모드 선택"
+              tone="popover"
               motionStyle="subtle"
               value={isFollowingDefaultSurfaceTone ? 'default' : 'custom'}
               options={DOCUMENT_TINT_MODE_OPTIONS}
@@ -141,6 +144,7 @@ export function DocumentMenu() {
             />
             <SegmentedSelector
               ariaLabel="문서 배경 톤 선택"
+              tone="popover"
               motionStyle="subtle"
               value={selectedSurfaceTone}
               layout="palette"

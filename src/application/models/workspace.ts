@@ -16,4 +16,11 @@ export interface WorkspaceBootstrapState {
   defaultBlockKind: BlockKind;
   icloudSyncEnabled: boolean;
   menuBarIconEnabled: boolean;
+  alwaysOnTopEnabled: boolean;
+  windowOpacityPercent: number;
+  globalToggleShortcut: string | null;
+}
+
+export interface WindowControlRuntimeState {
+  globalShortcutError: string | null;
 }

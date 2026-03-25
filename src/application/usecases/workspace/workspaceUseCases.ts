@@ -1,16 +1,18 @@
 import type { SyncEventMessage } from '../../../lib/types';
 import type { BackendPort } from '../../ports/backendPort';
 import type { DocumentSyncPort } from '../../ports/documentSyncPort';
+import type { PreferencesGateway } from '../../ports/preferencesGateway';
 import type { SchedulerPort } from '../../ports/schedulerPort';
 import type { SessionGateway } from '../../ports/sessionGateway';
 import type { SyncMutationPort } from '../../ports/syncMutationPort';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
-import { applyBootstrapPayloadState } from '../shared/documentState';
+import { applyBootstrapPayloadState, applyWindowControlRuntimeState } from '../shared/documentState';
 import { normalizeErrorMessage } from '../shared/errors';
 
 interface WorkspaceUseCaseDeps {
   backend: BackendPort;
   documentSync: DocumentSyncPort;
+  preferences: PreferencesGateway;
   scheduler: SchedulerPort;
   session: SessionGateway;
   syncMutation: SyncMutationPort;
@@ -20,6 +22,7 @@ interface WorkspaceUseCaseDeps {
 export function createWorkspaceUseCases({
   backend,
   documentSync,
+  preferences,
   scheduler,
   session,
   syncMutation,
@@ -34,7 +37,9 @@ export function createWorkspaceUseCases({
 
     try {
       const payload = await backend.bootstrapApp();
-      applyBootstrapPayloadState(workspace, session, payload, 'always');
+      const runtimeState = await backend.getWindowControlRuntimeState();
+      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
+      applyWindowControlRuntimeState(preferences, runtimeState);
       workspace.setSearchResults([]);
       workspace.setSearchQuery('');
     } catch (error) {
@@ -74,79 +79,12 @@ export function createWorkspaceUseCases({
     }, 200);
   }
 
-  async function setThemeMode(themeMode: Parameters<BackendPort['setThemeMode']>[0]) {
-    try {
-      const nextThemeMode = await backend.setThemeMode(themeMode);
-      workspace.clearError();
-      workspace.setThemeMode(nextThemeMode);
-    } catch (error) {
-      workspace.setError(normalizeErrorMessage(error, '테마를 변경하지 못했습니다.'));
-    }
-  }
-
-  async function setDefaultBlockTintPreset(preset: Parameters<BackendPort['setDefaultBlockTintPreset']>[0]) {
-    try {
-      const nextPreset = await backend.setDefaultBlockTintPreset(preset);
-      workspace.clearError();
-      workspace.setDefaultBlockTintPreset(nextPreset);
-    } catch (error) {
-      workspace.setError(normalizeErrorMessage(error, '기본 블록 색상쌍을 변경하지 못했습니다.'));
-    }
-  }
-
-  async function setDefaultDocumentSurfaceTonePreset(
-    preset: Parameters<BackendPort['setDefaultDocumentSurfaceTonePreset']>[0],
-  ) {
-    try {
-      const nextPreset = await backend.setDefaultDocumentSurfaceTonePreset(preset);
-      workspace.clearError();
-      workspace.setDefaultDocumentSurfaceTonePreset(nextPreset);
-    } catch (error) {
-      workspace.setError(normalizeErrorMessage(error, '기본 문서 배경 톤을 변경하지 못했습니다.'));
-    }
-  }
-
-  async function setIcloudSyncEnabled(enabled: boolean) {
-    try {
-      const result = await backend.setIcloudSyncEnabled(enabled);
-      workspace.clearError();
-      workspace.setIcloudSyncEnabled(result);
-      workspace.setIcloudSyncStatus({
-        state: result ? 'idle' : 'disabled',
-        lastSyncAt: null,
-        errorMessage: null,
-      });
-    } catch (error) {
-      workspace.setError(normalizeErrorMessage(error, 'iCloud 동기화 설정을 변경하지 못했습니다.'));
-    }
-  }
-
-  async function setDefaultBlockKind(kind: Parameters<BackendPort['setDefaultBlockKind']>[0]) {
-    try {
-      const result = await backend.setDefaultBlockKind(kind);
-      workspace.clearError();
-      workspace.setDefaultBlockKind(result);
-    } catch (error) {
-      workspace.setError(normalizeErrorMessage(error, '기본 블록 종류를 변경하지 못했습니다.'));
-    }
-  }
-
-  async function setMenuBarIconEnabled(enabled: boolean) {
-    try {
-      const result = await backend.setMenuBarIconEnabled(enabled);
-      workspace.clearError();
-      workspace.setMenuBarIconEnabled(result);
-    } catch (error) {
-      workspace.setError(normalizeErrorMessage(error, '메뉴바 아이콘 설정을 변경하지 못했습니다.'));
-    }
-  }
-
   async function deleteAllDocuments() {
     try {
       const payload = await backend.deleteAllDocuments();
       workspace.clearError();
       documentSync.clearAllDocumentSync();
-      applyBootstrapPayloadState(workspace, session, payload, 'always');
+      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
       workspace.setSettingsOpen(false);
       syncMutation.enqueue({ kind: 'documents-reset' });
     } catch (error) {
@@ -161,7 +99,7 @@ export function createWorkspaceUseCases({
         : message.state === 'syncing'
           ? 'syncing'
           : 'error';
-      workspace.setIcloudSyncStatus({
+      preferences.setIcloudSyncStatus({
         state,
         lastSyncAt: message.lastSyncAt ?? null,
         errorMessage: null,
@@ -172,16 +110,16 @@ export function createWorkspaceUseCases({
     if (message.type === 'remote-changed') {
       try {
         const payload = await backend.applyRemoteDocuments(message.documents);
-        applyBootstrapPayloadState(workspace, session, payload, 'match-current');
+        applyBootstrapPayloadState(preferences, workspace, session, payload, 'match-current');
       } catch {
         // 원격 적용 실패는 조용히 무시합니다.
       }
       return;
     }
 
-    workspace.setIcloudSyncStatus({
+    preferences.setIcloudSyncStatus({
       state: 'error',
-      lastSyncAt: workspace.getIcloudSyncStatus().lastSyncAt,
+      lastSyncAt: preferences.getIcloudSyncStatus().lastSyncAt,
       errorMessage: message.message,
     });
   }
@@ -189,12 +127,6 @@ export function createWorkspaceUseCases({
   return {
     bootstrapApp,
     setSearchQuery,
-    setThemeMode,
-    setDefaultBlockTintPreset,
-    setDefaultDocumentSurfaceTonePreset,
-    setIcloudSyncEnabled,
-    setDefaultBlockKind,
-    setMenuBarIconEnabled,
     deleteAllDocuments,
     handleSyncEventMessage,
   };

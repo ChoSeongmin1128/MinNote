@@ -6,6 +6,7 @@ mod infrastructure;
 mod ports;
 mod state;
 mod sync;
+mod window_controls;
 
 use std::fs;
 
@@ -14,6 +15,7 @@ use state::AppState;
 use tauri::{Emitter, Manager};
 use tauri::menu::{MenuBuilder, PredefinedMenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder, TrayIconEvent};
+use window_controls::{apply_window_preferences_with_settings, menu_bar_icon, register_saved_global_shortcut, show_main_window, toggle_main_window};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 pub(crate) const TRAY_ID: &str = "minnote-tray";
@@ -30,8 +32,7 @@ pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
     let block = RcBlock::new(move |_notif: NonNull<NSNotification>| {
       if let Some(window) = app_handle.get_webview_window("main") {
         if !window.is_visible().unwrap_or(true) {
-          let _ = window.show();
-          let _ = window.set_focus();
+          let _ = show_main_window(&app_handle);
         }
       }
     });
@@ -47,6 +48,9 @@ pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
 }
 
 pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
+  #[cfg(target_os = "macos")]
+  let icon = menu_bar_icon();
+  #[cfg(not(target_os = "macos"))]
   let icon = app.default_window_icon().cloned().expect("no app icon");
 
   let menu = MenuBuilder::new(app)
@@ -56,7 +60,7 @@ pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon>
     .text("quit", "종료")
     .build()?;
 
-  TrayIconBuilder::with_id(TRAY_ID)
+  let builder = TrayIconBuilder::with_id(TRAY_ID)
     .icon(icon)
     .tooltip("MinNote")
     .menu(&menu)
@@ -65,37 +69,27 @@ pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon>
       if let TrayIconEvent::Click { button_state, .. } = event {
         if button_state == tauri::tray::MouseButtonState::Up {
           let app = tray.app_handle();
-          if let Some(window) = app.get_webview_window("main") {
-            if window.is_visible().unwrap_or(false) {
-              let _ = window.hide();
-            } else {
-              let _ = window.show();
-              let _ = window.set_focus();
-            }
-          }
+          let _ = toggle_main_window(app);
         }
       }
     })
     .on_menu_event(|app, event| {
       match event.id().as_ref() {
         "show" => {
-          if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
-          }
+          let _ = show_main_window(app);
         }
         "settings" => {
           if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
+            let _ = show_main_window(app);
             let _ = window.emit("tray-open-settings", ());
           }
         }
         "quit" => app.exit(0),
         _ => {}
       }
-    })
-    .build(app)
+    });
+
+  builder.build(app)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -104,6 +98,7 @@ pub fn run() {
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_shell::init())
+    .plugin(tauri_plugin_global_shortcut::Builder::new().build())
     .plugin(tauri_plugin_window_state::Builder::default().build())
     .setup(|app| {
       let app_dir = app.path().app_data_dir().expect("failed to resolve app data directory");
@@ -122,6 +117,17 @@ pub fn run() {
       let menu_bar_icon_enabled = settings.as_ref().map(|s| s.menu_bar_icon_enabled).unwrap_or(false);
 
       app.manage(app_state);
+
+      if let Some(managed_state) = app.try_state::<AppState>() {
+        if let Ok(settings) = managed_state
+          .repository
+          .lock()
+          .map_err(|_| ())
+          .and_then(|repository| repository.get_app_settings().map_err(|_| ()))
+        {
+          let _ = apply_window_preferences_with_settings(app.handle(), &settings);
+        }
+      }
 
       if icloud_enabled {
         if let Some(managed_state) = app.try_state::<AppState>() {
@@ -144,6 +150,8 @@ pub fn run() {
       if menu_bar_icon_enabled && app.tray_by_id(TRAY_ID).is_none() {
         let _ = build_tray_icon(app.handle());
       }
+
+      register_saved_global_shortcut(app.handle());
 
       #[cfg(target_os = "macos")]
       setup_activation_listener(app.handle().clone());
@@ -170,6 +178,7 @@ pub fn run() {
     })
     .invoke_handler(tauri::generate_handler![
       commands::bootstrap_app,
+      commands::get_window_control_runtime_state,
       commands::list_documents,
       commands::open_document,
       commands::create_document,
@@ -196,6 +205,10 @@ pub fn run() {
       commands::set_icloud_sync_enabled,
       commands::set_menu_bar_icon_enabled,
       commands::set_default_block_kind,
+      commands::set_always_on_top_enabled,
+      commands::preview_window_opacity_percent,
+      commands::set_window_opacity_percent,
+      commands::set_global_toggle_shortcut,
       commands::apply_remote_documents,
     ])
     .build(tauri::generate_context!())
@@ -204,10 +217,7 @@ pub fn run() {
       match event {
         // Dock 아이콘 클릭 → 항상 창 복원
         tauri::RunEvent::Reopen { .. } => {
-          if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
-          }
+          let _ = show_main_window(app);
         }
         _ => {}
       }

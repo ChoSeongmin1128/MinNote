@@ -48,7 +48,12 @@ impl SqliteStore {
     self.ensure_app_state_value("theme_mode", DEFAULT_THEME_MODE)?;
     self.ensure_app_state_value("default_block_tint_preset", DEFAULT_BLOCK_TINT_PRESET)?;
     self.ensure_app_state_value("default_document_surface_tone_preset", DEFAULT_DOCUMENT_SURFACE_TONE_PRESET)?;
+    self.ensure_app_state_value("default_block_kind", DEFAULT_BLOCK_KIND)?;
     self.ensure_app_state_value("icloud_sync_enabled", DEFAULT_ICLOUD_SYNC_ENABLED)?;
+    self.ensure_app_state_value("menu_bar_icon_enabled", DEFAULT_MENU_BAR_ICON_ENABLED)?;
+    self.ensure_app_state_value("always_on_top_enabled", DEFAULT_ALWAYS_ON_TOP_ENABLED)?;
+    self.ensure_app_state_value("window_opacity_percent", DEFAULT_WINDOW_OPACITY_PERCENT)?;
+    self.ensure_app_state_value("global_toggle_shortcut", DEFAULT_GLOBAL_TOGGLE_SHORTCUT)?;
 
     Ok(())
   }

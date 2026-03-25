@@ -22,7 +22,12 @@ const SEARCH_INDEX_TABLE: &str = "search_index";
 const DEFAULT_THEME_MODE: &str = "system";
 const DEFAULT_BLOCK_TINT_PRESET: &str = "mist";
 const DEFAULT_DOCUMENT_SURFACE_TONE_PRESET: &str = "default";
+const DEFAULT_BLOCK_KIND: &str = "markdown";
 const DEFAULT_ICLOUD_SYNC_ENABLED: &str = "false";
+const DEFAULT_MENU_BAR_ICON_ENABLED: &str = "false";
+const DEFAULT_ALWAYS_ON_TOP_ENABLED: &str = "false";
+const DEFAULT_WINDOW_OPACITY_PERCENT: &str = "100";
+const DEFAULT_GLOBAL_TOGGLE_SHORTCUT: &str = "Cmd+Shift+Space";
 
 pub struct SqliteStore {
   pub(crate) connection: Connection,

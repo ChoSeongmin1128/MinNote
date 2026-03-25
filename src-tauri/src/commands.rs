@@ -1,10 +1,25 @@
 use tauri::State;
 
-use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, RemoteDocumentDto, SearchResultDto};
+use crate::application::dto::{
+  BlockDto,
+  BlockRestoreDto,
+  BootstrapPayload,
+  DocumentDto,
+  DocumentSummaryDto,
+  RemoteDocumentDto,
+  SearchResultDto,
+  WindowControlRuntimeStateDto,
+};
 use crate::application::services;
 use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, ThemeMode};
 use crate::error::AppError;
+use crate::ports::repositories::AppStateRepository;
 use crate::state::AppState;
+use crate::window_controls::{
+  apply_window_preferences_with_settings,
+  preview_window_opacity,
+  update_global_shortcut_registration,
+};
 use crate::{TRAY_ID, build_tray_icon};
 
 fn with_repository<T>(
@@ -18,6 +33,15 @@ fn with_repository<T>(
 #[tauri::command]
 pub fn bootstrap_app(state: State<'_, AppState>) -> Result<BootstrapPayload, String> {
   with_repository(state, services::bootstrap_app)
+}
+
+#[tauri::command]
+pub fn get_window_control_runtime_state(
+  state: State<'_, AppState>,
+) -> Result<WindowControlRuntimeStateDto, String> {
+  Ok(WindowControlRuntimeStateDto {
+    global_shortcut_error: state.global_shortcut_error(),
+  })
 }
 
 #[tauri::command]
@@ -297,11 +321,73 @@ pub fn set_menu_bar_icon_enabled(
 }
 
 #[tauri::command]
+pub fn set_always_on_top_enabled(
+  state: State<'_, AppState>,
+  app_handle: tauri::AppHandle,
+  enabled: bool,
+) -> Result<bool, String> {
+  let settings = with_repository(state.clone(), |repository| {
+    services::set_always_on_top_enabled(repository, enabled)?;
+    repository.get_app_settings()
+  })?;
+
+  apply_window_preferences_with_settings(&app_handle, &settings)?;
+  Ok(enabled)
+}
+
+#[tauri::command]
+pub fn set_window_opacity_percent(
+  state: State<'_, AppState>,
+  app_handle: tauri::AppHandle,
+  percent: u8,
+) -> Result<u8, String> {
+  let settings = with_repository(state.clone(), |repository| {
+    services::set_window_opacity_percent(repository, percent)?;
+    repository.get_app_settings()
+  })?;
+
+  apply_window_preferences_with_settings(&app_handle, &settings)?;
+  Ok(settings.window_opacity_percent)
+}
+
+#[tauri::command]
+pub fn preview_window_opacity_percent(
+  app_handle: tauri::AppHandle,
+  percent: u8,
+) -> Result<u8, String> {
+  preview_window_opacity(&app_handle, percent)
+}
+
+#[tauri::command]
+pub fn set_global_toggle_shortcut(
+  state: State<'_, AppState>,
+  app_handle: tauri::AppHandle,
+  shortcut: Option<String>,
+) -> Result<Option<String>, String> {
+  let previous_shortcut = state.active_global_toggle_shortcut();
+  let registered_shortcut = update_global_shortcut_registration(&app_handle, shortcut.clone())?;
+
+  match with_repository(state.clone(), |repository| {
+    services::set_global_toggle_shortcut(repository, registered_shortcut.clone())
+  }) {
+    Ok(result) => {
+      state.set_global_shortcut_error(None);
+      Ok(result)
+    }
+    Err(error) => {
+      let _ = update_global_shortcut_registration(&app_handle, previous_shortcut);
+      Err(error)
+    }
+  }
+}
+
+#[tauri::command]
 pub fn apply_remote_documents(
   state: State<'_, AppState>,
   documents: Vec<RemoteDocumentDto>,
 ) -> Result<BootstrapPayload, String> {
-  with_repository(state, |repository| {
+  let payload = with_repository(state.clone(), |repository| {
     services::apply_remote_documents(repository, documents)
-  })
+  })?;
+  Ok(payload)
 }

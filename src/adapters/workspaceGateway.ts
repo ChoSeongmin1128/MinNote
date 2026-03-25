@@ -26,30 +26,6 @@ export const workspaceGateway: WorkspaceGateway = {
   setError(message) {
     useWorkspaceStore.getState().setError(message);
   },
-  setDefaultBlockTintPreset(preset) {
-    useWorkspaceStore.getState().setDefaultBlockTintPreset(preset);
-  },
-  setDefaultDocumentSurfaceTonePreset(preset) {
-    useWorkspaceStore.getState().setDefaultDocumentSurfaceTonePreset(preset);
-  },
-  setDefaultBlockKind(kind) {
-    useWorkspaceStore.getState().setDefaultBlockKind(kind);
-  },
-  setThemeMode(themeMode) {
-    useWorkspaceStore.getState().setThemeMode(themeMode);
-  },
-  setIcloudSyncEnabled(value) {
-    useWorkspaceStore.getState().setIcloudSyncEnabled(value);
-  },
-  getIcloudSyncStatus() {
-    return useWorkspaceStore.getState().icloudSyncStatus;
-  },
-  setIcloudSyncStatus(status) {
-    useWorkspaceStore.getState().setIcloudSyncStatus(status);
-  },
-  setMenuBarIconEnabled(value) {
-    useWorkspaceStore.getState().setMenuBarIconEnabled(value);
-  },
   setSettingsOpen(isOpen) {
     useWorkspaceStore.getState().setSettingsOpen(isOpen);
   },

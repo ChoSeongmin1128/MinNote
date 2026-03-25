@@ -2,6 +2,7 @@ import type { BackendPort } from '../../ports/backendPort';
 import type { DocumentSyncPort } from '../../ports/documentSyncPort';
 import { summarizeDocument, touchDocument } from '../../models/document';
 import type { HistoryGateway } from '../../ports/historyGateway';
+import type { PreferencesGateway } from '../../ports/preferencesGateway';
 import type { SessionGateway } from '../../ports/sessionGateway';
 import type { SyncMutationPort } from '../../ports/syncMutationPort';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
@@ -12,6 +13,7 @@ interface DocumentUseCaseDeps {
   backend: BackendPort;
   documentSync: DocumentSyncPort;
   history: HistoryGateway;
+  preferences: PreferencesGateway;
   session: SessionGateway;
   syncMutation: SyncMutationPort;
   workspace: WorkspaceGateway;
@@ -21,6 +23,7 @@ export function createDocumentUseCases({
   backend,
   documentSync,
   history,
+  preferences,
   session,
   syncMutation,
   workspace,
@@ -108,7 +111,7 @@ export function createDocumentUseCases({
       const payload = await backend.deleteDocument(documentId);
       workspace.clearError();
       documentSync.clearDocumentSync(documentId);
-      applyBootstrapPayloadState(workspace, session, payload, 'always');
+      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
       workspace.setSettingsOpen(false);
       syncMutation.enqueue({ kind: 'document-deleted', documentId });
     } catch (error) {
@@ -130,7 +133,7 @@ export function createDocumentUseCases({
     try {
       const payload = await backend.restoreDocumentFromTrash(documentId);
       workspace.clearError();
-      applyBootstrapPayloadState(workspace, session, payload, 'if-missing');
+      applyBootstrapPayloadState(preferences, workspace, session, payload, 'if-missing');
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 복원하지 못했습니다.'));
     }

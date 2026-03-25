@@ -1,7 +1,8 @@
 import type { BlockCaretPlacement } from '../../../lib/types';
 import type { DocumentVm } from '../../models/document';
-import type { WorkspaceBootstrapState } from '../../models/workspace';
+import type { WindowControlRuntimeState, WorkspaceBootstrapState } from '../../models/workspace';
 import { summarizeDocument } from '../../models/document';
+import type { PreferencesGateway } from '../../ports/preferencesGateway';
 import type { SessionGateway } from '../../ports/sessionGateway';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
 
@@ -32,6 +33,7 @@ export function setDocumentWithFocus(
 }
 
 export function applyBootstrapPayloadState(
+  preferences: PreferencesGateway,
   workspace: WorkspaceGateway,
   session: SessionGateway,
   payload: WorkspaceBootstrapState,
@@ -39,12 +41,15 @@ export function applyBootstrapPayloadState(
 ) {
   workspace.setDocuments(payload.documents);
   workspace.setTrashDocuments(payload.trashDocuments);
-  workspace.setThemeMode(payload.themeMode);
-  workspace.setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
-  workspace.setDefaultDocumentSurfaceTonePreset(payload.defaultDocumentSurfaceTonePreset);
-  workspace.setDefaultBlockKind(payload.defaultBlockKind);
-  workspace.setIcloudSyncEnabled(payload.icloudSyncEnabled);
-  workspace.setMenuBarIconEnabled(payload.menuBarIconEnabled);
+  preferences.setThemeMode(payload.themeMode);
+  preferences.setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
+  preferences.setDefaultDocumentSurfaceTonePreset(payload.defaultDocumentSurfaceTonePreset);
+  preferences.setDefaultBlockKind(payload.defaultBlockKind);
+  preferences.setIcloudSyncEnabled(payload.icloudSyncEnabled);
+  preferences.setMenuBarIconEnabled(payload.menuBarIconEnabled);
+  preferences.setAlwaysOnTopEnabled(payload.alwaysOnTopEnabled);
+  preferences.setWindowOpacityPercent(payload.windowOpacityPercent);
+  preferences.setGlobalToggleShortcut(payload.globalToggleShortcut);
 
   const nextDocument = payload.currentDocument;
   if (currentDocumentStrategy === 'always') {
@@ -75,4 +80,11 @@ export function applyBootstrapPayloadState(
   if (!currentStillExists) {
     session.setCurrentDocument(nextDocument);
   }
+}
+
+export function applyWindowControlRuntimeState(
+  preferences: PreferencesGateway,
+  payload: WindowControlRuntimeState,
+) {
+  preferences.setGlobalShortcutError(payload.globalShortcutError);
 }

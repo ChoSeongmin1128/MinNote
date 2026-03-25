@@ -1,4 +1,4 @@
-import type { WorkspaceBootstrapState } from '../application/models/workspace';
+import type { WindowControlRuntimeState, WorkspaceBootstrapState } from '../application/models/workspace';
 import type {
   BlockVm,
   DocumentSummaryVm,
@@ -12,6 +12,7 @@ import type {
   DocumentDto,
   DocumentSummaryDto,
   SearchResultDto,
+  WindowControlRuntimeStateDto,
 } from '../lib/types';
 
 export function mapBlockDtoToVm(block: BlockDto): BlockVm {
@@ -92,5 +93,16 @@ export function mapBootstrapPayloadToState(payload: BootstrapPayload): Workspace
     defaultBlockKind: payload.defaultBlockKind,
     icloudSyncEnabled: payload.icloudSyncEnabled,
     menuBarIconEnabled: payload.menuBarIconEnabled,
+    alwaysOnTopEnabled: payload.alwaysOnTopEnabled,
+    windowOpacityPercent: payload.windowOpacityPercent,
+    globalToggleShortcut: payload.globalToggleShortcut,
+  };
+}
+
+export function mapWindowControlRuntimeStateDto(
+  payload: WindowControlRuntimeStateDto,
+): WindowControlRuntimeState {
+  return {
+    globalShortcutError: payload.globalShortcutError,
   };
 }

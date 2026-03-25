@@ -110,4 +110,24 @@ describe('SegmentedSelector', () => {
 
     expect(screen.getByTestId('palette-value')).toHaveTextContent('ocean-sand');
   });
+
+  it('applies popover tone class without affecting selection', async () => {
+    render(
+      <SegmentedSelector
+        ariaLabel="팝오버 선택"
+        tone="popover"
+        motionStyle="subtle"
+        value="left"
+        options={[
+          { value: 'left', label: '왼쪽' },
+          { value: 'right', label: '오른쪽' },
+        ]}
+        onChange={async () => {}}
+      />,
+    );
+
+    const group = screen.getByRole('radiogroup', { name: '팝오버 선택' });
+    expect(group.className).toContain('is-popover');
+    expect(screen.getByRole('radio', { name: '왼쪽' })).toHaveAttribute('aria-checked', 'true');
+  });
 });

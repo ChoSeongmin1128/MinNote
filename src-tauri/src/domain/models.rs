@@ -176,4 +176,7 @@ pub struct AppSettings {
   pub default_block_kind: BlockKind,
   pub icloud_sync_enabled: bool,
   pub menu_bar_icon_enabled: bool,
+  pub always_on_top_enabled: bool,
+  pub window_opacity_percent: u8,
+  pub global_toggle_shortcut: Option<String>,
 }

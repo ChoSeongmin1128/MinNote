@@ -60,6 +60,13 @@ export interface BootstrapPayload {
   defaultBlockKind: BlockKind;
   icloudSyncEnabled: boolean;
   menuBarIconEnabled: boolean;
+  alwaysOnTopEnabled: boolean;
+  windowOpacityPercent: number;
+  globalToggleShortcut: string | null;
+}
+
+export interface WindowControlRuntimeStateDto {
+  globalShortcutError: string | null;
 }
 
 export interface SearchResultDto extends DocumentSummaryDto {

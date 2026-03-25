@@ -47,6 +47,9 @@ pub fn bootstrap_app(repository: &mut impl AppRepository) -> Result<BootstrapPay
     default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
     menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
+    always_on_top_enabled: settings.always_on_top_enabled,
+    window_opacity_percent: settings.window_opacity_percent,
+    global_toggle_shortcut: settings.global_toggle_shortcut,
   })
 }
 
@@ -116,6 +119,9 @@ pub fn delete_document(
     default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
     menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
+    always_on_top_enabled: settings.always_on_top_enabled,
+    window_opacity_percent: settings.window_opacity_percent,
+    global_toggle_shortcut: settings.global_toggle_shortcut,
   })
 }
 
@@ -151,6 +157,9 @@ pub fn restore_document_from_trash(
     default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
     menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
+    always_on_top_enabled: settings.always_on_top_enabled,
+    window_opacity_percent: settings.window_opacity_percent,
+    global_toggle_shortcut: settings.global_toggle_shortcut,
   })
 }
 
@@ -178,6 +187,9 @@ pub fn delete_all_documents(repository: &mut impl AppRepository) -> Result<Boots
     default_block_kind: settings.default_block_kind,
     icloud_sync_enabled: settings.icloud_sync_enabled,
     menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
+    always_on_top_enabled: settings.always_on_top_enabled,
+    window_opacity_percent: settings.window_opacity_percent,
+    global_toggle_shortcut: settings.global_toggle_shortcut,
   })
 }
 
@@ -342,6 +354,34 @@ pub fn set_default_block_kind(
   Ok(kind)
 }
 
+pub fn set_always_on_top_enabled(
+  repository: &mut impl AppRepository,
+  enabled: bool,
+) -> Result<bool, AppError> {
+  repository.set_always_on_top_enabled(enabled)?;
+  Ok(enabled)
+}
+
+pub fn set_window_opacity_percent(
+  repository: &mut impl AppRepository,
+  percent: u8,
+) -> Result<u8, AppError> {
+  if !(50..=100).contains(&percent) {
+    return Err(AppError::validation("창 투명도는 50%에서 100% 사이여야 합니다."));
+  }
+
+  repository.set_window_opacity_percent(percent)?;
+  Ok(percent)
+}
+
+pub fn set_global_toggle_shortcut(
+  repository: &mut impl AppRepository,
+  shortcut: Option<String>,
+) -> Result<Option<String>, AppError> {
+  repository.set_global_toggle_shortcut(shortcut.as_deref())?;
+  Ok(shortcut)
+}
+
 pub fn apply_remote_documents(
   repository: &mut impl AppRepository,
   documents: Vec<RemoteDocumentDto>,
@@ -486,6 +526,9 @@ mod tests {
           default_block_kind,
           icloud_sync_enabled: true,
           menu_bar_icon_enabled: false,
+          always_on_top_enabled: true,
+          window_opacity_percent: 84,
+          global_toggle_shortcut: Some("Cmd+Shift+Space".to_string()),
         },
         current_document: document,
         current_blocks: vec![block],
@@ -569,6 +612,9 @@ mod tests {
     fn set_icloud_sync_enabled(&mut self, _enabled: bool) -> Result<(), AppError> { Ok(()) }
     fn set_menu_bar_icon_enabled(&mut self, _enabled: bool) -> Result<(), AppError> { Ok(()) }
     fn set_default_block_kind(&mut self, _kind: BlockKind) -> Result<(), AppError> { Ok(()) }
+    fn set_always_on_top_enabled(&mut self, _enabled: bool) -> Result<(), AppError> { Ok(()) }
+    fn set_window_opacity_percent(&mut self, _percent: u8) -> Result<(), AppError> { Ok(()) }
+    fn set_global_toggle_shortcut(&mut self, _shortcut: Option<&str>) -> Result<(), AppError> { Ok(()) }
   }
 
   impl RemoteSyncRepository for MockRepository {
@@ -594,6 +640,9 @@ mod tests {
     let payload = bootstrap_app(&mut repository).expect("bootstrap should succeed");
 
     assert_eq!(payload.default_block_kind, BlockKind::Code);
+    assert!(payload.always_on_top_enabled);
+    assert_eq!(payload.window_opacity_percent, 84);
+    assert_eq!(payload.global_toggle_shortcut.as_deref(), Some("Cmd+Shift+Space"));
   }
 
   #[test]
@@ -642,5 +691,14 @@ mod tests {
         position: 2,
       }]],
     );
+  }
+
+  #[test]
+  fn set_window_opacity_percent_rejects_out_of_range_value() {
+    let mut repository = MockRepository::new(BlockKind::Markdown);
+
+    let error = set_window_opacity_percent(&mut repository, 40).expect_err("should fail");
+
+    assert_eq!(error.to_string(), "창 투명도는 50%에서 100% 사이여야 합니다.");
   }
 }

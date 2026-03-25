@@ -35,6 +35,18 @@ impl AppStateRepository for SqliteStore {
       .get_state_value("default_block_kind")?
       .map(|value| BlockKind::from_str(&value))
       .unwrap_or(BlockKind::Markdown);
+    let always_on_top_enabled = self
+      .get_state_value("always_on_top_enabled")?
+      .map(|value| value == "true")
+      .unwrap_or(false);
+    let window_opacity_percent = self
+      .get_state_value("window_opacity_percent")?
+      .and_then(|value| value.parse::<u8>().ok())
+      .filter(|value| (50..=100).contains(value))
+      .unwrap_or(100);
+    let global_toggle_shortcut = self
+      .get_state_value("global_toggle_shortcut")?
+      .filter(|value| !value.trim().is_empty());
 
     Ok(AppSettings {
       theme_mode,
@@ -43,6 +55,9 @@ impl AppStateRepository for SqliteStore {
       default_block_kind,
       icloud_sync_enabled,
       menu_bar_icon_enabled,
+      always_on_top_enabled,
+      window_opacity_percent,
+      global_toggle_shortcut,
     })
   }
 
@@ -76,6 +91,26 @@ impl AppStateRepository for SqliteStore {
 
   fn set_default_block_kind(&mut self, kind: BlockKind) -> Result<(), AppError> {
     self.set_state_value("default_block_kind", kind.as_str())?;
+    Ok(())
+  }
+
+  fn set_always_on_top_enabled(&mut self, enabled: bool) -> Result<(), AppError> {
+    self.set_state_value("always_on_top_enabled", if enabled { "true" } else { "false" })?;
+    Ok(())
+  }
+
+  fn set_window_opacity_percent(&mut self, percent: u8) -> Result<(), AppError> {
+    self.set_state_value("window_opacity_percent", &percent.to_string())?;
+    Ok(())
+  }
+
+  fn set_global_toggle_shortcut(&mut self, shortcut: Option<&str>) -> Result<(), AppError> {
+    if let Some(shortcut) = shortcut {
+      self.set_state_value("global_toggle_shortcut", shortcut)?;
+    } else {
+      self.set_state_value("global_toggle_shortcut", "")?;
+    }
+
     Ok(())
   }
 }

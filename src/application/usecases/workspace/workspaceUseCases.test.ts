@@ -14,6 +14,9 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     defaultBlockKind,
     icloudSyncEnabled: true,
     menuBarIconEnabled: true,
+    alwaysOnTopEnabled: false,
+    windowOpacityPercent: 100,
+    globalToggleShortcut: 'Cmd+Shift+Space',
   };
 }
 
@@ -50,6 +53,12 @@ function createWorkspaceGateway() {
     setIsBootstrapping: vi.fn(),
     clearError: vi.fn(),
     setError: vi.fn(),
+    setSettingsOpen: vi.fn(),
+  };
+}
+
+function createPreferencesGateway() {
+  return {
     setDefaultBlockTintPreset: vi.fn(),
     setDefaultDocumentSurfaceTonePreset: vi.fn(),
     setDefaultBlockKind: vi.fn(),
@@ -58,28 +67,33 @@ function createWorkspaceGateway() {
     getIcloudSyncStatus: vi.fn(() => ({ state: 'idle' as const, lastSyncAt: 10, errorMessage: null })),
     setIcloudSyncStatus: vi.fn(),
     setMenuBarIconEnabled: vi.fn(),
-    setSettingsOpen: vi.fn(),
+    getAlwaysOnTopEnabled: vi.fn(() => false),
+    setAlwaysOnTopEnabled: vi.fn(),
+    getWindowOpacityPercent: vi.fn(() => 100),
+    setWindowOpacityPercent: vi.fn(),
+    getGlobalToggleShortcut: vi.fn(() => 'Cmd+Shift+Space'),
+    setGlobalToggleShortcut: vi.fn(),
+    getGlobalShortcutError: vi.fn(() => null),
+    setGlobalShortcutError: vi.fn(),
   };
 }
 
 describe('workspace usecases', () => {
   it('applies default block kind during bootstrap', async () => {
     const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
     const session = createSessionGateway();
     const payload = createPayload('code');
     const useCases = createWorkspaceUseCases({
       backend: {
         bootstrapApp: vi.fn(async () => payload),
+        getWindowControlRuntimeState: vi.fn(async () => ({ globalShortcutError: 'runtime error' })),
         searchDocuments: vi.fn(),
-        setThemeMode: vi.fn(),
-        setDefaultBlockTintPreset: vi.fn(),
-        setIcloudSyncEnabled: vi.fn(),
-        setDefaultBlockKind: vi.fn(),
-        setMenuBarIconEnabled: vi.fn(),
         deleteAllDocuments: vi.fn(),
         applyRemoteDocuments: vi.fn(),
       } as never,
       documentSync: { clearAllDocumentSync: vi.fn() } as never,
+      preferences: preferences as never,
       scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
       session,
       syncMutation: { enqueue: vi.fn() },
@@ -88,30 +102,29 @@ describe('workspace usecases', () => {
 
     await useCases.bootstrapApp();
 
-    expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('code');
-    expect(workspace.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
+    expect(preferences.setDefaultBlockKind).toHaveBeenCalledWith('code');
+    expect(preferences.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
+    expect(preferences.setGlobalShortcutError).toHaveBeenCalledWith('runtime error');
     expect(workspace.setSearchResults).toHaveBeenCalledWith([]);
     expect(workspace.setSearchQuery).toHaveBeenCalledWith('');
   });
 
   it('keeps default block kind in deleteAllDocuments payload sync', async () => {
     const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
     const session = createSessionGateway();
     const payload = createPayload('text');
     const syncMutation = { enqueue: vi.fn() };
     const useCases = createWorkspaceUseCases({
       backend: {
         bootstrapApp: vi.fn(),
+        getWindowControlRuntimeState: vi.fn(),
         searchDocuments: vi.fn(),
-        setThemeMode: vi.fn(),
-        setDefaultBlockTintPreset: vi.fn(),
-        setIcloudSyncEnabled: vi.fn(),
-        setDefaultBlockKind: vi.fn(),
-        setMenuBarIconEnabled: vi.fn(),
         deleteAllDocuments: vi.fn(async () => payload),
         applyRemoteDocuments: vi.fn(),
       } as never,
       documentSync: { clearAllDocumentSync: vi.fn() } as never,
+      preferences: preferences as never,
       scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
       session,
       syncMutation,
@@ -120,8 +133,8 @@ describe('workspace usecases', () => {
 
     await useCases.deleteAllDocuments();
 
-    expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('text');
-    expect(workspace.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
+    expect(preferences.setDefaultBlockKind).toHaveBeenCalledWith('text');
+    expect(preferences.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
     expect(workspace.setSettingsOpen).toHaveBeenCalledWith(false);
     expect(syncMutation.enqueue).toHaveBeenCalledWith({ kind: 'documents-reset' });
   });
@@ -157,20 +170,18 @@ describe('handleSyncEventMessage (remote-changed)', () => {
 
   function createUseCasesWithRemote(currentDocument: DocumentVm | null, payload: WorkspaceBootstrapState) {
     const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
     const session = createSessionGateway(currentDocument);
     const useCases = createWorkspaceUseCases({
       backend: {
         bootstrapApp: vi.fn(),
+        getWindowControlRuntimeState: vi.fn(),
         searchDocuments: vi.fn(),
-        setThemeMode: vi.fn(),
-        setDefaultBlockTintPreset: vi.fn(),
-        setIcloudSyncEnabled: vi.fn(),
-        setDefaultBlockKind: vi.fn(),
-        setMenuBarIconEnabled: vi.fn(),
         deleteAllDocuments: vi.fn(),
         applyRemoteDocuments: vi.fn(async () => payload),
       } as never,
       documentSync: { clearAllDocumentSync: vi.fn() } as never,
+      preferences: preferences as never,
       scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
       session,
       syncMutation: { enqueue: vi.fn() },

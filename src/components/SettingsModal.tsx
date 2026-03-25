@@ -2,9 +2,12 @@ import { AlertTriangle, MoonStar, MonitorCog, RefreshCw, SunMedium, X } from 'lu
 import { useRef, useState } from 'react';
 import {
   deleteAllDocuments,
+  setAlwaysOnTopEnabled,
   setDefaultBlockKind,
   setDefaultBlockTintPreset,
   setDefaultDocumentSurfaceTonePreset,
+  setGlobalToggleShortcut,
+  setIcloudSyncEnabled,
   setMenuBarIconEnabled,
   setThemeMode,
 } from '../app/actions';
@@ -16,6 +19,12 @@ import { SegmentedSelector } from './SegmentedSelector';
 import type { BlockKind, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { checkForUpdate, type UpdateStatus } from '../lib/appUpdater';
+import { ShortcutCaptureField } from './ShortcutCaptureField';
+import {
+  MAX_WINDOW_OPACITY_PERCENT,
+  MIN_WINDOW_OPACITY_PERCENT,
+} from '../lib/globalShortcut';
+import { useWindowOpacityControl } from '../hooks/useWindowOpacityControl';
 
 const THEME_OPTIONS: Array<{ id: ThemeMode; label: string; icon: typeof MonitorCog }> = [
   { id: 'system', label: '자동', icon: MonitorCog },
@@ -59,7 +68,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
   const defaultBlockKind = useWorkspaceStore((state) => state.defaultBlockKind);
+  const icloudSyncEnabled = useWorkspaceStore((state) => state.icloudSyncEnabled);
+  const icloudSyncStatus = useWorkspaceStore((state) => state.icloudSyncStatus);
   const menuBarIconEnabled = useWorkspaceStore((state) => state.menuBarIconEnabled);
+  const alwaysOnTopEnabled = useWorkspaceStore((state) => state.alwaysOnTopEnabled);
+  const globalToggleShortcut = useWorkspaceStore((state) => state.globalToggleShortcut);
+  const globalShortcutError = useWorkspaceStore((state) => state.globalShortcutError);
+  const { draftOpacity, previewOpacity, commitOpacity } = useWindowOpacityControl();
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
   const installerRef = useRef<{ install(): Promise<void>; relaunch(): Promise<void> } | null>(null);
@@ -85,6 +100,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
           <SegmentedSelector
             ariaLabel="테마 선택"
+            tone="settings"
             value={themeMode}
             options={THEME_OPTIONS.map((option) => ({
               value: option.id,
@@ -101,6 +117,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
           <SegmentedSelector
             ariaLabel="기본 블록 종류 선택"
+            tone="settings"
             value={defaultBlockKind}
             options={BLOCK_KIND_OPTIONS.map((option) => ({
               value: option.id,
@@ -116,6 +133,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
           <SegmentedSelector
             ariaLabel="기본 블록 색상쌍 선택"
+            tone="settings"
             value={defaultBlockTintPreset}
             layout="palette"
             columns={3}
@@ -136,6 +154,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
           <SegmentedSelector
             ariaLabel="기본 문서 배경 톤 선택"
+            tone="settings"
             value={defaultDocumentSurfaceTonePreset}
             layout="palette"
             columns={3}
@@ -156,6 +175,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
           <SegmentedSelector
             ariaLabel="메뉴바 아이콘 선택"
+            tone="settings"
             value={menuBarIconEnabled ? 'on' : 'off'}
             options={MENU_BAR_OPTIONS}
             onChange={(nextValue) => setMenuBarIconEnabled(nextValue === 'on')}
@@ -164,15 +184,92 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
         <div className="settings-section">
           <div className="settings-section-header">
+            <span className="settings-section-title">창 제어</span>
+          </div>
+
+          <label className="settings-toggle-row" htmlFor="settings-always-on-top">
+            <span className="settings-toggle-copy">
+              <span className="settings-toggle-title">항상 위에 고정</span>
+              <span className="document-menu-option-description">
+                다른 앱으로 전환해도 MinNote 창을 위에 유지합니다.
+              </span>
+            </span>
+            <input
+              id="settings-always-on-top"
+              type="checkbox"
+              checked={alwaysOnTopEnabled}
+              onChange={(event) => {
+                void setAlwaysOnTopEnabled(event.target.checked);
+              }}
+            />
+          </label>
+
+          <div className="settings-range-group">
+            <div className="settings-range-header">
+              <div className="settings-range-title-group">
+                <span className="settings-section-title">투명도</span>
+                <span className="settings-inline-stat">{draftOpacity}%</span>
+              </div>
+              <button
+                className="ghost-button settings-inline-action"
+                type="button"
+                disabled={draftOpacity === MAX_WINDOW_OPACITY_PERCENT}
+                onClick={() => {
+                  void commitOpacity(MAX_WINDOW_OPACITY_PERCENT);
+                }}
+              >
+                100%로 복원
+              </button>
+            </div>
+            <input
+              className="opacity-slider"
+              type="range"
+              min={MIN_WINDOW_OPACITY_PERCENT}
+              max={MAX_WINDOW_OPACITY_PERCENT}
+              step={1}
+              value={draftOpacity}
+              onInput={(event) => {
+                void previewOpacity(Number(event.currentTarget.value));
+              }}
+              onPointerUp={(event) => {
+                void commitOpacity(Number(event.currentTarget.value));
+              }}
+              onKeyUp={(event) => {
+                void commitOpacity(Number(event.currentTarget.value));
+              }}
+              onBlur={(event) => {
+                void commitOpacity(Number(event.currentTarget.value));
+              }}
+            />
+          </div>
+
+          <div className="settings-shortcut-group">
+            <div className="settings-section-header">
+              <span className="settings-section-title">전역 단축키</span>
+            </div>
+            <ShortcutCaptureField
+              value={globalToggleShortcut}
+              error={globalShortcutError}
+              onCommit={(shortcut) => setGlobalToggleShortcut(shortcut)}
+            />
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-header">
             <span className="settings-section-title">iCloud 동기화</span>
-            <span className="document-menu-option-description">추후 지원 예정</span>
+            <span className="document-menu-option-description">
+              {icloudSyncStatus.state === 'error'
+                ? icloudSyncStatus.errorMessage ?? '동기화 중 오류가 발생했습니다.'
+                : '같은 Apple ID로 로그인된 Mac 사이에서 문서를 동기화합니다.'}
+            </span>
           </div>
           <SegmentedSelector
             ariaLabel="iCloud 동기화 선택"
-            value="off"
+            tone="settings"
+            value={icloudSyncEnabled ? 'on' : 'off'}
             options={ICLOUD_OPTIONS}
-            disabled
-            onChange={() => {}}
+            onChange={(nextValue) => setIcloudSyncEnabled(nextValue === 'on')}
           />
         </div>
 

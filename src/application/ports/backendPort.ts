@@ -6,10 +6,11 @@ import type {
   ThemeMode,
 } from '../../lib/types';
 import type { BlockVm, DocumentVm, RestoreBlockInput, SearchResultVm } from '../models/document';
-import type { WorkspaceBootstrapState } from '../models/workspace';
+import type { WindowControlRuntimeState, WorkspaceBootstrapState } from '../models/workspace';
 
 export interface BackendPort {
   bootstrapApp(): Promise<WorkspaceBootstrapState>;
+  getWindowControlRuntimeState(): Promise<WindowControlRuntimeState>;
   searchDocuments(query: string): Promise<SearchResultVm[]>;
   openDocument(documentId: string): Promise<DocumentVm>;
   createDocument(): Promise<DocumentVm>;
@@ -40,5 +41,9 @@ export interface BackendPort {
   setIcloudSyncEnabled(enabled: boolean): Promise<boolean>;
   setMenuBarIconEnabled(enabled: boolean): Promise<boolean>;
   setDefaultBlockKind(kind: BlockKind): Promise<BlockKind>;
+  setAlwaysOnTopEnabled(enabled: boolean): Promise<boolean>;
+  previewWindowOpacityPercent(percent: number): Promise<number>;
+  setWindowOpacityPercent(percent: number): Promise<number>;
+  setGlobalToggleShortcut(shortcut: string | null): Promise<string | null>;
   applyRemoteDocuments(documents: RemoteDocumentDto[]): Promise<WorkspaceBootstrapState>;
 }

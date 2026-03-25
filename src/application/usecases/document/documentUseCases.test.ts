@@ -14,6 +14,9 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     defaultBlockKind,
     icloudSyncEnabled: false,
     menuBarIconEnabled: false,
+    alwaysOnTopEnabled: false,
+    windowOpacityPercent: 100,
+    globalToggleShortcut: 'Cmd+Shift+Space',
   };
 }
 
@@ -50,6 +53,12 @@ function createWorkspaceGateway() {
     setIsBootstrapping: vi.fn(),
     clearError: vi.fn(),
     setError: vi.fn(),
+    setSettingsOpen: vi.fn(),
+  };
+}
+
+function createPreferencesGateway() {
+  return {
     setDefaultBlockTintPreset: vi.fn(),
     setDefaultDocumentSurfaceTonePreset: vi.fn(),
     setDefaultBlockKind: vi.fn(),
@@ -58,13 +67,21 @@ function createWorkspaceGateway() {
     getIcloudSyncStatus: vi.fn(() => ({ state: 'idle' as const, lastSyncAt: null, errorMessage: null })),
     setIcloudSyncStatus: vi.fn(),
     setMenuBarIconEnabled: vi.fn(),
-    setSettingsOpen: vi.fn(),
+    getAlwaysOnTopEnabled: vi.fn(() => false),
+    setAlwaysOnTopEnabled: vi.fn(),
+    getWindowOpacityPercent: vi.fn(() => 100),
+    setWindowOpacityPercent: vi.fn(),
+    getGlobalToggleShortcut: vi.fn(() => 'Cmd+Shift+Space'),
+    setGlobalToggleShortcut: vi.fn(),
+    getGlobalShortcutError: vi.fn(() => null),
+    setGlobalShortcutError: vi.fn(),
   };
 }
 
 describe('document usecases', () => {
   it('syncs default block kind when deleting a document', async () => {
     const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
     const session = createSessionGateway();
     const documentSync = { clearDocumentSync: vi.fn(), flushDocumentSaves: vi.fn() };
     const useCases = createDocumentUseCases({
@@ -73,6 +90,7 @@ describe('document usecases', () => {
       } as never,
       documentSync: documentSync as never,
       history: { clear: vi.fn() } as never,
+      preferences: preferences as never,
       session,
       syncMutation: { enqueue: vi.fn() },
       workspace,
@@ -81,8 +99,8 @@ describe('document usecases', () => {
     await useCases.deleteDocument('doc-1');
 
     expect(documentSync.clearDocumentSync).toHaveBeenCalledWith('doc-1');
-    expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('code');
-    expect(workspace.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
+    expect(preferences.setDefaultBlockKind).toHaveBeenCalledWith('code');
+    expect(preferences.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
   });
 
   it('keeps current document while still syncing default block kind during restore', async () => {
@@ -98,6 +116,7 @@ describe('document usecases', () => {
       blocks: [],
     } satisfies DocumentVm;
     const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
     const session = createSessionGateway(currentDocument);
     const useCases = createDocumentUseCases({
       backend: {
@@ -105,6 +124,7 @@ describe('document usecases', () => {
       } as never,
       documentSync: { flushDocumentSaves: vi.fn() } as never,
       history: { clear: vi.fn() } as never,
+      preferences: preferences as never,
       session,
       syncMutation: { enqueue: vi.fn() },
       workspace,
@@ -112,8 +132,8 @@ describe('document usecases', () => {
 
     await useCases.restoreDocumentFromTrash('trash-doc');
 
-    expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('text');
-    expect(workspace.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
+    expect(preferences.setDefaultBlockKind).toHaveBeenCalledWith('text');
+    expect(preferences.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
     expect(session.setCurrentDocument).not.toHaveBeenCalled();
   });
 });

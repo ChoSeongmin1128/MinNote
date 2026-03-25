@@ -34,3 +34,7 @@ export const setDefaultBlockKind = appUseCases.setDefaultBlockKind;
 export const setIcloudSyncEnabled = appUseCases.setIcloudSyncEnabled;
 export const setMenuBarIconEnabled = appUseCases.setMenuBarIconEnabled;
 export const deleteAllDocuments = appUseCases.deleteAllDocuments;
+export const setAlwaysOnTopEnabled = appUseCases.setAlwaysOnTopEnabled;
+export const previewWindowOpacityPercent = appUseCases.previewWindowOpacityPercent;
+export const setWindowOpacityPercent = appUseCases.setWindowOpacityPercent;
+export const setGlobalToggleShortcut = appUseCases.setGlobalToggleShortcut;
