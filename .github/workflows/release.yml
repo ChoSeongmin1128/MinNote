@@ -56,24 +56,16 @@ jobs:
           swift build -c release --arch x86_64
           cp .build/x86_64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-x86_64-apple-darwin
 
-      - name: Build and release
-        id: tauri_build
-        uses: tauri-apps/tauri-action@v0
+      - name: Build macOS bundles
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI: true
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
-        with:
-          tagName: v__VERSION__
-          releaseName: MinNote v__VERSION__
-          releaseBody: |
-            MinNote ${{ github.ref_name }} 업데이트
-          releaseDraft: false
-          prerelease: false
+        run: pnpm tauri build --bundles app,dmg --verbose
 
       - name: Verify macOS signing
         env:
@@ -95,13 +87,49 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           xcrun stapler validate "$APP_PATH"
 
+      - name: Create or update GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          TITLE="MinNote $TAG"
+          NOTES="MinNote $TAG 업데이트"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES"
+          else
+            gh release create "$TAG" --title "$TITLE" --notes "$NOTES"
+          fi
+
+      - name: Upload release bundles
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          DMG_FILE="$(find src-tauri/target/release/bundle/dmg -type f -name 'MinNote_*_aarch64.dmg' -print -quit)"
+          APP_TAR_FILE="$(find src-tauri/target -type f -name 'MinNote*.app.tar.gz' -print -quit)"
+
+          if [ -z "$DMG_FILE" ] || [ ! -f "$DMG_FILE" ]; then
+            echo "DMG file not found"
+            exit 1
+          fi
+
+          if [ -z "$APP_TAR_FILE" ] || [ ! -f "$APP_TAR_FILE" ]; then
+            echo "App archive not found"
+            find src-tauri/target -type f -name '*.app.tar.gz' -print || true
+            exit 1
+          fi
+
+          gh release upload "$TAG" "$DMG_FILE#$(basename "$DMG_FILE")" --clobber
+          gh release upload "$TAG" "$APP_TAR_FILE#MinNote_aarch64.app.tar.gz" --clobber
+
       - name: Upload updater assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-          SIG_FILE="$(find src-tauri/target -type f -name 'MinNote.app.tar.gz.sig' -print -quit)"
+          SIG_FILE="$(find src-tauri/target -type f -name 'MinNote*.app.tar.gz.sig' -print -quit)"
 
           if [ -z "$SIG_FILE" ] || [ ! -f "$SIG_FILE" ]; then
             echo "Signature file not found, skipping updater assets upload"
