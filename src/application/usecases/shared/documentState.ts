@@ -46,6 +46,11 @@ export function applyBootstrapPayloadState(
   preferences.setDefaultDocumentSurfaceTonePreset(payload.defaultDocumentSurfaceTonePreset);
   preferences.setDefaultBlockKind(payload.defaultBlockKind);
   preferences.setIcloudSyncEnabled(payload.icloudSyncEnabled);
+  preferences.setIcloudSyncStatus({
+    state: payload.icloudSyncEnabled ? 'idle' : 'disabled',
+    lastSyncAt: null,
+    errorMessage: null,
+  });
   preferences.setMenuBarIconEnabled(payload.menuBarIconEnabled);
   preferences.setAlwaysOnTopEnabled(payload.alwaysOnTopEnabled);
   preferences.setWindowOpacityPercent(payload.windowOpacityPercent);

@@ -63,6 +63,29 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
+function formatIcloudSyncDescription(
+  enabled: boolean,
+  status: { state: 'idle' | 'syncing' | 'error' | 'disabled'; lastSyncAt: number | null; errorMessage: string | null },
+) {
+  if (!enabled || status.state === 'disabled') {
+    return '동기화가 꺼져 있습니다.';
+  }
+
+  if (status.state === 'error') {
+    return status.errorMessage ?? '동기화 중 오류가 발생했습니다.';
+  }
+
+  if (status.state === 'syncing') {
+    return 'iCloud와 동기화 중입니다.';
+  }
+
+  if (status.lastSyncAt) {
+    return `마지막 동기화 ${new Date(status.lastSyncAt).toLocaleString('ko-KR')}`;
+  }
+
+  return 'iCloud 동기화가 켜져 있으며 변경 사항을 기다리는 중입니다.';
+}
+
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
@@ -78,6 +101,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
   const installerRef = useRef<{ install(): Promise<void>; relaunch(): Promise<void> } | null>(null);
+  const icloudSyncDescription = formatIcloudSyncDescription(icloudSyncEnabled, icloudSyncStatus);
 
   if (!isOpen) {
     return null;
@@ -258,11 +282,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">iCloud 동기화</span>
-            <span className="document-menu-option-description">
-              {icloudSyncStatus.state === 'error'
-                ? icloudSyncStatus.errorMessage ?? '동기화 중 오류가 발생했습니다.'
-                : '같은 Apple ID로 로그인된 Mac 사이에서 문서를 동기화합니다.'}
-            </span>
+            <span className="document-menu-option-description">{icloudSyncDescription}</span>
           </div>
           <SegmentedSelector
             ariaLabel="iCloud 동기화 선택"
