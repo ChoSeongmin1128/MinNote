@@ -61,18 +61,18 @@ pub(crate) fn preview_window_opacity(app: &AppHandle, percent: u8) -> Result<u8,
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) fn menu_bar_icon() -> tauri::image::Image<'static> {
+pub(crate) fn menu_bar_icon() -> Result<tauri::image::Image<'static>, String> {
   use image::ImageFormat;
   use image::ImageReader;
 
   let cursor = std::io::Cursor::new(include_bytes!("../../icons/menu-bar-symbol-colored.png"));
   let image = ImageReader::with_format(cursor, ImageFormat::Png)
     .decode()
-    .expect("menu bar icon asset should be a valid png")
+    .map_err(|error| format!("메뉴바 아이콘 리소스를 읽지 못했습니다: {error}"))?
     .into_rgba8();
   let (width, height) = image.dimensions();
 
-  tauri::image::Image::new_owned(image.into_raw(), width, height)
+  Ok(tauri::image::Image::new_owned(image.into_raw(), width, height))
 }
 
 fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {

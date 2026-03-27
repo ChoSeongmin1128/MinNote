@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 
+use crate::domain::models::AppSettings;
 use crate::error::StartupError;
 use crate::ports::repositories::AppStateRepository;
 use crate::state::AppState;
@@ -51,9 +52,12 @@ pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
 
 pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
   #[cfg(target_os = "macos")]
-  let icon = menu_bar_icon();
+  let icon = menu_bar_icon().map_err(|error| tauri::Error::Anyhow(anyhow::anyhow!(error)))?;
   #[cfg(not(target_os = "macos"))]
-  let icon = app.default_window_icon().cloned().expect("no app icon");
+  let icon = app
+    .default_window_icon()
+    .cloned()
+    .ok_or_else(|| tauri::Error::Anyhow(anyhow::anyhow!("기본 앱 아이콘을 찾을 수 없습니다.")))?;
 
   let menu = MenuBuilder::new(app)
     .text("show", "열기")
@@ -100,6 +104,26 @@ fn initialize_app_state(app_dir: &Path) -> Result<AppState, StartupError> {
   AppState::new(&database_path).map_err(StartupError::InitializeState)
 }
 
+fn load_startup_settings(app_state: &AppState) -> Result<AppSettings, StartupError> {
+  let repository = app_state
+    .repository
+    .lock()
+    .map_err(|_| StartupError::LoadSettings(crate::error::AppError::StateLock))?;
+  repository.get_app_settings().map_err(StartupError::LoadSettings)
+}
+
+pub(crate) fn sync_tray_icon_enabled(app: &tauri::AppHandle, enabled: bool) -> Result<(), String> {
+  if enabled {
+    if app.tray_by_id(TRAY_ID).is_none() {
+      build_tray_icon(app).map_err(|error| error.to_string())?;
+    }
+  } else {
+    let _ = app.remove_tray_by_id(TRAY_ID);
+  }
+
+  Ok(())
+}
+
 pub(crate) fn show_startup_error_dialog(message: &str) {
   let _ = rfd::MessageDialog::new()
     .set_title("MinNote 초기화 실패")
@@ -114,13 +138,7 @@ pub(crate) fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
     .app_data_dir()
     .map_err(|_| StartupError::ResolveAppDataDir)?;
   let app_state = initialize_app_state(&app_dir)?;
-
-  let settings = app_state
-    .repository
-    .lock()
-    .ok()
-    .and_then(|repo| repo.get_app_settings().ok())
-    .ok_or_else(|| StartupError::LoadSettings(crate::error::AppError::StateLock))?;
+  let settings = load_startup_settings(&app_state)?;
 
   let menu_bar_icon_enabled = settings.menu_bar_icon_enabled;
 
@@ -131,7 +149,7 @@ pub(crate) fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
       .map_err(StartupError::ApplyWindowPreferences)?;
 
     if menu_bar_icon_enabled && app.tray_by_id(TRAY_ID).is_none() {
-      if let Err(error) = build_tray_icon(app.handle()) {
+      if let Err(error) = sync_tray_icon_enabled(app.handle(), true) {
         let message = format!("메뉴바 아이콘을 초기화하지 못했습니다: {error}");
         log::warn!("{message}");
         managed_state.set_menu_bar_icon_error(Some(message));

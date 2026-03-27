@@ -18,6 +18,8 @@ function createPreferencesGateway() {
     setDefaultDocumentSurfaceTonePreset: vi.fn(),
     setDefaultBlockKind: vi.fn(),
     setMenuBarIconEnabled: vi.fn(),
+    getMenuBarIconError: vi.fn(() => null),
+    setMenuBarIconError: vi.fn(),
     getAlwaysOnTopEnabled: vi.fn(() => false),
     setAlwaysOnTopEnabled: vi.fn(),
     getWindowOpacityPercent: vi.fn(() => opacity),
@@ -96,6 +98,28 @@ describe('preferences usecases', () => {
 
     expect(preferences.setGlobalShortcutError).toHaveBeenCalledWith('이미 다른 앱에서 사용 중입니다.');
     expect(preferences.setGlobalToggleShortcut).not.toHaveBeenCalledWith('Cmd+Shift+K');
+  });
+
+  it('surfaces menu bar icon runtime error without committing failed state', async () => {
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const backend = {
+      setMenuBarIconEnabled: vi.fn(async () => {
+        throw new Error('메뉴바 아이콘을 초기화하지 못했습니다.');
+      }),
+    };
+
+    const useCases = createPreferencesUseCases({
+      backend: backend as never,
+      preferences: preferences as never,
+      workspace: workspace as never,
+    });
+
+    await useCases.setMenuBarIconEnabled(true);
+
+    expect(preferences.setMenuBarIconEnabled).not.toHaveBeenCalledWith(true);
+    expect(preferences.setMenuBarIconError).toHaveBeenCalledWith('메뉴바 아이콘을 초기화하지 못했습니다.');
+    expect(workspace.setError).toHaveBeenCalledWith('메뉴바 아이콘을 초기화하지 못했습니다.');
   });
 
 });

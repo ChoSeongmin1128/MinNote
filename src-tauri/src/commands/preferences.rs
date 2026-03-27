@@ -5,7 +5,12 @@ use crate::application::services;
 use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, ThemeMode};
 use crate::state::AppState;
 
-use super::helpers::{persist_global_shortcut, persist_window_setting, sync_tray_icon_enabled, with_repository};
+use super::helpers::{
+  persist_global_shortcut,
+  persist_menu_bar_icon_setting,
+  persist_window_setting,
+  with_repository,
+};
 
 #[tauri::command]
 pub fn set_theme_mode(state: State<'_, AppState>, theme_mode: ThemeMode) -> Result<ThemeMode, String> {
@@ -70,11 +75,7 @@ pub fn set_menu_bar_icon_enabled(
   app_handle: tauri::AppHandle,
   enabled: bool,
 ) -> Result<bool, String> {
-  with_repository(state, |repository| {
-    services::set_menu_bar_icon_enabled(repository, enabled)
-  })?;
-  sync_tray_icon_enabled(&app_handle, enabled)?;
-  Ok(enabled)
+  persist_menu_bar_icon_setting(state, &app_handle, enabled)
 }
 
 #[tauri::command]

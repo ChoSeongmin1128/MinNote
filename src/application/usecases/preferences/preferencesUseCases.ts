@@ -63,8 +63,11 @@ export function createPreferencesUseCases({
       const result = await backend.setMenuBarIconEnabled(enabled);
       workspace.clearError();
       preferences.setMenuBarIconEnabled(result);
+      preferences.setMenuBarIconError(null);
     } catch (error) {
-      workspace.setError(normalizeErrorMessage(error, '메뉴바 아이콘 설정을 변경하지 못했습니다.'));
+      const message = normalizeErrorMessage(error, '메뉴바 아이콘 설정을 변경하지 못했습니다.');
+      workspace.setError(message);
+      preferences.setMenuBarIconError(message);
     }
   }
 
