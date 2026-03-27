@@ -1,9 +1,6 @@
 import {
   AlertTriangle,
   CheckCircle2,
-  Cloud,
-  CloudAlert,
-  CloudOff,
   Download,
   MoonStar,
   MonitorCog,
@@ -12,24 +9,13 @@ import {
   X,
 } from 'lucide-react';
 import { useState } from 'react';
-import {
-  deleteAllDocuments,
-  setAlwaysOnTopEnabled,
-  setDefaultBlockKind,
-  setDefaultBlockTintPreset,
-  setDefaultDocumentSurfaceTonePreset,
-  setGlobalToggleShortcut,
-  refreshIcloudSync,
-  setIcloudSyncMode,
-  setMenuBarIconEnabled,
-  setThemeMode,
-} from '../app/actions';
+import { usePreferencesController, useWorkspaceController } from '../app/controllers';
 import { BlockTintPreview } from './BlockTintPreview';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import { DOCUMENT_SURFACE_TONE_PRESETS } from '../lib/documentSurfaceTone';
 import { DocumentSurfacePreview } from './DocumentSurfacePreview';
 import { SegmentedSelector } from './SegmentedSelector';
-import type { BlockKind, ICloudSyncConnectionMode, ICloudSyncStatus, ThemeMode } from '../lib/types';
+import type { BlockKind, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { applyPreparedUpdate, formatUpdateStatusMessage, runUpdateCheckFrom } from '../lib/appUpdater';
 import { ShortcutCaptureField } from './ShortcutCaptureField';
@@ -38,6 +24,8 @@ import {
   MIN_WINDOW_OPACITY_PERCENT,
 } from '../lib/globalShortcut';
 import { useWindowOpacityControl } from '../hooks/useWindowOpacityControl';
+import { useUpdaterStore } from '../stores/updaterStore';
+import type { AppUpdateStatus } from '../lib/types';
 
 const THEME_OPTIONS: Array<{ id: ThemeMode; label: string; icon: typeof MonitorCog }> = [
   { id: 'system', label: '자동', icon: MonitorCog },
@@ -71,105 +59,8 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-function formatIcloudSyncDescription(
-  status: ICloudSyncStatus,
-) {
-  if (status.connectionMode === 'disconnected') {
-    return '해제됨';
-  }
-
-  if (status.connectionMode === 'paused') {
-    return status.pendingChangeCount > 0
-      ? `일시중지 · 보류 ${status.pendingChangeCount}건`
-      : '일시중지';
-  }
-
-  if (status.runtimeState === 'offline') {
-    return status.pendingChangeCount > 0
-      ? `오프라인 · 보류 ${status.pendingChangeCount}건`
-      : '오프라인';
-  }
-
-  if (status.runtimeState === 'error') {
-    return status.errorMessage ?? '오류';
-  }
-
-  if (status.runtimeState === 'syncing') {
-    return status.initialFetchCompleted ? '동기화 중' : '가져오는 중';
-  }
-
-  if (status.pendingChangeCount > 0) {
-    return `보류 ${status.pendingChangeCount}건`;
-  }
-
-  if (status.lastSyncAt) {
-    return `최근 동기화 ${formatCompactDateTime(status.lastSyncAt)}`;
-  }
-
-  if (status.lastStatusAt) {
-    return '연결됨';
-  }
-
-  return '기록 없음';
-}
-
-function formatCompactDateTime(value: number) {
-  const date = new Date(value);
-  const now = new Date();
-  const sameDay = date.toDateString() === now.toDateString();
-
-  if (sameDay) {
-    return date.toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-
-  return date.toLocaleString('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function getIcloudSyncPresentation(
-  status: ICloudSyncStatus,
-) {
-  const label = formatIcloudSyncDescription(status);
-
-  if (status.connectionMode === 'disconnected') {
-    return { label, tone: 'muted' as const, icon: CloudOff, spin: false };
-  }
-
-  if (status.connectionMode === 'paused') {
-    return { label, tone: 'muted' as const, icon: CloudOff, spin: false };
-  }
-
-  if (status.runtimeState === 'offline' || status.runtimeState === 'error') {
-    return { label, tone: 'error' as const, icon: CloudAlert, spin: false };
-  }
-
-  if (status.runtimeState === 'syncing') {
-    return { label, tone: 'progress' as const, icon: RefreshCw, spin: true };
-  }
-
-  if (status.lastSyncAt) {
-    return { label, tone: 'ready' as const, icon: CheckCircle2, spin: false };
-  }
-
-  if (status.lastStatusAt) {
-    return { label, tone: 'ready' as const, icon: Cloud, spin: false };
-  }
-
-  return { label, tone: 'muted' as const, icon: Cloud, spin: false };
-}
-
 function getAppUpdatePresentation(
-  status: Pick<
-    ReturnType<typeof useWorkspaceStore.getState>['appUpdateStatus'],
-    'state' | 'message' | 'version' | 'percent' | 'lastCheckedAt'
-  >,
+  status: Pick<AppUpdateStatus, 'state' | 'message' | 'version' | 'percent' | 'lastCheckedAt'>,
 ) {
   const label = formatUpdateStatusMessage(status);
 
@@ -201,29 +92,29 @@ function getAppUpdatePresentation(
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+  const {
+    setAlwaysOnTopEnabled,
+    setDefaultBlockKind,
+    setDefaultBlockTintPreset,
+    setDefaultDocumentSurfaceTonePreset,
+    setGlobalToggleShortcut,
+    setMenuBarIconEnabled,
+    setThemeMode,
+  } = usePreferencesController();
+  const { deleteAllDocuments } = useWorkspaceController();
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
   const defaultBlockKind = useWorkspaceStore((state) => state.defaultBlockKind);
-  const icloudSyncMode = useWorkspaceStore((state) => state.icloudSyncMode);
-  const icloudSyncStatus = useWorkspaceStore((state) => state.icloudSyncStatus);
   const menuBarIconEnabled = useWorkspaceStore((state) => state.menuBarIconEnabled);
   const alwaysOnTopEnabled = useWorkspaceStore((state) => state.alwaysOnTopEnabled);
   const globalToggleShortcut = useWorkspaceStore((state) => state.globalToggleShortcut);
   const globalShortcutError = useWorkspaceStore((state) => state.globalShortcutError);
-  const appUpdateStatus = useWorkspaceStore((state) => state.appUpdateStatus);
+  const appUpdateStatus = useUpdaterStore((state) => state.appUpdateStatus);
   const { draftOpacity, previewOpacity, commitOpacity } = useWindowOpacityControl();
   const [isConfirmOpen, setConfirmOpen] = useState(false);
-  const [isDisconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false);
-  const icloudSyncPresentation = getIcloudSyncPresentation(icloudSyncStatus);
   const appUpdatePresentation = getAppUpdatePresentation(appUpdateStatus);
-  const IcloudSyncIcon = icloudSyncPresentation.icon;
   const AppUpdateIcon = appUpdatePresentation?.icon;
-  const canRefreshIcloud = icloudSyncMode === 'connected' && icloudSyncStatus.runtimeState !== 'syncing';
-  const primaryIcloudActionLabel =
-    icloudSyncMode === 'connected' ? '동기화 일시중지' : '동기화 재개';
-  const nextIcloudMode: ICloudSyncConnectionMode =
-    icloudSyncMode === 'connected' ? 'paused' : 'connected';
 
   if (!isOpen) {
     return null;
@@ -399,73 +290,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               onCommit={(shortcut) => setGlobalToggleShortcut(shortcut)}
             />
           </div>
-        </div>
-
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-title">iCloud 동기화</span>
-            <span className={`settings-status-chip is-${icloudSyncPresentation.tone}`}>
-              <IcloudSyncIcon className={icloudSyncPresentation.spin ? 'spin' : undefined} size={14} />
-              <span>{icloudSyncPresentation.label}</span>
-            </span>
-          </div>
-          <div className="settings-update-actions">
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => {
-                void setIcloudSyncMode(nextIcloudMode);
-              }}
-            >
-              {primaryIcloudActionLabel}
-            </button>
-            <button
-              className="ghost-button"
-              type="button"
-              disabled={!canRefreshIcloud}
-              onClick={() => {
-                void refreshIcloudSync();
-              }}
-            >
-              지금 동기화
-            </button>
-          </div>
-          <div className="document-menu-option-description">
-            마지막 가져오기 {icloudSyncStatus.lastFetchAt ? formatCompactDateTime(icloudSyncStatus.lastFetchAt) : '기록 없음'}
-            {' · '}
-            마지막 보내기 {icloudSyncStatus.lastSendAt ? formatCompactDateTime(icloudSyncStatus.lastSendAt) : '기록 없음'}
-          </div>
-          {!isDisconnectConfirmOpen ? (
-            <button
-              className="document-menu-danger"
-              type="button"
-              disabled={icloudSyncMode === 'disconnected'}
-              onClick={() => setDisconnectConfirmOpen(true)}
-            >
-              <CloudOff size={14} />
-              iCloud 연결 해제
-            </button>
-          ) : (
-            <div className="danger-confirm-actions">
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => setDisconnectConfirmOpen(false)}
-              >
-                취소
-              </button>
-              <button
-                className="document-menu-danger"
-                type="button"
-                onClick={() => {
-                  void setIcloudSyncMode('disconnected');
-                  setDisconnectConfirmOpen(false);
-                }}
-              >
-                연결 해제 실행
-              </button>
-            </div>
-          )}
         </div>
 
         <div className="settings-section">

@@ -1,9 +1,9 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
+use std::{fs, io};
 
 use crate::error::AppError;
 use crate::infrastructure::sqlite::SqliteStore;
-use crate::sync::SyncManager;
 
 #[derive(Default)]
 pub struct WindowControlState {
@@ -13,11 +13,8 @@ pub struct WindowControlState {
 
 pub struct AppState {
   pub repository: Mutex<SqliteStore>,
-  pub sync_manager: Mutex<SyncManager>,
   pub window_controls: Mutex<WindowControlState>,
   pub shutdown_confirmed: Mutex<bool>,
-  pub db_path: PathBuf,
-  pub sync_state_path: PathBuf,
 }
 
 impl AppState {
@@ -27,33 +24,17 @@ impl AppState {
       .parent()
       .unwrap_or(db_path)
       .join("sync-engine-state.json");
+    match fs::remove_file(&sync_state_path) {
+      Ok(()) => {}
+      Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+      Err(error) => return Err(AppError::validation(format!("기존 동기화 상태 파일을 정리하지 못했습니다: {error}"))),
+    }
 
     Ok(Self {
       repository: Mutex::new(repository),
-      sync_manager: Mutex::new(SyncManager::new()),
       window_controls: Mutex::new(WindowControlState::default()),
       shutdown_confirmed: Mutex::new(false),
-      db_path: db_path.to_path_buf(),
-      sync_state_path,
     })
-  }
-
-  pub fn notify_sync_changed(&self, document_id: &str) {
-    if let Ok(mut sync) = self.sync_manager.lock() {
-      sync.notify_changed(document_id);
-    }
-  }
-
-  pub fn notify_sync_deleted(&self, document_id: &str) {
-    if let Ok(mut sync) = self.sync_manager.lock() {
-      sync.notify_deleted(document_id);
-    }
-  }
-
-  pub fn notify_sync_reset(&self) {
-    if let Ok(mut sync) = self.sync_manager.lock() {
-      sync.notify_reset();
-    }
   }
 
   pub fn active_global_toggle_shortcut(&self) -> Option<String> {

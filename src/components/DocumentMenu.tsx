@@ -1,6 +1,6 @@
 import { MoreHorizontal, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { deleteDocument, setDocumentBlockTintOverride, setDocumentSurfaceToneOverride } from '../app/actions';
+import { useDocumentController } from '../app/controllers';
 import { BlockTintPreview } from './BlockTintPreview';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import { DOCUMENT_SURFACE_TONE_PRESETS } from '../lib/documentSurfaceTone';
@@ -25,6 +25,11 @@ const DOCUMENT_SURFACE_TONE_OPTIONS = DOCUMENT_SURFACE_TONE_PRESETS.map((preset)
 }));
 
 export function DocumentMenu() {
+  const {
+    deleteDocument,
+    setDocumentBlockTintOverride,
+    setDocumentSurfaceToneOverride,
+  } = useDocumentController();
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);

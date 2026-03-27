@@ -5,20 +5,40 @@ import { BlockCard } from './BlockCard';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 
-const { createBlockBelow } = vi.hoisted(() => ({
-  createBlockBelow: vi.fn(),
-}));
-
-vi.mock('../app/actions', () => ({
+const {
+  changeBlockKind,
+  copySelectedBlocks,
+  copySingleBlock,
   createBlockBelow,
+  deleteSelectedBlocks,
+  deleteBlock,
+  updateCodeBlock,
+  updateMarkdownBlock,
+  updateTextBlock,
+} = vi.hoisted(() => ({
   changeBlockKind: vi.fn(),
   copySelectedBlocks: vi.fn(),
   copySingleBlock: vi.fn(),
+  createBlockBelow: vi.fn(),
   deleteSelectedBlocks: vi.fn(),
   deleteBlock: vi.fn(),
   updateCodeBlock: vi.fn(),
   updateMarkdownBlock: vi.fn(),
   updateTextBlock: vi.fn(),
+}));
+
+vi.mock('../app/controllers', () => ({
+  useBlockController: () => ({
+    changeBlockKind,
+    copySelectedBlocks,
+    copySingleBlock,
+    createBlockBelow,
+    deleteSelectedBlocks,
+    deleteBlock,
+    updateCodeBlock,
+    updateMarkdownBlock,
+    updateTextBlock,
+  }),
 }));
 
 vi.mock('./editors/editorLoaders', () => ({

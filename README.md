@@ -45,12 +45,12 @@ MinNote는 macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heyno
 ## 현재 상태
 
 - 이 저장소는 `Tauri + React + TypeScript + Rust + SQLite` 기반의 macOS 앱 구현을 포함합니다.
-- 프런트엔드에는 문서 목록, 블록 셸, Markdown/Code/Text 편집기, autosave, 검색 UI, iCloud 동기화 상태 표시가 들어 있습니다.
+- 프런트엔드에는 문서 목록, 블록 셸, Markdown/Code/Text 편집기, autosave, 검색 UI, 휴지통, 업데이트 UI가 들어 있습니다.
 - 앱은 초기 로딩이 끝나면 업데이트를 한 번 확인하고, 이후 `6시간` 간격으로 다시 확인합니다.
 - 새 버전이 있으면 백그라운드 다운로드를 먼저 진행하고, 헤더 우측의 작은 버튼으로 `업데이트 적용`을 실행합니다.
 - 설정의 업데이트 영역은 상태 확인과 수동 `업데이트 확인` 버튼을 위한 보조 UI입니다.
-- iCloud 상태는 `꺼짐`, `동기화 중`, `최근 동기화 ...`, `동기화 기록 없음`, `오류`로 표시합니다. `동기화 기록 없음`은 아직 CloudKit 왕복 성공 신호를 받지 못한 상태를 뜻합니다.
-- 백엔드에는 SQLite schema, Tauri command facade, 문서/블록 저장 로직, FTS 기반 검색 인덱스, CloudKit 동기화 sidecar 연동이 들어 있습니다.
+- 백엔드에는 SQLite schema, Tauri command facade, 문서/블록 저장 로직, FTS 기반 검색 인덱스, updater 연동이 들어 있습니다.
+- 현재 앱 데이터는 로컬 SQLite에만 저장됩니다. iCloud/CloudKit 동기화 기능은 제거된 상태입니다.
 - AI 전용 세부 맥락은 루트 `AGENTS.md`와 `.agents/skills/` 아래 skill들에 둡니다.
 
 ## 실행 방법
@@ -58,19 +58,19 @@ MinNote는 macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heyno
 - 의존성 설치: `pnpm install`
 - 웹 프런트엔드 실행: `pnpm dev`
 - Tauri 앱 실행: `pnpm tauri:dev`
+- 로컬 signed 앱 확인: `pnpm tauri:dev:signed`
 - 프런트엔드 빌드: `pnpm build`
-- sidecar 포함 앱 빌드: `pnpm tauri:build`
+- 앱 빌드: `pnpm tauri:build`
 - 프런트엔드 테스트: `pnpm test:run`
 
-`pnpm tauri:dev`와 `pnpm tauri:build`를 실제로 실행하려면 로컬에 Rust toolchain과 Swift toolchain이 필요합니다. sidecar는 스크립트에서 자동으로 준비됩니다.
+`pnpm tauri:dev`와 `pnpm tauri:build`를 실제로 실행하려면 로컬에 Rust toolchain이 필요합니다.
 
 로컬 릴리스 빌드는 아래 경로를 전제로 합니다.
 
 - `/.env.release.local`
 - `/.local-release/minnote-updater.key`
-- `/.local-release/MinNote_Developer_ID_CloudKit.provisionprofile`
 
-위 파일들은 Git에서 무시되며, `pnpm tauri:build`가 자동으로 읽습니다.
+`pnpm tauri:dev:signed`와 `pnpm tauri:build`는 위 파일 중 필요한 값을 자동으로 읽습니다. provisioning profile은 더 이상 전제하지 않습니다.
 
 ## 릴리스 흐름
 

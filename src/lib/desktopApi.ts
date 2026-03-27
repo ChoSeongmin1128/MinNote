@@ -8,8 +8,6 @@ import type {
   DocumentSurfaceTonePreset,
   DocumentDto,
   DocumentSummaryDto,
-  ICloudSyncConnectionMode,
-  RemoteDocumentDto,
   SearchResultDto,
   ThemeMode,
   WindowControlRuntimeStateDto,
@@ -133,12 +131,6 @@ export const desktopApi = {
   restoreDocumentFromTrash(documentId: string) {
     return call<BootstrapPayload>('restore_document_from_trash', { documentId });
   },
-  setIcloudSyncMode(mode: ICloudSyncConnectionMode) {
-    return call<ICloudSyncConnectionMode>('set_icloud_sync_mode', { mode });
-  },
-  refreshIcloudSync() {
-    return call<boolean>('refresh_icloud_sync');
-  },
   confirmAppShutdown() {
     return call<void>('confirm_app_shutdown');
   },
@@ -159,8 +151,5 @@ export const desktopApi = {
   },
   setGlobalToggleShortcut(shortcut: string | null) {
     return call<string | null>('set_global_toggle_shortcut', { shortcut });
-  },
-  applyRemoteDocuments(documents: RemoteDocumentDto[]) {
-    return call<BootstrapPayload>('apply_remote_documents', { documents });
   },
 };

@@ -136,11 +136,20 @@ impl SqliteStore {
         "UPDATE documents SET updated_at = ?1 WHERE id = ?2",
         params![now, document_id],
       )?;
-      self.enqueue_sync_change(document_id, SyncOutboxOperation::Upsert, now)?;
     }
 
     self.get_document(document_id)?
       .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))
+  }
+
+  pub(crate) fn finish_document_mutation(&mut self, document_id: &str) -> Result<Document, AppError> {
+    self.rebuild_search_index(document_id)?;
+    self.touch_document_internal(document_id, false)
+  }
+
+  pub(crate) fn finish_document_structure_mutation(&mut self, document_id: &str) -> Result<Document, AppError> {
+    self.normalize_positions(document_id)?;
+    self.finish_document_mutation(document_id)
   }
 
   pub(crate) fn block_document_id(&self, block_id: &str) -> Result<String, AppError> {
@@ -164,7 +173,8 @@ impl SqliteStore {
           Ok(Block {
             id: row.get(0)?,
             document_id: row.get(1)?,
-            kind: BlockKind::from_str(row.get::<_, String>(2)?.as_str()),
+            kind: BlockKind::try_from_str(row.get::<_, String>(2)?.as_str())
+              .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
             position: row.get(3)?,
             content: row.get(4)?,
             search_text: row.get(5)?,
@@ -530,41 +540,5 @@ impl SqliteStore {
       params![key, value],
     )?;
     Ok(())
-  }
-
-  pub(crate) fn enqueue_sync_change(
-    &self,
-    document_id: &str,
-    operation: SyncOutboxOperation,
-    version_at_enqueue: i64,
-  ) -> Result<(), AppError> {
-    let now = Self::now();
-    self.connection.execute(
-      "INSERT INTO sync_outbox (document_id, operation, version_at_enqueue, enqueued_at, last_attempt_at, last_error, acknowledged_at)
-       VALUES (?1, ?2, ?3, ?4, NULL, NULL, NULL)
-       ON CONFLICT(document_id) DO UPDATE SET
-         operation = excluded.operation,
-         version_at_enqueue = excluded.version_at_enqueue,
-         enqueued_at = excluded.enqueued_at,
-         last_attempt_at = NULL,
-         last_error = NULL,
-         acknowledged_at = NULL",
-      params![document_id, operation.as_str(), version_at_enqueue, now],
-    )?;
-    Ok(())
-  }
-
-  pub(crate) fn clear_sync_outbox(&self) -> Result<(), AppError> {
-    self.connection.execute("DELETE FROM sync_outbox", [])?;
-    Ok(())
-  }
-
-  pub(crate) fn count_pending_sync_changes(&self) -> Result<usize, AppError> {
-    let count = self.connection.query_row(
-      "SELECT COUNT(*) FROM sync_outbox WHERE acknowledged_at IS NULL",
-      [],
-      |row| row.get::<_, i64>(0),
-    )?;
-    Ok(count as usize)
   }
 }

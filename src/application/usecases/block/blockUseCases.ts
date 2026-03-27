@@ -5,10 +5,9 @@ import {
 } from '../../models/document';
 import type { BackendPort } from '../../ports/backendPort';
 import type { ClipboardPort } from '../../ports/clipboardPort';
-import type { PendingDocumentSave, DocumentSyncPort } from '../../ports/documentSyncPort';
+import type { EditorPersistencePort, PendingBlockSave } from '../../ports/editorPersistencePort';
 import type { HistoryGateway } from '../../ports/historyGateway';
 import type { SessionGateway } from '../../ports/sessionGateway';
-import type { SyncMutationPort } from '../../ports/syncMutationPort';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
 import { isBlockClipboardText, parseBlockClipboardText, type ClipboardBlockData } from '../../../lib/blockClipboardCodec';
 import { createEmptyMarkdownContent, isMarkdownContentEmpty } from '../../../lib/markdown';
@@ -20,11 +19,10 @@ import { executeWithErrorHandling, normalizeErrorMessage } from '../shared/error
 interface BlockUseCaseDeps {
   backend: BackendPort;
   clipboard: ClipboardPort;
-  documentSync: DocumentSyncPort;
+  editorPersistence: EditorPersistencePort;
   flushCurrentDocument: () => Promise<void>;
   history: HistoryGateway;
   session: SessionGateway;
-  syncMutation: SyncMutationPort;
   workspace: WorkspaceGateway;
 }
 
@@ -39,11 +37,10 @@ function toClipboardBlocks(blocks: BlockVm[]): ClipboardBlockData[] {
 export function createBlockUseCases({
   backend,
   clipboard,
-  documentSync,
+  editorPersistence,
   flushCurrentDocument,
   history,
   session,
-  syncMutation,
   workspace,
 }: BlockUseCaseDeps) {
   function findEditableBlock<K extends BlockKind>(
@@ -71,8 +68,8 @@ export function createBlockUseCases({
     });
   }
 
-  function queueAndApplyBlockUpdate(blockId: string, nextBlock: BlockVm, payload: PendingDocumentSave) {
-    documentSync.queueDocumentSave(nextBlock.documentId, blockId, payload);
+  function queueAndApplyBlockUpdate(blockId: string, nextBlock: BlockVm, payload: PendingBlockSave) {
+    editorPersistence.queueBlockSave(nextBlock.documentId, blockId, payload);
     applyUpdatedBlock(nextBlock);
   }
 
@@ -149,9 +146,6 @@ export function createBlockUseCases({
 
       workspace.clearError();
       setDocumentWithFocus(session, workspace, nextDocument, nextBlock?.id ?? null, 'start');
-      if (nextBlock) {
-        syncMutation.enqueue({ kind: 'block-created', documentId: nextDocument.id, blockId: nextBlock.id });
-      }
     }, (message) => workspace.setError(message), '블록을 만들지 못했습니다.');
   }
 
@@ -168,10 +162,9 @@ export function createBlockUseCases({
 
       const nextBlock = await backend.changeBlockKind(blockId, kind);
       const replaced = replaceBlockInDocument(currentDocument, nextBlock);
-      documentSync.clearBlockSync(currentDocument.id, blockId);
+      editorPersistence.clearBlock(currentDocument.id, blockId);
       workspace.clearError();
       updateDocumentState(session, workspace, replaced);
-      syncMutation.enqueue({ kind: 'block-updated', documentId: currentDocument.id, blockId });
     }, (message) => workspace.setError(message), '블록 형식을 바꾸지 못했습니다.');
   }
 
@@ -192,11 +185,10 @@ export function createBlockUseCases({
     session.setIsFlushing(true);
 
     try {
-      await documentSync.flushDocumentSaves(previousDocument.id);
+      await editorPersistence.flushDocument(previousDocument.id);
       const nextDocument = await backend.moveBlock(previousDocument.id, blockId, targetPosition);
       updateDocumentState(session, workspace, nextDocument);
       session.requestBlockFocus(blockId, 'start');
-      syncMutation.enqueue({ kind: 'document-reordered-blocks', documentId: nextDocument.id });
     } catch (error) {
       setDocumentWithFocus(session, workspace, previousDocument, blockId, 'start');
       workspace.setError(normalizeErrorMessage(error, '블록 순서를 저장하지 못했습니다.'));
@@ -220,11 +212,10 @@ export function createBlockUseCases({
       const previousBlock = deletedIndex > 0 ? currentDocument.blocks[deletedIndex - 1] : null;
       const nextBlock = deletedIndex >= 0 ? currentDocument.blocks[deletedIndex + 1] ?? null : null;
 
-      documentSync.clearBlockSync(currentDocument.id, blockId);
+      editorPersistence.clearBlock(currentDocument.id, blockId);
       const nextDocument = await backend.deleteBlock(blockId);
       workspace.clearError();
       updateDocumentState(session, workspace, nextDocument);
-      syncMutation.enqueue({ kind: 'block-deleted', documentId: nextDocument.id, blockId });
 
       const focusTarget = previousBlock?.id ?? nextBlock?.id;
       if (focusTarget) {
@@ -387,7 +378,7 @@ export function createBlockUseCases({
     session.setIsFlushing(true);
 
     try {
-      await documentSync.flushDocumentSaves(currentDocument.id);
+      await editorPersistence.flushDocument(currentDocument.id);
       let workingDocument = currentDocument;
       const selectedIds = new Set(selectedBlocks.map((block) => block.id));
       const selectedIndices = currentDocument.blocks
@@ -405,9 +396,8 @@ export function createBlockUseCases({
       if (isWholeDocumentSelection) {
         const survivorId = selectedBlocks[0]?.id ?? null;
         for (const block of selectedBlocks.slice(1).reverse()) {
-          documentSync.clearBlockSync(currentDocument.id, block.id);
+          editorPersistence.clearBlock(currentDocument.id, block.id);
           workingDocument = await backend.deleteBlock(block.id);
-          syncMutation.enqueue({ kind: 'block-deleted', documentId: currentDocument.id, blockId: block.id });
         }
 
         const survivor = survivorId
@@ -415,13 +405,11 @@ export function createBlockUseCases({
           : null;
         if (survivor) {
           await clearBlockContent(survivor);
-          syncMutation.enqueue({ kind: 'block-updated', documentId: currentDocument.id, blockId: survivor.id });
         }
       } else {
         for (const block of selectedBlocks.slice().reverse()) {
-          documentSync.clearBlockSync(currentDocument.id, block.id);
+          editorPersistence.clearBlock(currentDocument.id, block.id);
           workingDocument = await backend.deleteBlock(block.id);
-          syncMutation.enqueue({ kind: 'block-deleted', documentId: currentDocument.id, blockId: block.id });
         }
       }
 
@@ -456,7 +444,7 @@ export function createBlockUseCases({
 
     await executeWithErrorHandling(async () => {
       history.pushRedo(currentDocument);
-      await documentSync.flushDocumentSaves(currentDocument.id);
+      await editorPersistence.flushDocument(currentDocument.id);
       const restored = await backend.restoreDocumentBlocks(
         currentDocument.id,
         previousDocument.blocks.map((block) => ({
@@ -486,7 +474,7 @@ export function createBlockUseCases({
 
     await executeWithErrorHandling(async () => {
       history.pushUndo(currentDocument);
-      await documentSync.flushDocumentSaves(currentDocument.id);
+      await editorPersistence.flushDocument(currentDocument.id);
       const restored = await backend.restoreDocumentBlocks(
         currentDocument.id,
         nextDocument.blocks.map((block) => ({

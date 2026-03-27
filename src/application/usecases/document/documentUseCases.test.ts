@@ -12,8 +12,6 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     defaultBlockTintPreset: 'mist',
     defaultDocumentSurfaceTonePreset: 'default',
     defaultBlockKind,
-    icloudSyncMode: 'disconnected',
-    icloudPendingChangeCount: 0,
     menuBarIconEnabled: false,
     alwaysOnTopEnabled: false,
     windowOpacityPercent: 100,
@@ -54,6 +52,11 @@ function createWorkspaceGateway() {
     setIsBootstrapping: vi.fn(),
     clearError: vi.fn(),
     setError: vi.fn(),
+  };
+}
+
+function createUiGateway() {
+  return {
     setSettingsOpen: vi.fn(),
   };
 }
@@ -64,20 +67,6 @@ function createPreferencesGateway() {
     setDefaultDocumentSurfaceTonePreset: vi.fn(),
     setDefaultBlockKind: vi.fn(),
     setThemeMode: vi.fn(),
-    setIcloudSyncMode: vi.fn(),
-    getIcloudSyncStatus: vi.fn(() => ({
-      connectionMode: 'disconnected' as const,
-      runtimeState: 'idle' as const,
-      lastSyncAt: null,
-      lastStatusAt: null,
-      lastFetchAt: null,
-      lastSendAt: null,
-      initialFetchCompleted: false,
-      errorMessage: null,
-      hasPendingWrites: false,
-      pendingChangeCount: 0,
-    })),
-    setIcloudSyncStatus: vi.fn(),
     setMenuBarIconEnabled: vi.fn(),
     getAlwaysOnTopEnabled: vi.fn(() => false),
     setAlwaysOnTopEnabled: vi.fn(),
@@ -95,24 +84,26 @@ describe('document usecases', () => {
     const workspace = createWorkspaceGateway();
     const preferences = createPreferencesGateway();
     const session = createSessionGateway();
-    const documentSync = { clearDocumentSync: vi.fn(), flushDocumentSaves: vi.fn() };
+    const editorPersistence = { clearDocument: vi.fn(), flushDocument: vi.fn(), clearAll: vi.fn() };
+    const ui = createUiGateway();
     const useCases = createDocumentUseCases({
       backend: {
         deleteDocument: vi.fn(async () => createPayload('code')),
       } as never,
-      documentSync: documentSync as never,
+      editorPersistence: editorPersistence as never,
       history: { clear: vi.fn() } as never,
       preferences: preferences as never,
       session,
-      syncMutation: { enqueue: vi.fn() },
+      ui: ui as never,
       workspace,
     });
 
     await useCases.deleteDocument('doc-1');
 
-    expect(documentSync.clearDocumentSync).toHaveBeenCalledWith('doc-1');
+    expect(editorPersistence.clearDocument).toHaveBeenCalledWith('doc-1');
     expect(preferences.setDefaultBlockKind).toHaveBeenCalledWith('code');
     expect(preferences.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
+    expect(ui.setSettingsOpen).toHaveBeenCalledWith(false);
   });
 
   it('keeps current document while still syncing default block kind during restore', async () => {
@@ -130,15 +121,16 @@ describe('document usecases', () => {
     const workspace = createWorkspaceGateway();
     const preferences = createPreferencesGateway();
     const session = createSessionGateway(currentDocument);
+    const ui = createUiGateway();
     const useCases = createDocumentUseCases({
       backend: {
         restoreDocumentFromTrash: vi.fn(async () => createPayload('text')),
       } as never,
-      documentSync: { flushDocumentSaves: vi.fn() } as never,
+      editorPersistence: { clearDocument: vi.fn(), flushDocument: vi.fn(), clearAll: vi.fn() } as never,
       history: { clear: vi.fn() } as never,
       preferences: preferences as never,
       session,
-      syncMutation: { enqueue: vi.fn() },
+      ui: ui as never,
       workspace,
     });
 

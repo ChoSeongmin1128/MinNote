@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { previewWindowOpacityPercent, setWindowOpacityPercent } from '../app/actions';
+import { usePreferencesController } from '../app/controllers';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 
 export function useWindowOpacityControl() {
+  const { previewWindowOpacityPercent, setWindowOpacityPercent } = usePreferencesController();
   const persistedOpacity = useWorkspaceStore((state) => state.windowOpacityPercent);
   const [draftOpacity, setDraftOpacity] = useState(persistedOpacity);
 

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::domain::models::{Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, IcloudSyncMode, SearchResult, ThemeMode};
+use crate::domain::models::{Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode};
 use crate::error::AppError;
 
 #[derive(Debug, Serialize)]
@@ -60,8 +60,6 @@ pub struct BootstrapPayload {
   pub default_block_tint_preset: BlockTintPreset,
   pub default_document_surface_tone_preset: DocumentSurfaceTonePreset,
   pub default_block_kind: BlockKind,
-  pub icloud_sync_mode: IcloudSyncMode,
-  pub icloud_pending_change_count: usize,
   pub menu_bar_icon_enabled: bool,
   pub always_on_top_enabled: bool,
   pub window_opacity_percent: u8,
@@ -82,33 +80,6 @@ pub struct BlockRestoreDto {
   pub content: String,
   pub language: Option<String>,
   pub position: i64,
-}
-
-// CloudKit에서 받은 원격 문서 (CloudKit 런타임 → Tauri)
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoteDocumentDto {
-  pub id: String,
-  pub title: Option<String>,
-  pub block_tint_override: Option<String>,
-  pub document_surface_tone_override: Option<String>,
-  pub blocks_json: String,
-  pub created_at: i64,
-  pub updated_at: i64,
-  pub deleted_at: Option<i64>,
-}
-
-// blocks_json 내부 블록 항목 (JSON 파싱용)
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoteBlockJson {
-  pub id: String,
-  pub kind: String,
-  pub content: String,
-  pub language: Option<String>,
-  pub position: i64,
-  pub created_at: i64,
-  pub updated_at: i64,
 }
 
 impl TryFrom<Block> for BlockDto {

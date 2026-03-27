@@ -9,10 +9,14 @@ fn map_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<Document> {
     title: row.get(1)?,
     block_tint_override: row
       .get::<_, Option<String>>(2)?
-      .map(|value| BlockTintPreset::from_str(&value)),
+      .map(|value| BlockTintPreset::try_from_str(&value))
+      .transpose()
+      .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
     document_surface_tone_override: row
       .get::<_, Option<String>>(3)?
-      .map(|value| DocumentSurfaceTonePreset::from_str(&value)),
+      .map(|value| DocumentSurfaceTonePreset::try_from_str(&value))
+      .transpose()
+      .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
     created_at: row.get(4)?,
     updated_at: row.get(5)?,
     last_opened_at: row.get(6)?,
@@ -147,9 +151,7 @@ impl DocumentRepository for SqliteStore {
     )?;
 
     self.create_empty_block(&document.id, 0, BlockKind::Markdown)?;
-    self.rebuild_search_index(&document.id)?;
-    self.enqueue_sync_change(&document.id, SyncOutboxOperation::Upsert, document.updated_at)?;
-
+    self.finish_document_mutation(&document.id)?;
     Ok(document)
   }
 
@@ -159,8 +161,7 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET title = ?1 WHERE id = ?2",
       params![normalized, document_id],
     )?;
-    self.rebuild_search_index(document_id)?;
-    self.touch_document_internal(document_id, false)
+    self.finish_document_mutation(document_id)
   }
 
   fn delete_document(&mut self, document_id: &str) -> Result<(), AppError> {
@@ -169,7 +170,6 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
       params![now, document_id],
     )?;
-    self.enqueue_sync_change(document_id, SyncOutboxOperation::Delete, now)?;
     Ok(())
   }
 
@@ -179,7 +179,6 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET deleted_at = NULL, updated_at = ?1 WHERE id = ?2",
       params![now, document_id],
     )?;
-    self.enqueue_sync_change(document_id, SyncOutboxOperation::Upsert, now)?;
     self
       .get_document(document_id)?
       .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))
@@ -192,11 +191,7 @@ impl DocumentRepository for SqliteStore {
         "SELECT id
          FROM documents
          WHERE deleted_at IS NOT NULL
-           AND deleted_at < ?1
-           AND id NOT IN (
-             SELECT document_id FROM sync_outbox
-             WHERE operation = 'delete' AND acknowledged_at IS NULL
-           )",
+           AND deleted_at < ?1",
       )?
       .query_map(params![cutoff_ms], |row| row.get::<_, String>(0))?
       .collect::<Result<Vec<_>, _>>()?;
@@ -211,11 +206,7 @@ impl DocumentRepository for SqliteStore {
     self.connection.execute(
       "DELETE FROM documents
        WHERE deleted_at IS NOT NULL
-         AND deleted_at < ?1
-         AND id NOT IN (
-           SELECT document_id FROM sync_outbox
-           WHERE operation = 'delete' AND acknowledged_at IS NULL
-         )",
+         AND deleted_at < ?1",
       params![cutoff_ms],
     )?;
 
@@ -228,11 +219,7 @@ impl DocumentRepository for SqliteStore {
       .prepare(
         "SELECT id
          FROM documents
-         WHERE deleted_at IS NOT NULL
-           AND id NOT IN (
-             SELECT document_id FROM sync_outbox
-             WHERE operation = 'delete' AND acknowledged_at IS NULL
-           )",
+         WHERE deleted_at IS NOT NULL",
       )?
       .query_map([], |row| row.get::<_, String>(0))?
       .collect::<Result<Vec<_>, _>>()?;
@@ -246,11 +233,7 @@ impl DocumentRepository for SqliteStore {
 
     self.connection.execute(
       "DELETE FROM documents
-       WHERE deleted_at IS NOT NULL
-         AND id NOT IN (
-           SELECT document_id FROM sync_outbox
-           WHERE operation = 'delete' AND acknowledged_at IS NULL
-         )",
+       WHERE deleted_at IS NOT NULL",
       [],
     )?;
 
@@ -273,7 +256,7 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET block_tint_override = ?1 WHERE id = ?2",
       params![value, document_id],
     )?;
-    self.touch_document_internal(document_id, false)
+    self.finish_document_mutation(document_id)
   }
 
   fn set_document_surface_tone_override(
@@ -286,7 +269,7 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET document_surface_tone_override = ?1 WHERE id = ?2",
       params![value, document_id],
     )?;
-    self.touch_document_internal(document_id, false)
+    self.finish_document_mutation(document_id)
   }
 
   fn mark_document_opened(&mut self, document_id: &str) -> Result<Document, AppError> {

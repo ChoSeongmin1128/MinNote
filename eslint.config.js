@@ -20,4 +20,51 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    files: ['src/components/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [
+          {
+            name: '../app/actions',
+            message: '컴포넌트와 훅은 app/actions 대신 controller hook을 사용해야 합니다.',
+          },
+          {
+            name: '../../app/actions',
+            message: '컴포넌트와 훅은 app/actions 대신 controller hook을 사용해야 합니다.',
+          },
+        ],
+      }],
+    },
+  },
+  {
+    files: ['src/services/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [
+          {
+            name: '../lib/desktopApi',
+            message: 'desktopApi 직접 호출 대신 BackendPort를 통해 접근해야 합니다.',
+          },
+          {
+            name: '../../lib/desktopApi',
+            message: 'desktopApi 직접 호출 대신 BackendPort를 통해 접근해야 합니다.',
+          },
+        ],
+      }],
+    },
+  },
+  {
+    files: ['src/application/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['../adapters/*', '../../adapters/*', '../../../adapters/*'],
+            message: 'application 계층은 adapter를 직접 참조하면 안 됩니다.',
+          },
+        ],
+      }],
+    },
+  },
 ])

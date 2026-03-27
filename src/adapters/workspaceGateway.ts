@@ -26,7 +26,4 @@ export const workspaceGateway: WorkspaceGateway = {
   setError(message) {
     useWorkspaceStore.getState().setError(message);
   },
-  setSettingsOpen(isOpen) {
-    useWorkspaceStore.getState().setSettingsOpen(isOpen);
-  },
 };

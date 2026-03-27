@@ -1,13 +1,5 @@
 import { useEffect, useRef } from 'react';
-import {
-  copySelectedBlocks,
-  deleteSelectedBlocks,
-  flushCurrentDocument,
-  isBlockClipboardText,
-  pasteBlocks,
-  undoBlockOperation,
-  redoBlockOperation,
-} from '../app/actions';
+import { useBlockController, useDocumentController } from '../app/controllers';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { resetHoldState } from '../lib/backspaceHoldState';
 
@@ -24,6 +16,15 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 export function useAppShortcuts() {
+  const {
+    copySelectedBlocks,
+    deleteSelectedBlocks,
+    isBlockClipboardText,
+    pasteBlocks,
+    undoBlockOperation,
+    redoBlockOperation,
+  } = useBlockController();
+  const { flushCurrentDocument } = useDocumentController();
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const blockSelected = useDocumentSessionStore((state) => state.blockSelected);
   const allBlocksSelected = useDocumentSessionStore((state) => state.allBlocksSelected);

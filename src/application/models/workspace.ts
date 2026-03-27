@@ -2,7 +2,6 @@ import type {
   BlockKind,
   BlockTintPreset,
   DocumentSurfaceTonePreset,
-  ICloudSyncConnectionMode,
   ThemeMode,
 } from '../../lib/types';
 import type { DocumentSummaryVm, DocumentVm } from './document';
@@ -15,8 +14,6 @@ export interface WorkspaceBootstrapState {
   defaultBlockTintPreset: BlockTintPreset;
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
-  icloudSyncMode: ICloudSyncConnectionMode;
-  icloudPendingChangeCount: number;
   menuBarIconEnabled: boolean;
   alwaysOnTopEnabled: boolean;
   windowOpacityPercent: number;

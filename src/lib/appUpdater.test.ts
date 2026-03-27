@@ -7,7 +7,7 @@ import {
   __resetAppUpdaterForTests,
   runUpdateCheck,
 } from './appUpdater';
-import { useWorkspaceStore } from '../stores/workspaceStore';
+import { useUpdaterStore } from '../stores/updaterStore';
 
 const { checkMock, relaunchMock } = vi.hoisted(() => ({
   checkMock: vi.fn(),
@@ -28,7 +28,7 @@ describe('runUpdateCheck', () => {
   });
 
   beforeEach(() => {
-    useWorkspaceStore.setState({
+    useUpdaterStore.setState({
       appUpdateStatus: {
         state: 'idle',
         version: null,
@@ -52,7 +52,7 @@ describe('runUpdateCheck', () => {
     await runUpdateCheck();
 
     expect(checkMock).toHaveBeenCalledWith({ timeout: APP_UPDATE_CHECK_TIMEOUT_MS });
-    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+    expect(useUpdaterStore.getState().appUpdateStatus).toMatchObject({
       state: 'idle',
       message: '최신',
     });
@@ -75,7 +75,7 @@ describe('runUpdateCheck', () => {
     await runUpdateCheck();
 
     expect(downloadMock).toHaveBeenCalledTimes(1);
-    expect(useWorkspaceStore.getState().appUpdateStatus).toEqual({
+    expect(useUpdaterStore.getState().appUpdateStatus).toEqual({
       state: 'ready_to_install',
       version: '1.1.0',
       percent: 100,
@@ -89,7 +89,7 @@ describe('runUpdateCheck', () => {
 
     await runUpdateCheck();
 
-    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+    expect(useUpdaterStore.getState().appUpdateStatus).toMatchObject({
       state: 'error',
       message: '메타데이터 없음',
     });
@@ -100,7 +100,7 @@ describe('runUpdateCheck', () => {
 
     await runUpdateCheck();
 
-    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+    expect(useUpdaterStore.getState().appUpdateStatus).toMatchObject({
       state: 'error',
       message: '업데이트 응답 지연',
     });
@@ -114,7 +114,7 @@ describe('runUpdateCheck', () => {
     await vi.advanceTimersByTimeAsync(APP_UPDATE_CHECK_TIMEOUT_MS + 1_001);
     await pending;
 
-    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+    expect(useUpdaterStore.getState().appUpdateStatus).toMatchObject({
       state: 'error',
       message: '업데이트 응답 지연',
     });
@@ -135,7 +135,7 @@ describe('runUpdateCheck', () => {
     await vi.advanceTimersByTimeAsync(APP_UPDATE_DOWNLOAD_TIMEOUT_MS + 1);
     await pending;
 
-    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+    expect(useUpdaterStore.getState().appUpdateStatus).toMatchObject({
       state: 'error',
       message: '업데이트 다운로드 지연',
     });
@@ -143,7 +143,7 @@ describe('runUpdateCheck', () => {
     await runUpdateCheck();
 
     expect(checkMock).toHaveBeenCalledTimes(2);
-    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+    expect(useUpdaterStore.getState().appUpdateStatus).toMatchObject({
       state: 'idle',
       message: '최신',
     });
@@ -184,7 +184,7 @@ describe('runUpdateCheck', () => {
     await vi.advanceTimersByTimeAsync(APP_UPDATE_INSTALL_TIMEOUT_MS + 1);
     await pending;
 
-    expect(useWorkspaceStore.getState().appUpdateStatus).toMatchObject({
+    expect(useUpdaterStore.getState().appUpdateStatus).toMatchObject({
       state: 'error',
       message: '업데이트 적용 지연',
     });

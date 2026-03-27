@@ -12,8 +12,6 @@ if [ -f "$ENV_FILE" ]; then
   set +a
 fi
 
-"$SCRIPT_DIR/prepare-provisioning-profile.sh"
-
 if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]; then
   for candidate in \
     "$ROOT_DIR/.local-release/minnote-updater.key" \

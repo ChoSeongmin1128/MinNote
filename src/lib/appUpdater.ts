@@ -1,7 +1,7 @@
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
 import type { AppUpdateStatus } from './types';
-import { useWorkspaceStore } from '../stores/workspaceStore';
+import { updaterGateway } from '../adapters/updaterGateway';
 
 export const APP_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export const APP_UPDATE_CHECK_TIMEOUT_MS = 15 * 1000;
@@ -40,7 +40,7 @@ function debugUpdater(message: string, payload?: unknown) {
 }
 
 function buildStatus(next: Partial<AppUpdateStatus> & Pick<AppUpdateStatus, 'state'>): AppUpdateStatus {
-  const current = useWorkspaceStore.getState().appUpdateStatus;
+  const current = updaterGateway.getStatus();
 
   return {
     state: next.state,
@@ -52,12 +52,12 @@ function buildStatus(next: Partial<AppUpdateStatus> & Pick<AppUpdateStatus, 'sta
 }
 
 function setUpdateStatus(status: AppUpdateStatus) {
-  const current = useWorkspaceStore.getState().appUpdateStatus;
+  const current = updaterGateway.getStatus();
   debugUpdater('status', {
     from: current,
     to: status,
   });
-  useWorkspaceStore.getState().setAppUpdateStatus(status);
+  updaterGateway.setStatus(status);
 }
 
 function normalizeUpdateError(error: unknown) {
@@ -281,7 +281,7 @@ export async function runUpdateCheck() {
 }
 
 export async function runUpdateCheckFrom(source: string) {
-  const current = useWorkspaceStore.getState().appUpdateStatus;
+  const current = updaterGateway.getStatus();
   debugUpdater('check:requested', { source, current });
 
   if (current.state === 'checking' && pendingCheck) {
@@ -318,7 +318,7 @@ export async function applyPreparedUpdate() {
   }
 
   try {
-    const current = useWorkspaceStore.getState().appUpdateStatus;
+    const current = updaterGateway.getStatus();
     debugUpdater('install:start', { version: current.version });
     setUpdateStatus(buildStatus({
       state: 'installing',

@@ -1,6 +1,6 @@
 import { SlidersHorizontal } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { setAlwaysOnTopEnabled } from '../app/actions';
+import { usePreferencesController } from '../app/controllers';
 import {
   MAX_WINDOW_OPACITY_PERCENT,
   MIN_WINDOW_OPACITY_PERCENT,
@@ -9,6 +9,7 @@ import { useWindowOpacityControl } from '../hooks/useWindowOpacityControl';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 
 export function WindowMenu() {
+  const { setAlwaysOnTopEnabled } = usePreferencesController();
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const alwaysOnTopEnabled = useWorkspaceStore((state) => state.alwaysOnTopEnabled);

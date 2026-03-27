@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { commitDocumentTitle, moveBlock } from '../app/actions';
+import { useBlockController, useDocumentController } from '../app/controllers';
 import { BlockCard } from './BlockCard';
 import { BlockGhostPreview } from './BlockGhostPreview';
 import { getEditableDocumentTitle } from '../lib/documentTitle';
@@ -9,6 +9,7 @@ import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useBlockReorder } from '../hooks/useBlockReorder';
 
 function DocumentTitleInput({ title }: { title: string | null }) {
+  const { commitDocumentTitle } = useDocumentController();
   const [draft, setDraft] = useState(getEditableDocumentTitle(title));
 
   return (
@@ -44,6 +45,7 @@ interface MarqueeState {
 }
 
 export function DocumentCanvas() {
+  const { moveBlock } = useBlockController();
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const selectedBlockId = useDocumentSessionStore((state) => state.selectedBlockId);
   const selectedBlockIds = useDocumentSessionStore((state) => state.selectedBlockIds);

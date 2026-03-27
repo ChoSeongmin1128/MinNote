@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::error::AppError;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum BlockKind {
@@ -17,11 +19,12 @@ impl BlockKind {
     }
   }
 
-  pub fn from_str(value: &str) -> Self {
+  pub fn try_from_str(value: &str) -> Result<Self, AppError> {
     match value {
-      "code" => Self::Code,
-      "text" => Self::Text,
-      _ => Self::Markdown,
+      "markdown" => Ok(Self::Markdown),
+      "code" => Ok(Self::Code),
+      "text" => Ok(Self::Text),
+      _ => Err(AppError::validation(format!("알 수 없는 블록 종류입니다: {value}"))),
     }
   }
 }
@@ -49,14 +52,15 @@ impl BlockTintPreset {
     }
   }
 
-  pub fn from_str(value: &str) -> Self {
+  pub fn try_from_str(value: &str) -> Result<Self, AppError> {
     match value {
-      "sage-rose" => Self::SageRose,
-      "sky-amber" => Self::SkyAmber,
-      "mint-plum" => Self::MintPlum,
-      "ocean-sand" => Self::OceanSand,
-      "violet-lime" => Self::VioletLime,
-      _ => Self::Mist,
+      "mist" => Ok(Self::Mist),
+      "sage-rose" => Ok(Self::SageRose),
+      "sky-amber" => Ok(Self::SkyAmber),
+      "mint-plum" => Ok(Self::MintPlum),
+      "ocean-sand" => Ok(Self::OceanSand),
+      "violet-lime" => Ok(Self::VioletLime),
+      _ => Err(AppError::validation(format!("알 수 없는 블록 색상쌍입니다: {value}"))),
     }
   }
 }
@@ -86,15 +90,16 @@ impl DocumentSurfaceTonePreset {
     }
   }
 
-  pub fn from_str(value: &str) -> Self {
+  pub fn try_from_str(value: &str) -> Result<Self, AppError> {
     match value {
-      "default" => Self::Default,
-      "fog" => Self::Fog,
-      "sand" => Self::Sand,
-      "sage" => Self::Sage,
-      "slate" => Self::Slate,
-      "dusk" => Self::Dusk,
-      _ => Self::Default,
+      "default" => Ok(Self::Default),
+      "paper" => Ok(Self::Paper),
+      "fog" => Ok(Self::Fog),
+      "sand" => Ok(Self::Sand),
+      "sage" => Ok(Self::Sage),
+      "slate" => Ok(Self::Slate),
+      "dusk" => Ok(Self::Dusk),
+      _ => Err(AppError::validation(format!("알 수 없는 문서 배경 톤입니다: {value}"))),
     }
   }
 }
@@ -116,37 +121,12 @@ impl ThemeMode {
     }
   }
 
-  pub fn from_str(value: &str) -> Self {
+  pub fn try_from_str(value: &str) -> Result<Self, AppError> {
     match value {
-      "light" => Self::Light,
-      "dark" => Self::Dark,
-      _ => Self::System,
-    }
-  }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum IcloudSyncMode {
-  Connected,
-  Paused,
-  Disconnected,
-}
-
-impl IcloudSyncMode {
-  pub fn as_str(&self) -> &'static str {
-    match self {
-      Self::Connected => "connected",
-      Self::Paused => "paused",
-      Self::Disconnected => "disconnected",
-    }
-  }
-
-  pub fn from_str(value: &str) -> Self {
-    match value {
-      "connected" => Self::Connected,
-      "paused" => Self::Paused,
-      _ => Self::Disconnected,
+      "system" => Ok(Self::System),
+      "light" => Ok(Self::Light),
+      "dark" => Ok(Self::Dark),
+      _ => Err(AppError::validation(format!("알 수 없는 테마 모드입니다: {value}"))),
     }
   }
 }
@@ -200,7 +180,6 @@ pub struct AppSettings {
   pub default_block_tint_preset: BlockTintPreset,
   pub default_document_surface_tone_preset: DocumentSurfaceTonePreset,
   pub default_block_kind: BlockKind,
-  pub icloud_sync_mode: IcloudSyncMode,
   pub menu_bar_icon_enabled: bool,
   pub always_on_top_enabled: bool,
   pub window_opacity_percent: u8,

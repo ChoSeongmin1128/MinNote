@@ -58,8 +58,6 @@ export interface BootstrapPayload {
   defaultBlockTintPreset: BlockTintPreset;
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
-  icloudSyncMode: ICloudSyncConnectionMode;
-  icloudPendingChangeCount: number;
   menuBarIconEnabled: boolean;
   alwaysOnTopEnabled: boolean;
   windowOpacityPercent: number;
@@ -82,22 +80,6 @@ export interface BlockRestoreDto {
   position: number;
 }
 
-export type ICloudSyncConnectionMode = 'connected' | 'paused' | 'disconnected';
-export type ICloudSyncRuntimeState = 'idle' | 'syncing' | 'offline' | 'error';
-
-export interface ICloudSyncStatus {
-  connectionMode: ICloudSyncConnectionMode;
-  runtimeState: ICloudSyncRuntimeState;
-  lastSyncAt: number | null;
-  lastStatusAt: number | null;
-  lastFetchAt: number | null;
-  lastSendAt: number | null;
-  initialFetchCompleted: boolean;
-  errorMessage: string | null;
-  hasPendingWrites: boolean;
-  pendingChangeCount: number;
-}
-
 export type AppUpdateState =
   | 'idle'
   | 'checking'
@@ -113,31 +95,3 @@ export interface AppUpdateStatus {
   message: string | null;
   lastCheckedAt: number | null;
 }
-
-// CloudKit에서 받은 원격 문서 (Tauri → frontend → Rust)
-export interface RemoteDocumentDto {
-  id: string;
-  title: string | null;
-  blockTintOverride: string | null;
-  documentSurfaceToneOverride: string | null;
-  blocksJson: string;
-  createdAt: number;
-  updatedAt: number;
-  deletedAt: number | null;
-}
-
-// Tauri → frontend 이벤트 메시지
-export type SyncEventMessage =
-  | {
-      type: 'status';
-      state: ICloudSyncRuntimeState;
-      connectionMode: ICloudSyncConnectionMode;
-      lastSyncAt: number | null;
-      lastFetchAt: number | null;
-      lastSendAt: number | null;
-      initialFetchCompleted: boolean;
-      hasPendingWrites: boolean;
-      pendingChangeCount: number;
-    }
-  | { type: 'remote-changed'; documents: RemoteDocumentDto[] }
-  | { type: 'error'; message: string };

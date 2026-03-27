@@ -85,12 +85,6 @@ export const backendPort: BackendPort = {
   async restoreDocumentFromTrash(documentId) {
     return mapBootstrapPayloadToState(await desktopApi.restoreDocumentFromTrash(documentId));
   },
-  setIcloudSyncMode(mode) {
-    return desktopApi.setIcloudSyncMode(mode);
-  },
-  refreshIcloudSync() {
-    return desktopApi.refreshIcloudSync();
-  },
   confirmAppShutdown() {
     return desktopApi.confirmAppShutdown();
   },
@@ -111,8 +105,5 @@ export const backendPort: BackendPort = {
   },
   setGlobalToggleShortcut(shortcut) {
     return desktopApi.setGlobalToggleShortcut(shortcut);
-  },
-  async applyRemoteDocuments(documents) {
-    return mapBootstrapPayloadToState(await desktopApi.applyRemoteDocuments(documents));
   },
 };

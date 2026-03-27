@@ -14,15 +14,6 @@ export const preferencesGateway: PreferencesGateway = {
   setDefaultBlockKind(kind) {
     useWorkspaceStore.getState().setDefaultBlockKind(kind);
   },
-  setIcloudSyncMode(value) {
-    useWorkspaceStore.getState().setIcloudSyncMode(value);
-  },
-  getIcloudSyncStatus() {
-    return useWorkspaceStore.getState().icloudSyncStatus;
-  },
-  setIcloudSyncStatus(status) {
-    useWorkspaceStore.getState().setIcloudSyncStatus(status);
-  },
   setMenuBarIconEnabled(value) {
     useWorkspaceStore.getState().setMenuBarIconEnabled(value);
   },

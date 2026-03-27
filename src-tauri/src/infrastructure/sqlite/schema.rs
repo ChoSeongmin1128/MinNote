@@ -33,16 +33,6 @@ impl SqliteStore {
           value TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS sync_outbox (
-          document_id TEXT PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
-          operation TEXT NOT NULL,
-          version_at_enqueue INTEGER NOT NULL,
-          enqueued_at INTEGER NOT NULL,
-          last_attempt_at INTEGER NULL,
-          last_error TEXT NULL,
-          acknowledged_at INTEGER NULL
-        );
-
         CREATE VIRTUAL TABLE IF NOT EXISTS {SEARCH_INDEX_TABLE} USING fts5 (
           document_id UNINDEXED,
           title,
@@ -59,12 +49,11 @@ impl SqliteStore {
     self.ensure_app_state_value("default_block_tint_preset", DEFAULT_BLOCK_TINT_PRESET)?;
     self.ensure_app_state_value("default_document_surface_tone_preset", DEFAULT_DOCUMENT_SURFACE_TONE_PRESET)?;
     self.ensure_app_state_value("default_block_kind", DEFAULT_BLOCK_KIND)?;
-    self.ensure_app_state_value("icloud_sync_enabled", DEFAULT_ICLOUD_SYNC_ENABLED)?;
-    self.migrate_icloud_sync_mode()?;
     self.ensure_app_state_value("menu_bar_icon_enabled", DEFAULT_MENU_BAR_ICON_ENABLED)?;
     self.ensure_app_state_value("always_on_top_enabled", DEFAULT_ALWAYS_ON_TOP_ENABLED)?;
     self.ensure_app_state_value("window_opacity_percent", DEFAULT_WINDOW_OPACITY_PERCENT)?;
     self.ensure_app_state_value("global_toggle_shortcut", DEFAULT_GLOBAL_TOGGLE_SHORTCUT)?;
+    self.cleanup_removed_sync_state()?;
 
     Ok(())
   }
@@ -95,16 +84,12 @@ impl SqliteStore {
     Ok(())
   }
 
-  fn migrate_icloud_sync_mode(&self) -> Result<(), AppError> {
-    let existing_mode = self.get_state_value("icloud_sync_mode")?;
-    if existing_mode.is_some() {
-      return Ok(());
-    }
-
-    let mode = self
-      .get_state_value("icloud_sync_enabled")?
-      .map(|value| if value == "true" { "connected" } else { DEFAULT_ICLOUD_SYNC_MODE })
-      .unwrap_or(DEFAULT_ICLOUD_SYNC_MODE);
-    self.ensure_app_state_value("icloud_sync_mode", mode)
+  fn cleanup_removed_sync_state(&self) -> Result<(), AppError> {
+    self.connection.execute("DROP TABLE IF EXISTS sync_outbox", [])?;
+    self.connection.execute(
+      "DELETE FROM app_state WHERE key IN ('icloud_sync_enabled', 'icloud_sync_mode')",
+      [],
+    )?;
+    Ok(())
   }
 }

@@ -91,8 +91,6 @@ export function mapBootstrapPayloadToState(payload: BootstrapPayload): Workspace
     defaultBlockTintPreset: payload.defaultBlockTintPreset,
     defaultDocumentSurfaceTonePreset: payload.defaultDocumentSurfaceTonePreset,
     defaultBlockKind: payload.defaultBlockKind,
-    icloudSyncMode: payload.icloudSyncMode,
-    icloudPendingChangeCount: payload.icloudPendingChangeCount,
     menuBarIconEnabled: payload.menuBarIconEnabled,
     alwaysOnTopEnabled: payload.alwaysOnTopEnabled,
     windowOpacityPercent: payload.windowOpacityPercent,

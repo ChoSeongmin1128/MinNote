@@ -2,35 +2,24 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- App Sandbox -->
+    <key>com.apple.application-identifier</key>
+    <string>5YG4V2PLZV.com.seongmin.minnote</string>
+
+    <key>com.apple.developer.team-identifier</key>
+    <string>5YG4V2PLZV</string>
+
     <key>com.apple.security.app-sandbox</key>
     <true/>
 
-    <!-- 네트워크 (CloudKit 필수) -->
     <key>com.apple.security.network.client</key>
     <true/>
 
-    <!-- 파일 시스템 접근 (App Support 디렉토리) -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
 
-    <!-- iCloud 서비스 -->
-    <key>com.apple.developer.icloud-services</key>
-    <array>
-        <string>CloudKit</string>
-    </array>
-
-    <!-- iCloud 컨테이너 -->
-    <key>com.apple.developer.icloud-container-identifiers</key>
-    <array>
-        <string>iCloud.com.seongmin.minnote</string>
-    </array>
-
-    <!-- JIT (Tauri WebView 필수) -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
 
-    <!-- Unsigned Executable Memory (Tauri WebView 필수) -->
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
 </dict>

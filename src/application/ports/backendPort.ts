@@ -2,8 +2,6 @@ import type {
   BlockKind,
   BlockTintPreset,
   DocumentSurfaceTonePreset,
-  ICloudSyncConnectionMode,
-  RemoteDocumentDto,
   ThemeMode,
 } from '../../lib/types';
 import type { BlockVm, DocumentVm, RestoreBlockInput, SearchResultVm } from '../models/document';
@@ -39,8 +37,6 @@ export interface BackendPort {
   restoreDocumentBlocks(documentId: string, blocks: RestoreBlockInput[]): Promise<DocumentVm>;
   emptyTrash(): Promise<void>;
   restoreDocumentFromTrash(documentId: string): Promise<WorkspaceBootstrapState>;
-  setIcloudSyncMode(mode: ICloudSyncConnectionMode): Promise<ICloudSyncConnectionMode>;
-  refreshIcloudSync(): Promise<boolean>;
   confirmAppShutdown(): Promise<void>;
   setMenuBarIconEnabled(enabled: boolean): Promise<boolean>;
   setDefaultBlockKind(kind: BlockKind): Promise<BlockKind>;
@@ -48,5 +44,4 @@ export interface BackendPort {
   previewWindowOpacityPercent(percent: number): Promise<number>;
   setWindowOpacityPercent(percent: number): Promise<number>;
   setGlobalToggleShortcut(shortcut: string | null): Promise<string | null>;
-  applyRemoteDocuments(documents: RemoteDocumentDto[]): Promise<WorkspaceBootstrapState>;
 }

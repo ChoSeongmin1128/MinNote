@@ -5,7 +5,6 @@ mod error;
 mod infrastructure;
 mod ports;
 mod state;
-mod sync;
 mod window_controls;
 
 use std::fs;
@@ -28,8 +27,6 @@ fn emit_shutdown_request(app_handle: &tauri::AppHandle) {
 #[cfg(target_os = "macos")]
 pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
   use block2::RcBlock;
-  use objc2::MainThreadMarker;
-  use objc2_app_kit::NSApplication;
   use objc2_app_kit::NSApplicationDidBecomeActiveNotification;
   use objc2_foundation::{NSNotification, NSNotificationCenter};
   use std::ptr::NonNull;
@@ -52,24 +49,6 @@ pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
   };
   // 앱 생명주기 동안 observer 유지
   std::mem::forget(observer);
-
-  if let Some(mtm) = MainThreadMarker::new() {
-    let app = NSApplication::sharedApplication(mtm);
-    app.registerForRemoteNotifications();
-  }
-}
-
-#[cfg(target_os = "macos")]
-pub(crate) fn register_remote_notifications() {
-  use objc2::MainThreadMarker;
-  use objc2_app_kit::NSApplication;
-
-  if let Some(mtm) = MainThreadMarker::new() {
-    let app = NSApplication::sharedApplication(mtm);
-    if !app.isRegisteredForRemoteNotifications() {
-      app.registerForRemoteNotifications();
-    }
-  }
 }
 
 pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
@@ -137,10 +116,6 @@ pub fn run() {
         .ok()
         .and_then(|repo| repo.get_app_settings().ok());
 
-      let icloud_enabled = settings
-        .as_ref()
-        .map(|s| s.icloud_sync_mode == crate::domain::models::IcloudSyncMode::Connected)
-        .unwrap_or(false);
       let menu_bar_icon_enabled = settings.as_ref().map(|s| s.menu_bar_icon_enabled).unwrap_or(false);
 
       app.manage(app_state);
@@ -153,24 +128,6 @@ pub fn run() {
           .and_then(|repository| repository.get_app_settings().map_err(|_| ()))
         {
           let _ = apply_window_preferences_with_settings(app.handle(), &settings);
-        }
-      }
-
-      if icloud_enabled {
-        if let Some(managed_state) = app.try_state::<AppState>() {
-          let db_path = database_path.to_str().unwrap_or_default().to_string();
-          let state_path = database_path
-            .parent()
-            .unwrap_or(&database_path)
-            .join("sync-engine-state.json")
-            .to_str()
-            .unwrap_or_default()
-            .to_string();
-
-          let app_handle = app.handle().clone();
-          if let Ok(mut sync) = managed_state.sync_manager.lock() {
-            let _ = sync.start(&app_handle, &db_path, &state_path);
-          }
         }
       }
 
@@ -238,8 +195,6 @@ pub fn run() {
       commands::restore_document_blocks,
       commands::empty_trash,
       commands::restore_document_from_trash,
-      commands::set_icloud_sync_mode,
-      commands::refresh_icloud_sync,
       commands::confirm_app_shutdown,
       commands::set_menu_bar_icon_enabled,
       commands::set_default_block_kind,
@@ -247,7 +202,6 @@ pub fn run() {
       commands::preview_window_opacity_percent,
       commands::set_window_opacity_percent,
       commands::set_global_toggle_shortcut,
-      commands::apply_remote_documents,
     ])
     .build(tauri::generate_context!())
     .expect("error building tauri application")

@@ -1,12 +1,11 @@
 import { backendPort } from '../adapters/backendPort';
 import { clipboardPort } from '../adapters/clipboardPort';
-import { documentSyncPort } from '../adapters/documentSyncPort';
+import { createEditorPersistenceAdapter } from '../adapters/editorPersistenceAdapter';
 import { historyGateway } from '../adapters/historyGateway';
 import { preferencesGateway } from '../adapters/preferencesGateway';
 import { schedulerPort } from '../adapters/schedulerPort';
 import { sessionGateway } from '../adapters/sessionGateway';
-import { syncEventPort } from '../adapters/syncEventPort';
-import { syncMutationPort } from '../adapters/syncMutationPort';
+import { uiGateway } from '../adapters/uiGateway';
 import { workspaceGateway } from '../adapters/workspaceGateway';
 import { createBlockUseCases } from '../application/usecases/block/blockUseCases';
 import { createDocumentUseCases } from '../application/usecases/document/documentUseCases';
@@ -14,13 +13,15 @@ import { createPreferencesUseCases } from '../application/usecases/preferences/p
 import { normalizeErrorMessage } from '../application/usecases/shared/errors';
 import { createWorkspaceUseCases } from '../application/usecases/workspace/workspaceUseCases';
 
+const editorPersistence = createEditorPersistenceAdapter(backendPort);
+
 const documentUseCases = createDocumentUseCases({
   backend: backendPort,
-  documentSync: documentSyncPort,
+  editorPersistence,
   history: historyGateway,
   preferences: preferencesGateway,
   session: sessionGateway,
-  syncMutation: syncMutationPort,
+  ui: uiGateway,
   workspace: workspaceGateway,
 });
 
@@ -32,26 +33,25 @@ const preferencesUseCases = createPreferencesUseCases({
 
 const workspaceUseCases = createWorkspaceUseCases({
   backend: backendPort,
-  documentSync: documentSyncPort,
+  editorPersistence,
   preferences: preferencesGateway,
   scheduler: schedulerPort,
   session: sessionGateway,
-  syncMutation: syncMutationPort,
+  ui: uiGateway,
   workspace: workspaceGateway,
 });
 
 const blockUseCases = createBlockUseCases({
   backend: backendPort,
   clipboard: clipboardPort,
-  documentSync: documentSyncPort,
+  editorPersistence,
   flushCurrentDocument: documentUseCases.flushCurrentDocument,
   history: historyGateway,
   session: sessionGateway,
-  syncMutation: syncMutationPort,
   workspace: workspaceGateway,
 });
 
-documentSyncPort.setErrorHandler((error, context) => {
+editorPersistence.setErrorHandler((error, context) => {
   const fallback =
     context.phase === 'autosave'
       ? '변경 내용을 자동 저장하지 못했습니다.'
@@ -59,11 +59,9 @@ documentSyncPort.setErrorHandler((error, context) => {
   workspaceGateway.setError(normalizeErrorMessage(error, fallback));
 });
 
-export const appUseCases = {
-  ...documentUseCases,
-  ...blockUseCases,
-  ...preferencesUseCases,
-  ...workspaceUseCases,
+export const appControllers = {
+  documents: documentUseCases,
+  blocks: blockUseCases,
+  preferences: preferencesUseCases,
+  workspace: workspaceUseCases,
 };
-
-export { syncEventPort };

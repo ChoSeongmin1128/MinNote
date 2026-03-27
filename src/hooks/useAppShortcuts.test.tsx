@@ -10,9 +10,23 @@ const controllerMocks = vi.hoisted(() => ({
   flushCurrentDocument: vi.fn().mockResolvedValue(undefined),
   isBlockClipboardText: vi.fn((text: string) => text.startsWith('<!--minnote-block:')),
   pasteBlocks: vi.fn().mockResolvedValue(undefined),
+  undoBlockOperation: vi.fn().mockResolvedValue(undefined),
+  redoBlockOperation: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../app/actions', () => controllerMocks);
+vi.mock('../app/controllers', () => ({
+  useBlockController: () => ({
+    copySelectedBlocks: controllerMocks.copySelectedBlocks,
+    deleteSelectedBlocks: controllerMocks.deleteSelectedBlocks,
+    isBlockClipboardText: controllerMocks.isBlockClipboardText,
+    pasteBlocks: controllerMocks.pasteBlocks,
+    undoBlockOperation: controllerMocks.undoBlockOperation,
+    redoBlockOperation: controllerMocks.redoBlockOperation,
+  }),
+  useDocumentController: () => ({
+    flushCurrentDocument: controllerMocks.flushCurrentDocument,
+  }),
+}));
 
 function Harness() {
   useAppShortcuts();

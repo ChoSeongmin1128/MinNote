@@ -10,7 +10,7 @@ usage() {
   cat <<'EOF'
 usage: ./scripts/run-signed-dev-app.sh [--release] [--target <triple>] [--no-open] [--strict-gatekeeper]
 
-Build a signed MinNote.app bundle for local CloudKit verification and optionally open it.
+Build a signed MinNote.app bundle for local verification and optionally open it.
 
 Options:
   --release         Build the release app bundle instead of debug
@@ -77,8 +77,6 @@ for var_name in "${required_vars[@]}"; do
   fi
 done
 
-"$SCRIPT_DIR/prepare-provisioning-profile.sh"
-
 cd "$ROOT_DIR"
 
 BUILD_ARGS=(--bundles app --no-sign)
@@ -90,7 +88,7 @@ if [ "${#TARGET_ARGS[@]}" -gt 0 ]; then
 fi
 
 echo "[1/4] app bundle build"
-VITE_DEBUG_ICLOUD=1 pnpm exec tauri build "${BUILD_ARGS[@]}"
+pnpm exec tauri build "${BUILD_ARGS[@]}"
 
 APP_PATH="$ROOT_DIR/src-tauri/target"
 if [ "${#TARGET_ARGS[@]}" -gt 0 ]; then
@@ -106,8 +104,8 @@ fi
 
 echo "[2/4] codesign"
 xattr -crs "$APP_PATH"
-codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$APP_PATH/Contents/MacOS/minnote"
-codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$APP_PATH"
+codesign --force --timestamp=none --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$APP_PATH/Contents/MacOS/minnote"
+codesign --force --timestamp=none --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$APP_PATH"
 
 echo "[3/4] verify"
 SIGN_INFO="$(codesign -dv --verbose=4 "$APP_PATH" 2>&1)"
@@ -122,7 +120,7 @@ if ! spctl -a -vv -t exec "$APP_PATH"; then
     exit 1
   fi
 
-  echo "warn: 로컬 CloudKit 확인용 dev 앱은 notarization을 생략하므로 Gatekeeper에서 거절될 수 있습니다."
+  echo "warn: 로컬 signed dev 앱은 notarization을 생략하므로 Gatekeeper에서 거절될 수 있습니다."
   echo "warn: codesign 검증은 통과했으므로 이 상태로 로컬 실행 확인을 계속합니다."
 fi
 

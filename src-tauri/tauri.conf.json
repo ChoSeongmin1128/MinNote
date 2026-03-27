@@ -57,10 +57,7 @@
         }
       },
       "entitlements": "Entitlements.plist",
-      "minimumSystemVersion": "14.0",
-      "files": {
-        "embedded.provisionprofile": "embedded.provisionprofile"
-      }
+      "minimumSystemVersion": "14.0"
     },
     "icon": [
       "icons/32x32.png",

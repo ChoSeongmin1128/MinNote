@@ -9,5 +9,4 @@ export interface WorkspaceGateway {
   setIsBootstrapping(value: boolean): void;
   clearError(): void;
   setError(message: string | null): void;
-  setSettingsOpen(isOpen: boolean): void;
 }

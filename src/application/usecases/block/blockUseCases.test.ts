@@ -50,18 +50,23 @@ describe('block usecases', () => {
     const workspace = {
       upsertDocumentSummary: vi.fn(),
     };
+    const editorPersistence = {
+      queueBlockSave: vi.fn((...args) => {
+        queued.push(args);
+      }),
+      flushDocument: vi.fn(),
+      clearDocument: vi.fn(),
+      clearAll: vi.fn(),
+      clearBlock: vi.fn(),
+      setErrorHandler: vi.fn(),
+    };
     const useCases = createBlockUseCases({
       backend: {} as never,
       clipboard: {} as never,
-      documentSync: {
-        queueDocumentSave: vi.fn((...args) => {
-          queued.push(args);
-        }),
-      } as never,
+      editorPersistence: editorPersistence as never,
       flushCurrentDocument: vi.fn(),
       history: {} as never,
       session: session as never,
-      syncMutation: {} as never,
       workspace: workspace as never,
     });
 

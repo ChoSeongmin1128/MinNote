@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { AlertCircle, LoaderCircle, PanelLeft } from 'lucide-react';
-import { bootstrapApp, confirmAppShutdown, flushCurrentDocument } from './app/actions';
+import { useDocumentController, useWorkspaceController } from './app/controllers';
 import { AppUpdateButton } from './components/AppUpdateButton';
 import { DocumentMenu } from './components/DocumentMenu';
 import { Sidebar } from './components/Sidebar';
@@ -11,9 +11,10 @@ import { WindowMenu } from './components/WindowMenu';
 import { useAppUpdater } from './hooks/useAppUpdater';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
-import { useSyncEventListener } from './hooks/useSyncEventListener';
 import { useWorkspaceStore } from './stores/workspaceStore';
 import { useDocumentSessionStore } from './stores/documentSessionStore';
+import { useUiStore } from './stores/uiStore';
+import { useUpdaterStore } from './stores/updaterStore';
 
 function formatLastSavedAt(value: number) {
   const date = new Date(value);
@@ -32,25 +33,26 @@ function formatLastSavedAt(value: number) {
 }
 
 function App() {
+  const { flushCurrentDocument } = useDocumentController();
+  const { bootstrapApp, confirmAppShutdown } = useWorkspaceController();
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const isFlushing = useDocumentSessionStore((state) => state.isFlushing);
   const lastSavedAt = useDocumentSessionStore((state) => state.lastSavedAt);
   const isBootstrapping = useWorkspaceStore((state) => state.isBootstrapping);
-  const appUpdateStatus = useWorkspaceStore((state) => state.appUpdateStatus);
+  const appUpdateStatus = useUpdaterStore((state) => state.appUpdateStatus);
   const error = useWorkspaceStore((state) => state.error);
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
-  const isSettingsOpen = useWorkspaceStore((state) => state.isSettingsOpen);
-  const setSettingsOpen = useWorkspaceStore((state) => state.setSettingsOpen);
+  const isSettingsOpen = useUiStore((state) => state.isSettingsOpen);
+  const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const setWorkspaceError = useWorkspaceStore((state) => state.setError);
-  const desktopSidebarExpanded = useWorkspaceStore((state) => state.desktopSidebarExpanded);
-  const mobileSidebarOpen = useWorkspaceStore((state) => state.mobileSidebarOpen);
-  const setDesktopSidebarExpanded = useWorkspaceStore((state) => state.setDesktopSidebarExpanded);
-  const setMobileSidebarOpen = useWorkspaceStore((state) => state.setMobileSidebarOpen);
+  const desktopSidebarExpanded = useUiStore((state) => state.desktopSidebarExpanded);
+  const mobileSidebarOpen = useUiStore((state) => state.mobileSidebarOpen);
+  const setDesktopSidebarExpanded = useUiStore((state) => state.setDesktopSidebarExpanded);
+  const setMobileSidebarOpen = useUiStore((state) => state.setMobileSidebarOpen);
   const isMobileViewport = useIsMobileViewport();
 
   useAppShortcuts();
-  useSyncEventListener();
   useAppUpdater(!isBootstrapping);
 
   useEffect(() => {

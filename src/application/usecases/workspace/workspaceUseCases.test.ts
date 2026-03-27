@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { DocumentSummaryVm, DocumentVm } from '../../models/document';
+import type { DocumentVm } from '../../models/document';
 import type { WorkspaceBootstrapState } from '../../models/workspace';
 import { createWorkspaceUseCases } from './workspaceUseCases';
 
@@ -12,8 +12,6 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     defaultBlockTintPreset: 'ocean-sand',
     defaultDocumentSurfaceTonePreset: 'default',
     defaultBlockKind,
-    icloudSyncMode: 'connected',
-    icloudPendingChangeCount: 0,
     menuBarIconEnabled: true,
     alwaysOnTopEnabled: false,
     windowOpacityPercent: 100,
@@ -54,6 +52,11 @@ function createWorkspaceGateway() {
     setIsBootstrapping: vi.fn(),
     clearError: vi.fn(),
     setError: vi.fn(),
+  };
+}
+
+function createUiGateway() {
+  return {
     setSettingsOpen: vi.fn(),
   };
 }
@@ -64,20 +67,6 @@ function createPreferencesGateway() {
     setDefaultDocumentSurfaceTonePreset: vi.fn(),
     setDefaultBlockKind: vi.fn(),
     setThemeMode: vi.fn(),
-    setIcloudSyncMode: vi.fn(),
-    getIcloudSyncStatus: vi.fn(() => ({
-      connectionMode: 'connected' as const,
-      runtimeState: 'idle' as const,
-      lastSyncAt: 10,
-      lastStatusAt: 11,
-      lastFetchAt: 12,
-      lastSendAt: 13,
-      initialFetchCompleted: true,
-      errorMessage: null,
-      hasPendingWrites: false,
-      pendingChangeCount: 0,
-    })),
-    setIcloudSyncStatus: vi.fn(),
     setMenuBarIconEnabled: vi.fn(),
     getAlwaysOnTopEnabled: vi.fn(() => false),
     setAlwaysOnTopEnabled: vi.fn(),
@@ -96,19 +85,19 @@ describe('workspace usecases', () => {
     const preferences = createPreferencesGateway();
     const session = createSessionGateway();
     const payload = createPayload('code');
+    const ui = createUiGateway();
     const useCases = createWorkspaceUseCases({
       backend: {
         bootstrapApp: vi.fn(async () => payload),
         getWindowControlRuntimeState: vi.fn(async () => ({ globalShortcutError: 'runtime error' })),
         searchDocuments: vi.fn(),
         deleteAllDocuments: vi.fn(),
-        applyRemoteDocuments: vi.fn(),
       } as never,
-      documentSync: { clearAllDocumentSync: vi.fn() } as never,
+      editorPersistence: { clearAll: vi.fn() } as never,
       preferences: preferences as never,
       scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
       session,
-      syncMutation: { enqueue: vi.fn() },
+      ui: ui as never,
       workspace,
     });
 
@@ -126,20 +115,20 @@ describe('workspace usecases', () => {
     const preferences = createPreferencesGateway();
     const session = createSessionGateway();
     const payload = createPayload('text');
-    const syncMutation = { enqueue: vi.fn() };
+    const editorPersistence = { clearAll: vi.fn() };
+    const ui = createUiGateway();
     const useCases = createWorkspaceUseCases({
       backend: {
         bootstrapApp: vi.fn(),
         getWindowControlRuntimeState: vi.fn(),
         searchDocuments: vi.fn(),
         deleteAllDocuments: vi.fn(async () => payload),
-        applyRemoteDocuments: vi.fn(),
       } as never,
-      documentSync: { clearAllDocumentSync: vi.fn() } as never,
+      editorPersistence: editorPersistence as never,
       preferences: preferences as never,
       scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
       session,
-      syncMutation,
+      ui: ui as never,
       workspace,
     });
 
@@ -147,201 +136,7 @@ describe('workspace usecases', () => {
 
     expect(preferences.setDefaultBlockKind).toHaveBeenCalledWith('text');
     expect(preferences.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
-    expect(workspace.setSettingsOpen).toHaveBeenCalledWith(false);
-    expect(syncMutation.enqueue).toHaveBeenCalledWith({ kind: 'documents-reset' });
-  });
-});
-
-describe('handleSyncEventMessage (remote-changed)', () => {
-  function createDocument(id: string): DocumentVm {
-    return {
-      id,
-      title: null,
-      blockTintOverride: null,
-      documentSurfaceToneOverride: null,
-      preview: '',
-      updatedAt: 0,
-      lastOpenedAt: 0,
-      blockCount: 0,
-      blocks: [],
-    };
-  }
-
-  function createSummary(id: string): DocumentSummaryVm {
-    return {
-      id,
-      title: null,
-      blockTintOverride: null,
-      documentSurfaceToneOverride: null,
-      preview: '',
-      updatedAt: 0,
-      lastOpenedAt: 0,
-      blockCount: 0,
-    };
-  }
-
-  function createUseCasesWithRemote(currentDocument: DocumentVm | null, payload: WorkspaceBootstrapState) {
-    const workspace = createWorkspaceGateway();
-    const preferences = createPreferencesGateway();
-    const session = createSessionGateway(currentDocument);
-    const useCases = createWorkspaceUseCases({
-      backend: {
-        bootstrapApp: vi.fn(),
-        getWindowControlRuntimeState: vi.fn(),
-        searchDocuments: vi.fn(),
-        deleteAllDocuments: vi.fn(),
-        applyRemoteDocuments: vi.fn(async () => payload),
-      } as never,
-      documentSync: { clearAllDocumentSync: vi.fn() } as never,
-      preferences: preferences as never,
-      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
-      session,
-      syncMutation: { enqueue: vi.fn() },
-      workspace,
-    });
-    return { useCases, session };
-  }
-
-  it('clears current document when it is absent from a remote-changed payload', async () => {
-    const currentDoc = createDocument('doc-1');
-    const payload = { ...createPayload('markdown'), documents: [], currentDocument: null };
-    const { useCases, session } = createUseCasesWithRemote(currentDoc, payload);
-
-    await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
-
-    expect(session.setCurrentDocument).toHaveBeenCalledWith(null);
-  });
-
-  it('switches to next document when current is absent from a remote-changed payload', async () => {
-    const currentDoc = createDocument('doc-1');
-    const nextDoc = createDocument('doc-2');
-    const payload = { ...createPayload('markdown'), documents: [createSummary('doc-2')], currentDocument: nextDoc };
-    const { useCases, session } = createUseCasesWithRemote(currentDoc, payload);
-
-    await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
-
-    expect(session.setCurrentDocument).toHaveBeenCalledWith(nextDoc);
-  });
-
-  it('does not change current document when it still exists in a remote-changed payload', async () => {
-    const currentDoc = createDocument('doc-1');
-    const payload = { ...createPayload('markdown'), documents: [createSummary('doc-1')], currentDocument: null };
-    const { useCases, session } = createUseCasesWithRemote(currentDoc, payload);
-
-    await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
-
-    expect(session.setCurrentDocument).not.toHaveBeenCalled();
-  });
-
-  it('preserves runtime icloud sync status when remote documents are applied', async () => {
-    const workspace = createWorkspaceGateway();
-    const preferences = createPreferencesGateway();
-    const session = createSessionGateway(createDocument('doc-1'));
-    const payload = { ...createPayload('markdown'), documents: [createSummary('doc-1')], currentDocument: createDocument('doc-1') };
-    const useCases = createWorkspaceUseCases({
-      backend: {
-        bootstrapApp: vi.fn(),
-        getWindowControlRuntimeState: vi.fn(),
-        searchDocuments: vi.fn(),
-        deleteAllDocuments: vi.fn(),
-        applyRemoteDocuments: vi.fn(async () => payload),
-      } as never,
-      documentSync: { clearAllDocumentSync: vi.fn() } as never,
-      preferences: preferences as never,
-      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
-      session,
-      syncMutation: { enqueue: vi.fn() },
-      workspace,
-    });
-
-    await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
-
-    expect(preferences.setIcloudSyncStatus).not.toHaveBeenCalled();
-  });
-
-  it('stores an error when remote documents cannot be applied', async () => {
-    const workspace = createWorkspaceGateway();
-    const preferences = createPreferencesGateway();
-    const session = createSessionGateway();
-    const useCases = createWorkspaceUseCases({
-      backend: {
-        bootstrapApp: vi.fn(),
-        getWindowControlRuntimeState: vi.fn(),
-        searchDocuments: vi.fn(),
-        deleteAllDocuments: vi.fn(),
-        applyRemoteDocuments: vi.fn(async () => {
-          throw new Error('remote apply failed');
-        }),
-      } as never,
-      documentSync: { clearAllDocumentSync: vi.fn() } as never,
-      preferences: preferences as never,
-      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
-      session,
-      syncMutation: { enqueue: vi.fn() },
-      workspace,
-    });
-
-    await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
-
-    expect(preferences.setIcloudSyncStatus).toHaveBeenCalledWith({
-      connectionMode: 'connected',
-      runtimeState: 'error',
-      lastSyncAt: 10,
-      lastStatusAt: expect.any(Number),
-      lastFetchAt: 12,
-      lastSendAt: 13,
-      initialFetchCompleted: true,
-      errorMessage: 'remote apply failed',
-      hasPendingWrites: false,
-      pendingChangeCount: 0,
-    });
-  });
-});
-
-describe('handleSyncEventMessage (status)', () => {
-  it('captures fetch and send timestamps from sync status events', async () => {
-    const workspace = createWorkspaceGateway();
-    const preferences = createPreferencesGateway();
-    const session = createSessionGateway();
-    const useCases = createWorkspaceUseCases({
-      backend: {
-        bootstrapApp: vi.fn(),
-        getWindowControlRuntimeState: vi.fn(),
-        searchDocuments: vi.fn(),
-        deleteAllDocuments: vi.fn(),
-        applyRemoteDocuments: vi.fn(),
-      } as never,
-      documentSync: { clearAllDocumentSync: vi.fn() } as never,
-      preferences: preferences as never,
-      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
-      session,
-      syncMutation: { enqueue: vi.fn() },
-      workspace,
-    });
-
-    await useCases.handleSyncEventMessage({
-      type: 'status',
-      state: 'idle',
-      connectionMode: 'connected',
-      lastSyncAt: 100,
-      lastFetchAt: 80,
-      lastSendAt: 90,
-      initialFetchCompleted: true,
-      hasPendingWrites: true,
-      pendingChangeCount: 2,
-    });
-
-    expect(preferences.setIcloudSyncStatus).toHaveBeenCalledWith({
-      connectionMode: 'connected',
-      runtimeState: 'idle',
-      lastSyncAt: 100,
-      lastStatusAt: expect.any(Number),
-      lastFetchAt: 80,
-      lastSendAt: 90,
-      initialFetchCompleted: true,
-      errorMessage: null,
-      hasPendingWrites: true,
-      pendingChangeCount: 2,
-    });
+    expect(ui.setSettingsOpen).toHaveBeenCalledWith(false);
+    expect(editorPersistence.clearAll).toHaveBeenCalledTimes(1);
   });
 });

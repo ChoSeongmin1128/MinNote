@@ -9,17 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { BlockVm } from '../application/models/document';
-import {
-  changeBlockKind,
-  copySelectedBlocks,
-  copySingleBlock,
-  createBlockBelow,
-  deleteSelectedBlocks,
-  deleteBlock,
-  updateCodeBlock,
-  updateMarkdownBlock,
-  updateTextBlock,
-} from '../app/actions';
+import { useBlockController } from '../app/controllers';
 import { createEmptyMarkdownContent } from '../lib/markdown';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import type { BlockEditorHandle } from '../lib/editorHandle';
@@ -75,12 +65,26 @@ export function BlockCard({
     hasSelection: false,
     isWholeBlockSelected: false,
   });
+  const {
+    changeBlockKind,
+    copySelectedBlocks,
+    copySingleBlock,
+    createBlockBelow,
+    deleteSelectedBlocks,
+    deleteBlock,
+    updateCodeBlock,
+    updateMarkdownBlock,
+    updateTextBlock,
+  } = useBlockController();
   const setSelectedBlockId = useDocumentSessionStore((state) => state.setSelectedBlockId);
   const setAllBlocksSelected = useDocumentSessionStore((state) => state.setAllBlocksSelected);
   const focusPreviousBlock = useDocumentSessionStore((state) => state.focusPreviousBlock);
   const focusNextBlock = useDocumentSessionStore((state) => state.focusNextBlock);
   const focusRequest = useDocumentSessionStore((state) => state.focusRequest);
   const selectedBlockIds = useDocumentSessionStore((state) => state.selectedBlockIds);
+  const lastCodeLanguage = useDocumentSessionStore((state) => state.lastCodeLanguage);
+  const setLastCodeLanguage = useDocumentSessionStore((state) => state.setLastCodeLanguage);
+  const defaultBlockKind = useWorkspaceStore((state) => state.defaultBlockKind);
   const editorRef = useRef<BlockEditorHandle | null>(null);
 
   const isEmpty = isEffectivelyEmpty(block);
@@ -119,11 +123,10 @@ export function BlockCard({
     }
 
     if (kind === 'code') {
-      const lastLang = useWorkspaceStore.getState().lastCodeLanguage;
-      updateCodeBlock(block.id, '', lastLang);
+      updateCodeBlock(block.id, '', lastCodeLanguage);
       return;
     }
-  }, [block.id, block.kind, onMenuClose]);
+  }, [block.id, block.kind, lastCodeLanguage, onMenuClose, updateCodeBlock]);
 
   const handleDeleteBlock = useCallback(() => {
     setContextMenuPosition(null);
@@ -142,9 +145,9 @@ export function BlockCard({
     if (block.kind !== 'code') {
       return;
     }
-    useWorkspaceStore.getState().setLastCodeLanguage(language);
+    setLastCodeLanguage(language);
     updateCodeBlock(block.id, block.content, language);
-  }, [block.content, block.id, block.kind, onMenuClose]);
+  }, [block.content, block.id, block.kind, onMenuClose, setLastCodeLanguage, updateCodeBlock]);
 
   const handleBlockFocus = () => {
     setSelectedBlockId(block.id);
@@ -320,7 +323,7 @@ export function BlockCard({
             focusNonce={focusNonce}
             onFocus={handleBlockFocus}
             onSelectionVisualChange={setMarkdownSelectionState}
-            onCreateBelow={() => void createBlockBelow(block.id, useWorkspaceStore.getState().defaultBlockKind)}
+            onCreateBelow={() => void createBlockBelow(block.id, defaultBlockKind)}
             onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
             onNavigateNext={(caret) => focusNextBlock(block.id, caret)}
             onDeleteIfEmpty={handleDeleteIfEmpty}
@@ -337,7 +340,7 @@ export function BlockCard({
             focusPlacement={focusPlacement}
             focusNonce={focusNonce}
             onFocus={handleBlockFocus}
-            onCreateBelow={() => void createBlockBelow(block.id, useWorkspaceStore.getState().defaultBlockKind)}
+            onCreateBelow={() => void createBlockBelow(block.id, defaultBlockKind)}
             onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
             onNavigateNext={(caret) => focusNextBlock(block.id, caret)}
             onDeleteIfEmpty={handleDeleteIfEmpty}
@@ -353,7 +356,7 @@ export function BlockCard({
             focusPlacement={focusPlacement}
             focusNonce={focusNonce}
             onFocus={handleBlockFocus}
-            onCreateBelow={() => void createBlockBelow(block.id, useWorkspaceStore.getState().defaultBlockKind)}
+            onCreateBelow={() => void createBlockBelow(block.id, defaultBlockKind)}
             onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
             onNavigateNext={(caret) => focusNextBlock(block.id, caret)}
             onDeleteIfEmpty={handleDeleteIfEmpty}

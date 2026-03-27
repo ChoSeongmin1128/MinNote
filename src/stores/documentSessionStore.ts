@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { DocumentVm } from '../application/models/document';
 import type { BlockEditorHandle } from '../lib/editorHandle';
+import type { CodeLanguageId } from '../lib/codeLanguageRegistry';
 import type { BlockCaretPlacement } from '../lib/types';
 
 export interface BlockFocusRequest {
@@ -17,6 +18,7 @@ interface DocumentSessionState {
   allBlocksSelected: boolean;
   isFlushing: boolean;
   lastSavedAt: number | null;
+  lastCodeLanguage: CodeLanguageId;
   focusRequest: BlockFocusRequest | null;
   activeEditorRef: { current: BlockEditorHandle | null } | null;
   setCurrentDocument: (document: DocumentVm | null) => void;
@@ -26,6 +28,7 @@ interface DocumentSessionState {
   setAllBlocksSelected: (value: boolean) => void;
   setIsFlushing: (value: boolean) => void;
   setLastSavedAt: (value: number | null) => void;
+  setLastCodeLanguage: (language: CodeLanguageId) => void;
   requestBlockFocus: (blockId: string, caret: BlockCaretPlacement) => void;
   setFocusRequest: (focusRequest: BlockFocusRequest | null) => void;
   setActiveEditorRef: (ref: { current: BlockEditorHandle | null } | null) => void;
@@ -60,6 +63,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
   allBlocksSelected: false,
   isFlushing: false,
   lastSavedAt: null,
+  lastCodeLanguage: 'javascript',
   focusRequest: null,
   activeEditorRef: null,
   setCurrentDocument: (currentDocument) =>
@@ -98,6 +102,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
     }),
   setIsFlushing: (isFlushing) => set({ isFlushing }),
   setLastSavedAt: (lastSavedAt) => set({ lastSavedAt }),
+  setLastCodeLanguage: (lastCodeLanguage) => set({ lastCodeLanguage }),
   requestBlockFocus: (blockId, caret) =>
     set({
       selectedBlockId: blockId,

@@ -3,15 +3,28 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from './Sidebar';
+import { useUiStore } from '../stores/uiStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 
-vi.mock('../app/actions', () => ({
+const controllerMocks = vi.hoisted(() => ({
   createDocument: vi.fn(),
   emptyTrash: vi.fn(),
   openDocument: vi.fn(),
   restoreDocumentFromTrash: vi.fn(),
   setSearchQuery: vi.fn(),
+}));
+
+vi.mock('../app/controllers', () => ({
+  useDocumentController: () => ({
+    createDocument: controllerMocks.createDocument,
+    emptyTrash: controllerMocks.emptyTrash,
+    openDocument: controllerMocks.openDocument,
+    restoreDocumentFromTrash: controllerMocks.restoreDocumentFromTrash,
+  }),
+  useWorkspaceController: () => ({
+    setSearchQuery: controllerMocks.setSearchQuery,
+  }),
 }));
 
 function renderSidebar(props?: Partial<ComponentProps<typeof Sidebar>>) {
@@ -47,8 +60,8 @@ describe('Sidebar', () => {
       trashDocuments: [],
       searchResults: [],
       searchQuery: '',
-      isSettingsOpen: false,
     });
+    useUiStore.setState({ isSettingsOpen: false });
 
     useDocumentSessionStore.setState({
       currentDocument: null,

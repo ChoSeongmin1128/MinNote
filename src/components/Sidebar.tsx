@@ -10,15 +10,10 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  createDocument,
-  emptyTrash,
-  openDocument,
-  restoreDocumentFromTrash,
-  setSearchQuery,
-} from '../app/actions';
+import { useDocumentController, useWorkspaceController } from '../app/controllers';
 import { getVisibleDocumentTitle } from '../lib/documentTitle';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
+import { useUiStore } from '../stores/uiStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { SidebarDocumentMenu } from './SidebarDocumentMenu';
 
@@ -50,11 +45,13 @@ export function Sidebar({
   onOpenMobile,
   onCloseMobile,
 }: SidebarProps) {
+  const { createDocument, emptyTrash, openDocument, restoreDocumentFromTrash } = useDocumentController();
+  const { setSearchQuery } = useWorkspaceController();
   const documents = useWorkspaceStore((state) => state.documents);
   const trashDocuments = useWorkspaceStore((state) => state.trashDocuments);
   const searchResults = useWorkspaceStore((state) => state.searchResults);
   const searchQuery = useWorkspaceStore((state) => state.searchQuery);
-  const setSettingsOpen = useWorkspaceStore((state) => state.setSettingsOpen);
+  const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
   const [shouldFocusSearch, setShouldFocusSearch] = useState(false);

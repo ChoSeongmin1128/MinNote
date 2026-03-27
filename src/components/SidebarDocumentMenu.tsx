@@ -1,11 +1,12 @@
 import { Trash2 } from 'lucide-react';
-import { deleteDocument } from '../app/actions';
+import { useDocumentController } from '../app/controllers';
 
 interface SidebarDocumentMenuProps {
   documentId: string;
 }
 
 export function SidebarDocumentMenu({ documentId }: SidebarDocumentMenuProps) {
+  const { deleteDocument } = useDocumentController();
   return (
     <button
       className="icon-button document-card-action is-danger"

@@ -57,7 +57,8 @@ impl BlockRepository for SqliteStore {
         Ok(Block {
           id: row.get(0)?,
           document_id: row.get(1)?,
-          kind: BlockKind::from_str(row.get::<_, String>(2)?.as_str()),
+          kind: BlockKind::try_from_str(row.get::<_, String>(2)?.as_str())
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
           position: row.get(3)?,
           content: row.get(4)?,
           search_text: row.get(5)?,
@@ -98,9 +99,7 @@ impl BlockRepository for SqliteStore {
     Self::rewrite_positions(&transaction, document_id, &ordered_ids)?;
     transaction.commit()?;
 
-    self.normalize_positions(document_id)?;
-    self.rebuild_search_index(document_id)?;
-    self.touch_document_internal(document_id, false)?;
+    self.finish_document_mutation(document_id)?;
     self.list_blocks(document_id)
   }
 
@@ -117,8 +116,7 @@ impl BlockRepository for SqliteStore {
       "UPDATE blocks SET kind = ?1, content = ?2, search_text = ?3, language = ?4, updated_at = ?5 WHERE id = ?6",
       params![kind.as_str(), content, search_text, language, now, block_id],
     )?;
-    self.rebuild_search_index(&document_id)?;
-    self.touch_document_internal(&document_id, false)?;
+    self.finish_document_mutation(&document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -142,14 +140,13 @@ impl BlockRepository for SqliteStore {
     Self::rewrite_positions(&transaction, document_id, &ordered_ids)?;
     transaction.commit()?;
 
-    self.touch_document_internal(document_id, false)?;
+    self.finish_document_mutation(document_id)?;
     self.list_blocks(document_id)
   }
 
   fn delete_block(&mut self, block_id: &str) -> Result<String, AppError> {
     let document_id = self.block_document_id(block_id)?;
     self.connection.execute("DELETE FROM blocks WHERE id = ?1", params![block_id])?;
-    self.normalize_positions(&document_id)?;
 
     let remaining = self
       .connection
@@ -163,8 +160,7 @@ impl BlockRepository for SqliteStore {
       self.create_empty_block(&document_id, 0, BlockKind::Markdown)?;
     }
 
-    self.rebuild_search_index(&document_id)?;
-    self.touch_document_internal(&document_id, false)?;
+    self.finish_document_structure_mutation(&document_id)?;
     Ok(document_id)
   }
 
@@ -177,8 +173,7 @@ impl BlockRepository for SqliteStore {
       "UPDATE blocks SET content = ?1, search_text = ?2, updated_at = ?3 WHERE id = ?4",
       params![normalized_content, search_text, now, block_id],
     )?;
-    self.rebuild_search_index(&document_id)?;
-    self.touch_document_internal(&document_id, false)?;
+    self.finish_document_mutation(&document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -194,8 +189,7 @@ impl BlockRepository for SqliteStore {
       "UPDATE blocks SET content = ?1, search_text = ?2, language = ?3, updated_at = ?4 WHERE id = ?5",
       params![content, content, language, now, block_id],
     )?;
-    self.rebuild_search_index(&document_id)?;
-    self.touch_document_internal(&document_id, false)?;
+    self.finish_document_mutation(&document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -206,8 +200,7 @@ impl BlockRepository for SqliteStore {
       "UPDATE blocks SET content = ?1, search_text = ?2, language = NULL, updated_at = ?3 WHERE id = ?4",
       params![content, content, now, block_id],
     )?;
-    self.rebuild_search_index(&document_id)?;
-    self.touch_document_internal(&document_id, false)?;
+    self.finish_document_mutation(&document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -256,8 +249,7 @@ impl BlockRepository for SqliteStore {
 
     transaction.commit()?;
 
-    self.rebuild_search_index(document_id)?;
-    self.touch_document_internal(document_id, false)?;
+    self.finish_document_mutation(document_id)?;
     self.list_blocks(document_id)
   }
 }

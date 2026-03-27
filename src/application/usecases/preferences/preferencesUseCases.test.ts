@@ -17,20 +17,6 @@ function createPreferencesGateway() {
     setDefaultBlockTintPreset: vi.fn(),
     setDefaultDocumentSurfaceTonePreset: vi.fn(),
     setDefaultBlockKind: vi.fn(),
-    setIcloudSyncMode: vi.fn(),
-    getIcloudSyncStatus: vi.fn(() => ({
-      connectionMode: 'connected' as const,
-      runtimeState: 'idle' as const,
-      lastSyncAt: null,
-      lastStatusAt: null,
-      lastFetchAt: null,
-      lastSendAt: null,
-      initialFetchCompleted: false,
-      errorMessage: null,
-      hasPendingWrites: false,
-      pendingChangeCount: 0,
-    })),
-    setIcloudSyncStatus: vi.fn(),
     setMenuBarIconEnabled: vi.fn(),
     getAlwaysOnTopEnabled: vi.fn(() => false),
     setAlwaysOnTopEnabled: vi.fn(),
@@ -112,49 +98,4 @@ describe('preferences usecases', () => {
     expect(preferences.setGlobalToggleShortcut).not.toHaveBeenCalledWith('Cmd+Shift+K');
   });
 
-  it('refreshes icloud sync immediately after enabling it', async () => {
-    const workspace = createWorkspaceGateway();
-    const preferences = createPreferencesGateway();
-    const backend = {
-      setIcloudSyncMode: vi.fn(async () => 'connected'),
-      refreshIcloudSync: vi.fn(async () => true),
-    };
-
-    const useCases = createPreferencesUseCases({
-      backend: backend as never,
-      preferences: preferences as never,
-      workspace: workspace as never,
-    });
-
-    await useCases.setIcloudSyncEnabled(true);
-
-    expect(backend.refreshIcloudSync).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps icloud enabled in preferences when refresh fails after enabling', async () => {
-    const workspace = createWorkspaceGateway();
-    const preferences = createPreferencesGateway();
-    const backend = {
-      setIcloudSyncMode: vi.fn(async () => 'connected'),
-      refreshIcloudSync: vi.fn(async () => {
-        throw new Error('refresh failed');
-      }),
-    };
-
-    const useCases = createPreferencesUseCases({
-      backend: backend as never,
-      preferences: preferences as never,
-      workspace: workspace as never,
-    });
-
-    await useCases.setIcloudSyncEnabled(true);
-
-    expect(preferences.setIcloudSyncMode).toHaveBeenCalledWith('connected');
-    expect(preferences.setIcloudSyncStatus).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        runtimeState: 'error',
-        errorMessage: 'refresh failed',
-      }),
-    );
-  });
 });

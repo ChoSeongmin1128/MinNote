@@ -1,31 +1,31 @@
 import type { BackendPort } from '../../ports/backendPort';
-import type { DocumentSyncPort } from '../../ports/documentSyncPort';
+import type { EditorPersistencePort } from '../../ports/editorPersistencePort';
 import { summarizeDocument, touchDocument } from '../../models/document';
 import type { HistoryGateway } from '../../ports/historyGateway';
 import type { PreferencesGateway } from '../../ports/preferencesGateway';
 import type { SessionGateway } from '../../ports/sessionGateway';
-import type { SyncMutationPort } from '../../ports/syncMutationPort';
+import type { UiGateway } from '../../ports/uiGateway';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
 import { applyBootstrapPayloadState, updateDocumentState } from '../shared/documentState';
 import { normalizeErrorMessage } from '../shared/errors';
 
 interface DocumentUseCaseDeps {
   backend: BackendPort;
-  documentSync: DocumentSyncPort;
+  editorPersistence: EditorPersistencePort;
   history: HistoryGateway;
   preferences: PreferencesGateway;
   session: SessionGateway;
-  syncMutation: SyncMutationPort;
+  ui: UiGateway;
   workspace: WorkspaceGateway;
 }
 
 export function createDocumentUseCases({
   backend,
-  documentSync,
+  editorPersistence,
   history,
   preferences,
   session,
-  syncMutation,
+  ui,
   workspace,
 }: DocumentUseCaseDeps) {
   async function flushCurrentDocument() {
@@ -36,7 +36,7 @@ export function createDocumentUseCases({
 
     session.setIsFlushing(true);
     try {
-      const updatedAt = await documentSync.flushDocumentSaves(currentDocument.id);
+      const updatedAt = await editorPersistence.flushDocument(currentDocument.id);
       if (updatedAt !== null) {
         updateDocumentState(
           session,
@@ -61,8 +61,7 @@ export function createDocumentUseCases({
       history.clear();
       workspace.upsertDocumentSummary(summarizeDocument(document));
       session.setCurrentDocument(document);
-      workspace.setSettingsOpen(false);
-      syncMutation.enqueue({ kind: 'document-created', documentId: document.id });
+      ui.setSettingsOpen(false);
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 만들지 못했습니다.'));
     }
@@ -84,7 +83,7 @@ export function createDocumentUseCases({
       history.clear();
       workspace.upsertDocumentSummary(summarizeDocument(document));
       session.setCurrentDocument(document);
-      workspace.setSettingsOpen(false);
+      ui.setSettingsOpen(false);
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 열지 못했습니다.'));
     }
@@ -100,7 +99,6 @@ export function createDocumentUseCases({
       const document = await backend.renameDocument(currentDocument.id, title.trim() ? title : null);
       workspace.clearError();
       updateDocumentState(session, workspace, document);
-      syncMutation.enqueue({ kind: 'document-renamed', documentId: document.id });
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서 제목을 저장하지 못했습니다.'));
     }
@@ -110,10 +108,9 @@ export function createDocumentUseCases({
     try {
       const payload = await backend.deleteDocument(documentId);
       workspace.clearError();
-      documentSync.clearDocumentSync(documentId);
-      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always', 'preserve');
-      workspace.setSettingsOpen(false);
-      syncMutation.enqueue({ kind: 'document-deleted', documentId });
+      editorPersistence.clearDocument(documentId);
+      applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
+      ui.setSettingsOpen(false);
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 삭제하지 못했습니다.'));
     }
@@ -133,7 +130,7 @@ export function createDocumentUseCases({
     try {
       const payload = await backend.restoreDocumentFromTrash(documentId);
       workspace.clearError();
-      applyBootstrapPayloadState(preferences, workspace, session, payload, 'if-missing', 'preserve');
+      applyBootstrapPayloadState(preferences, workspace, session, payload, 'if-missing');
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 복원하지 못했습니다.'));
     }

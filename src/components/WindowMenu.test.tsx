@@ -10,10 +10,12 @@ const actions = vi.hoisted(() => ({
   setWindowOpacityPercent: vi.fn(),
 }));
 
-vi.mock('../app/actions', () => ({
-  setAlwaysOnTopEnabled: actions.setAlwaysOnTopEnabled,
-  previewWindowOpacityPercent: actions.previewWindowOpacityPercent,
-  setWindowOpacityPercent: actions.setWindowOpacityPercent,
+vi.mock('../app/controllers', () => ({
+  usePreferencesController: () => ({
+    setAlwaysOnTopEnabled: actions.setAlwaysOnTopEnabled,
+    previewWindowOpacityPercent: actions.previewWindowOpacityPercent,
+    setWindowOpacityPercent: actions.setWindowOpacityPercent,
+  }),
 }));
 
 describe('WindowMenu', () => {

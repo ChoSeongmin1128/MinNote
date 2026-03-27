@@ -1,8 +1,6 @@
 import type { BackendPort } from '../../ports/backendPort';
 import type { PreferencesGateway } from '../../ports/preferencesGateway';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
-import type { ICloudSyncConnectionMode, ICloudSyncRuntimeState } from '../../../lib/types';
-import { isIcloudDebugEnabled } from '../../../lib/debugFlags';
 import { normalizeErrorMessage } from '../shared/errors';
 
 interface PreferencesUseCaseDeps {
@@ -17,54 +15,6 @@ export function createPreferencesUseCases({
   workspace,
 }: PreferencesUseCaseDeps) {
   let opacityRequestToken = 0;
-
-  function debugIcloud(message: string, payload?: unknown) {
-    if (!isIcloudDebugEnabled) {
-      return;
-    }
-
-    if (payload === undefined) {
-      console.info(`[icloud] ${message}`);
-      return;
-    }
-
-    console.info(`[icloud] ${message}`, payload);
-  }
-
-  function setIcloudStatusError(message: string) {
-    const current = preferences.getIcloudSyncStatus();
-    preferences.setIcloudSyncStatus({
-      connectionMode: current.connectionMode,
-      runtimeState: 'error',
-      lastSyncAt: current.lastSyncAt,
-      lastStatusAt: Date.now(),
-      lastFetchAt: current.lastFetchAt,
-      lastSendAt: current.lastSendAt,
-      initialFetchCompleted: current.initialFetchCompleted,
-      errorMessage: message,
-      hasPendingWrites: current.hasPendingWrites,
-      pendingChangeCount: current.pendingChangeCount,
-    });
-  }
-
-  function makeSyncStatus(
-    connectionMode: ICloudSyncConnectionMode,
-    runtimeState: ICloudSyncRuntimeState,
-    pendingChangeCount = 0,
-  ) {
-    return {
-      connectionMode,
-      runtimeState,
-      lastSyncAt: null,
-      lastStatusAt: connectionMode === 'connected' ? Date.now() : null,
-      lastFetchAt: null,
-      lastSendAt: null,
-      initialFetchCompleted: false,
-      errorMessage: null,
-      hasPendingWrites: pendingChangeCount > 0,
-      pendingChangeCount,
-    };
-  }
 
   async function setThemeMode(themeMode: Parameters<BackendPort['setThemeMode']>[0]) {
     try {
@@ -95,53 +45,6 @@ export function createPreferencesUseCases({
       preferences.setDefaultDocumentSurfaceTonePreset(nextPreset);
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '기본 문서 배경 톤을 변경하지 못했습니다.'));
-    }
-  }
-
-  async function setIcloudSyncMode(mode: ICloudSyncConnectionMode) {
-    try {
-      debugIcloud('mode:requested', { mode });
-      const result = await backend.setIcloudSyncMode(mode);
-      debugIcloud('mode:stored', { mode: result });
-      workspace.clearError();
-      const current = preferences.getIcloudSyncStatus();
-      const pendingChangeCount = result === 'disconnected' ? 0 : current.pendingChangeCount;
-      preferences.setIcloudSyncMode(result);
-      preferences.setIcloudSyncStatus(
-        makeSyncStatus(result, result === 'connected' ? 'syncing' : 'idle', pendingChangeCount),
-      );
-
-      if (result === 'connected') {
-        try {
-          debugIcloud('refresh:requested-after-mode-change');
-          await backend.refreshIcloudSync();
-          debugIcloud('refresh:dispatched-after-mode-change');
-        } catch (error) {
-          const message = normalizeErrorMessage(error, 'iCloud 동기화를 새로고침하지 못했습니다.');
-          debugIcloud('refresh:error-after-mode-change', { message });
-          setIcloudStatusError(message);
-          workspace.setError(message);
-        }
-      }
-    } catch (error) {
-      debugIcloud('mode:error', {
-        mode,
-        message: normalizeErrorMessage(error, 'iCloud 동기화 상태를 변경하지 못했습니다.'),
-      });
-      workspace.setError(normalizeErrorMessage(error, 'iCloud 동기화 상태를 변경하지 못했습니다.'));
-    }
-  }
-
-  async function refreshIcloudSync() {
-    try {
-      debugIcloud('refresh:requested');
-      return await backend.refreshIcloudSync();
-    } catch (error) {
-      const message = normalizeErrorMessage(error, 'iCloud 동기화를 새로고침하지 못했습니다.');
-      debugIcloud('refresh:error', { message });
-      setIcloudStatusError(message);
-      workspace.setError(message);
-      throw error;
     }
   }
 
@@ -232,10 +135,6 @@ export function createPreferencesUseCases({
     setThemeMode,
     setDefaultBlockTintPreset,
     setDefaultDocumentSurfaceTonePreset,
-    setIcloudSyncMode,
-    setIcloudSyncEnabled: (enabled: boolean) =>
-      setIcloudSyncMode(enabled ? 'connected' : 'disconnected'),
-    refreshIcloudSync,
     setDefaultBlockKind,
     setMenuBarIconEnabled,
     setAlwaysOnTopEnabled,
