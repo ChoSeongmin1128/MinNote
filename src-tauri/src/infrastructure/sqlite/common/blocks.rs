@@ -1,5 +1,23 @@
 use super::*;
 
+pub(crate) const BLOCK_COLUMNS: &str =
+  "id, document_id, kind, position, content, search_text, language, created_at, updated_at";
+
+pub(crate) fn map_block(row: &rusqlite::Row<'_>) -> rusqlite::Result<Block> {
+  Ok(Block {
+    id: row.get(0)?,
+    document_id: row.get(1)?,
+    kind: BlockKind::try_from_str(row.get::<_, String>(2)?.as_str())
+      .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
+    position: row.get(3)?,
+    content: row.get(4)?,
+    search_text: row.get(5)?,
+    language: row.get(6)?,
+    created_at: row.get(7)?,
+    updated_at: row.get(8)?,
+  })
+}
+
 impl SqliteStore {
   pub(crate) fn insert_empty_block(
     connection: &Connection,
@@ -128,23 +146,9 @@ impl SqliteStore {
   pub(crate) fn fetch_block(&self, block_id: &str) -> Result<Block, AppError> {
     self.connection
       .query_row(
-        "SELECT id, document_id, kind, position, content, search_text, language, created_at, updated_at
-         FROM blocks WHERE id = ?1",
+        &format!("SELECT {BLOCK_COLUMNS} FROM blocks WHERE id = ?1"),
         params![block_id],
-        |row| {
-          Ok(Block {
-            id: row.get(0)?,
-            document_id: row.get(1)?,
-            kind: BlockKind::try_from_str(row.get::<_, String>(2)?.as_str())
-              .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
-            position: row.get(3)?,
-            content: row.get(4)?,
-            search_text: row.get(5)?,
-            language: row.get(6)?,
-            created_at: row.get(7)?,
-            updated_at: row.get(8)?,
-          })
-        },
+        map_block,
       )
       .optional()?
       .ok_or_else(|| AppError::validation("블록을 찾을 수 없습니다."))

@@ -13,6 +13,8 @@ pub(crate) enum DocumentTimestampTarget {
   LastOpenedAt,
 }
 
+pub(crate) use blocks::{map_block, BLOCK_COLUMNS};
+
 impl SqliteStore {
   pub(crate) fn now() -> i64 {
     SystemTime::now()

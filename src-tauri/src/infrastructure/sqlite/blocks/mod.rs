@@ -1,0 +1,246 @@
+use super::common::{map_block, BLOCK_COLUMNS};
+use super::*;
+
+#[cfg(test)]
+mod tests;
+
+impl BlockRepository for SqliteStore {
+  fn migrate_legacy_markdown_blocks(&mut self) -> Result<(), AppError> {
+    let mut statement = self.connection.prepare(
+      "SELECT id, document_id, content, search_text FROM blocks WHERE kind = 'markdown'",
+    )?;
+
+    let markdown_blocks = statement
+      .query_map([], |row| {
+        Ok((
+          row.get::<_, String>(0)?,
+          row.get::<_, String>(1)?,
+          row.get::<_, String>(2)?,
+          row.get::<_, String>(3)?,
+        ))
+      })?
+      .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+
+    let mut changed_document_ids = std::collections::HashSet::new();
+
+    for (block_id, document_id, content, search_text) in markdown_blocks {
+      let (normalized_content, normalized_search_text, did_migrate) =
+        Self::normalize_markdown_storage(&content);
+
+      if did_migrate {
+        self.connection.execute(
+          "UPDATE blocks SET content = ?1, search_text = ?2 WHERE id = ?3",
+          params![normalized_content, normalized_search_text, block_id],
+        )?;
+        changed_document_ids.insert(document_id);
+      } else if normalized_search_text != search_text {
+        self.connection.execute(
+          "UPDATE blocks SET search_text = ?1 WHERE id = ?2",
+          params![normalized_search_text, block_id],
+        )?;
+        changed_document_ids.insert(document_id);
+      }
+    }
+
+    for document_id in changed_document_ids {
+      self.rebuild_search_index(&document_id)?;
+    }
+
+    Ok(())
+  }
+
+  fn list_blocks(&self, document_id: &str) -> Result<Vec<Block>, AppError> {
+    let mut statement = self.connection.prepare(&format!(
+      "SELECT {BLOCK_COLUMNS}
+       FROM blocks WHERE document_id = ?1 ORDER BY position ASC"
+    ))?;
+
+    let blocks = statement
+      .query_map(params![document_id], map_block)?
+      .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(blocks)
+  }
+
+  fn create_block_below(
+    &mut self,
+    document_id: &str,
+    after_block_id: Option<&str>,
+    kind: BlockKind,
+  ) -> Result<Vec<Block>, AppError> {
+    let transaction = self.connection.transaction()?;
+    let mut ordered_ids = transaction
+      .prepare("SELECT id FROM blocks WHERE document_id = ?1 ORDER BY position ASC")?
+      .query_map(params![document_id], |row| row.get::<_, String>(0))?
+      .collect::<Result<Vec<_>, _>>()?;
+
+    let target_index = match after_block_id {
+      Some(block_id) => ordered_ids
+        .iter()
+        .position(|id| id == block_id)
+        .map(|index| index + 1)
+        .ok_or_else(|| AppError::validation("블록을 찾을 수 없습니다."))?,
+      None => 0,
+    };
+
+    let temp_position = -(ordered_ids.len() as i64 + 1);
+    let new_block = Self::insert_empty_block(&transaction, document_id, temp_position, kind)?;
+    ordered_ids.insert(target_index, new_block.id);
+    Self::rewrite_positions(&transaction, document_id, &ordered_ids)?;
+    transaction.commit()?;
+
+    self.finish_document_mutation(document_id)?;
+    self.list_blocks(document_id)
+  }
+
+  fn change_block_kind(&mut self, block_id: &str, kind: BlockKind) -> Result<Block, AppError> {
+    let document_id = self.block_document_id(block_id)?;
+    let now = Self::now();
+    let (content, search_text, language) = match kind {
+      BlockKind::Markdown => (String::new(), String::new(), None),
+      BlockKind::Code => (String::new(), String::new(), Some("plaintext".to_string())),
+      BlockKind::Text => (String::new(), String::new(), None),
+    };
+
+    self.connection.execute(
+      "UPDATE blocks SET kind = ?1, content = ?2, search_text = ?3, language = ?4, updated_at = ?5 WHERE id = ?6",
+      params![kind.as_str(), content, search_text, language, now, block_id],
+    )?;
+    self.finish_document_mutation(&document_id)?;
+    self.fetch_block(block_id)
+  }
+
+  fn move_block(&mut self, document_id: &str, block_id: &str, target_position: i64) -> Result<Vec<Block>, AppError> {
+    let blocks = self.list_blocks(document_id)?;
+    let current_index = blocks
+      .iter()
+      .position(|block| block.id == block_id)
+      .ok_or_else(|| AppError::validation("블록을 찾을 수 없습니다."))?;
+
+    let clamped_target = target_position.clamp(0, blocks.len().saturating_sub(1) as i64) as usize;
+    if current_index == clamped_target {
+      return Ok(blocks);
+    }
+
+    let mut ordered_ids = blocks.into_iter().map(|block| block.id).collect::<Vec<_>>();
+    let block_id = ordered_ids.remove(current_index);
+    ordered_ids.insert(clamped_target, block_id);
+
+    let transaction = self.connection.transaction()?;
+    Self::rewrite_positions(&transaction, document_id, &ordered_ids)?;
+    transaction.commit()?;
+
+    self.finish_document_mutation(document_id)?;
+    self.list_blocks(document_id)
+  }
+
+  fn delete_block(&mut self, block_id: &str) -> Result<String, AppError> {
+    let document_id = self.block_document_id(block_id)?;
+    self.connection.execute("DELETE FROM blocks WHERE id = ?1", params![block_id])?;
+
+    let remaining = self
+      .connection
+      .query_row(
+        "SELECT COUNT(*) FROM blocks WHERE document_id = ?1",
+        params![document_id],
+        |row| row.get::<_, i64>(0),
+      )?;
+
+    if remaining == 0 {
+      self.create_empty_block(&document_id, 0, BlockKind::Markdown)?;
+    }
+
+    self.finish_document_structure_mutation(&document_id)?;
+    Ok(document_id)
+  }
+
+  fn update_markdown_block(&mut self, block_id: &str, content: String) -> Result<Block, AppError> {
+    let document_id = self.block_document_id(block_id)?;
+    let (normalized_content, search_text, _) = Self::normalize_markdown_storage(&content);
+    let now = Self::now();
+
+    self.connection.execute(
+      "UPDATE blocks SET content = ?1, search_text = ?2, updated_at = ?3 WHERE id = ?4",
+      params![normalized_content, search_text, now, block_id],
+    )?;
+    self.finish_document_mutation(&document_id)?;
+    self.fetch_block(block_id)
+  }
+
+  fn update_code_block(
+    &mut self,
+    block_id: &str,
+    content: String,
+    language: Option<String>,
+  ) -> Result<Block, AppError> {
+    let document_id = self.block_document_id(block_id)?;
+    let now = Self::now();
+    self.connection.execute(
+      "UPDATE blocks SET content = ?1, search_text = ?2, language = ?3, updated_at = ?4 WHERE id = ?5",
+      params![content, content, language, now, block_id],
+    )?;
+    self.finish_document_mutation(&document_id)?;
+    self.fetch_block(block_id)
+  }
+
+  fn update_text_block(&mut self, block_id: &str, content: String) -> Result<Block, AppError> {
+    let document_id = self.block_document_id(block_id)?;
+    let now = Self::now();
+    self.connection.execute(
+      "UPDATE blocks SET content = ?1, search_text = ?2, language = NULL, updated_at = ?3 WHERE id = ?4",
+      params![content, content, now, block_id],
+    )?;
+    self.finish_document_mutation(&document_id)?;
+    self.fetch_block(block_id)
+  }
+
+  fn restore_blocks(
+    &mut self,
+    document_id: &str,
+    blocks: &[crate::ports::models::RestoreBlockInput],
+  ) -> Result<Vec<Block>, AppError> {
+    let now = Self::now();
+    let transaction = self.connection.transaction()?;
+
+    transaction.execute("DELETE FROM blocks WHERE document_id = ?1", params![document_id])?;
+
+    if blocks.is_empty() {
+      Self::insert_empty_block(&transaction, document_id, 0, BlockKind::Markdown)?;
+    } else {
+      let mut ordered: Vec<_> = blocks.iter().collect();
+      ordered.sort_by_key(|b| b.position);
+
+      for (i, block) in ordered.iter().enumerate() {
+        let (content, search_text) = match block.kind {
+          BlockKind::Markdown => {
+            let (c, s, _) = Self::normalize_markdown_storage(&block.content);
+            (c, s)
+          }
+          BlockKind::Code | BlockKind::Text => (block.content.clone(), block.content.clone()),
+        };
+
+        transaction.execute(
+          "INSERT INTO blocks (id, document_id, kind, position, content, search_text, language, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+          params![
+            block.id,
+            document_id,
+            block.kind.as_str(),
+            i as i64,
+            content,
+            search_text,
+            block.language,
+            now,
+            now
+          ],
+        )?;
+      }
+    }
+
+    transaction.commit()?;
+
+    self.finish_document_mutation(document_id)?;
+    self.list_blocks(document_id)
+  }
+}
