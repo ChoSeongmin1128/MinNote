@@ -9,6 +9,10 @@ export type BlockNoteEditorLike = {
   setTextCursorPosition: (blockId: string, placement: 'start' | 'end') => void;
   getSelectedText: () => string;
   pasteMarkdown: (markdown: string) => void;
+  canNestBlock?: () => boolean;
+  nestBlock?: () => void;
+  canUnnestBlock?: () => boolean;
+  unnestBlock?: () => void;
 };
 
 function getSelection(editor: BlockNoteEditorLike) {
@@ -178,4 +182,40 @@ export function focusBlockNote(editor: BlockNoteEditorLike, focusPlacement: 'sta
 
 export function clearBlockNoteContent(editor: BlockNoteEditorLike, createEmptyBlocks: () => unknown[]) {
   editor.replaceBlocks(editor.document, createEmptyBlocks());
+}
+
+export function insertBlockNotePlainText(editor: BlockNoteEditorLike, text: string) {
+  if (!text) {
+    return false;
+  }
+
+  const transaction = editor._tiptapEditor.state.tr.insertText(text);
+  dispatchTransaction(editor, transaction);
+  return true;
+}
+
+export function canNestBlockNote(editor: BlockNoteEditorLike) {
+  return typeof editor.canNestBlock === 'function' ? editor.canNestBlock() : false;
+}
+
+export function nestBlockNote(editor: BlockNoteEditorLike) {
+  if (typeof editor.nestBlock !== 'function') {
+    return false;
+  }
+
+  editor.nestBlock();
+  return true;
+}
+
+export function canUnnestBlockNote(editor: BlockNoteEditorLike) {
+  return typeof editor.canUnnestBlock === 'function' ? editor.canUnnestBlock() : false;
+}
+
+export function unnestBlockNote(editor: BlockNoteEditorLike) {
+  if (typeof editor.unnestBlock !== 'function') {
+    return false;
+  }
+
+  editor.unnestBlock();
+  return true;
 }

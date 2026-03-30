@@ -14,6 +14,18 @@ export const preferencesGateway: PreferencesGateway = {
   setDefaultBlockKind(kind) {
     useWorkspaceStore.getState().setDefaultBlockKind(kind);
   },
+  setBodyFontFamily(fontFamily) {
+    useWorkspaceStore.getState().setBodyFontFamily(fontFamily);
+  },
+  setBodyFontSizePx(size) {
+    useWorkspaceStore.getState().setBodyFontSizePx(size);
+  },
+  setCodeFontFamily(fontFamily) {
+    useWorkspaceStore.getState().setCodeFontFamily(fontFamily);
+  },
+  setCodeFontSizePx(size) {
+    useWorkspaceStore.getState().setCodeFontSizePx(size);
+  },
   setMenuBarIconEnabled(value) {
     useWorkspaceStore.getState().setMenuBarIconEnabled(value);
   },

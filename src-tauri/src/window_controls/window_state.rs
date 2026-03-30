@@ -20,8 +20,9 @@ pub(crate) fn toggle_main_window(app: &AppHandle) -> Result<(), String> {
   let window = main_window(app)?;
   let is_visible = window.is_visible().map_err(|error| error.to_string())?;
   let is_minimized = window.is_minimized().map_err(|error| error.to_string())?;
+  let is_focused = window.is_focused().map_err(|error| error.to_string())?;
 
-  if is_visible && !is_minimized {
+  if is_visible && !is_minimized && is_focused {
     window.hide().map_err(|error| error.to_string())?;
     return Ok(());
   }

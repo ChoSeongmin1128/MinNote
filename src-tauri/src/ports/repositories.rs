@@ -1,4 +1,4 @@
-use crate::domain::models::{AppSettings, Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode};
+use crate::domain::models::{AppSettings, Block, BlockKind, BlockTintPreset, BodyFontFamily, CodeFontFamily, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode};
 use crate::error::AppError;
 use crate::ports::models::RestoreBlockInput;
 
@@ -63,6 +63,10 @@ pub trait AppStateRepository {
   fn set_theme_mode(&mut self, theme_mode: ThemeMode) -> Result<(), AppError>;
   fn set_default_block_tint_preset(&mut self, preset: BlockTintPreset) -> Result<(), AppError>;
   fn set_default_document_surface_tone_preset(&mut self, preset: DocumentSurfaceTonePreset) -> Result<(), AppError>;
+  fn set_body_font_family(&mut self, font_family: BodyFontFamily) -> Result<(), AppError>;
+  fn set_body_font_size_px(&mut self, size: u8) -> Result<(), AppError>;
+  fn set_code_font_family(&mut self, font_family: CodeFontFamily) -> Result<(), AppError>;
+  fn set_code_font_size_px(&mut self, size: u8) -> Result<(), AppError>;
   fn set_menu_bar_icon_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
   fn set_default_block_kind(&mut self, kind: BlockKind) -> Result<(), AppError>;
   fn set_always_on_top_enabled(&mut self, enabled: bool) -> Result<(), AppError>;

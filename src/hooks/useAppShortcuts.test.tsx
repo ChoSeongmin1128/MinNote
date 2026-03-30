@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { act, cleanup, render } from '@testing-library/react';
 import type { DocumentVm } from '../application/models/document';
 import { useAppShortcuts } from './useAppShortcuts';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
+import { useUiStore } from '../stores/uiStore';
 
 const controllerMocks = vi.hoisted(() => ({
   copySelectedBlocks: vi.fn().mockResolvedValue(undefined),
@@ -26,6 +27,10 @@ vi.mock('../app/controllers', () => ({
   useDocumentController: () => ({
     flushCurrentDocument: controllerMocks.flushCurrentDocument,
   }),
+}));
+
+vi.mock('./useIsMobileViewport', () => ({
+  useIsMobileViewport: () => false,
 }));
 
 function Harness() {
@@ -88,6 +93,12 @@ function resetStore() {
     isFlushing: false,
     lastSavedAt: null,
     focusRequest: null,
+    activeEditorRef: null,
+  });
+  useUiStore.setState({
+    isSettingsOpen: false,
+    desktopSidebarExpanded: true,
+    mobileSidebarOpen: false,
   });
 }
 
@@ -152,5 +163,91 @@ describe('useAppShortcuts', () => {
 
     expect(controllerMocks.pasteBlocks).toHaveBeenCalledTimes(1);
     expect(controllerMocks.pasteBlocks).toHaveBeenCalledWith(metadata);
+  });
+
+  it('routes Cmd+Shift+V to the active editor plain-text paste handle', async () => {
+    const pastePlainText = vi.fn().mockResolvedValue(true);
+    useDocumentSessionStore.setState({
+      activeEditorRef: {
+        current: {
+          cut: vi.fn(),
+          copy: vi.fn(),
+          paste: vi.fn(),
+          pastePlainText,
+          selectAll: vi.fn(),
+          canUndo: vi.fn(() => false),
+          undo: vi.fn(),
+          canRedo: vi.fn(() => false),
+          redo: vi.fn(),
+        },
+      },
+    });
+
+    render(<Harness />);
+
+    const target = document.createElement('div');
+    target.className = 'block-editor';
+    document.body.appendChild(target);
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+    await Promise.resolve();
+
+    expect(pastePlainText).toHaveBeenCalledTimes(1);
+    target.remove();
+  });
+
+  it('does not route Cmd+Shift+V from non-block editable inputs', async () => {
+    const pastePlainText = vi.fn().mockResolvedValue(true);
+    useDocumentSessionStore.setState({
+      activeEditorRef: {
+        current: {
+          cut: vi.fn(),
+          copy: vi.fn(),
+          paste: vi.fn(),
+          pastePlainText,
+          selectAll: vi.fn(),
+          canUndo: vi.fn(() => false),
+          undo: vi.fn(),
+          canRedo: vi.fn(() => false),
+          redo: vi.fn(),
+        },
+      },
+    });
+
+    render(<Harness />);
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+    await Promise.resolve();
+
+    expect(pastePlainText).not.toHaveBeenCalled();
+    input.remove();
+  });
+
+  it('toggles the desktop sidebar with Cmd+B outside editable targets', () => {
+    useUiStore.setState({ desktopSidebarExpanded: true });
+    render(<Harness />);
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', metaKey: true, bubbles: true, cancelable: true }));
+    });
+    expect(useUiStore.getState().desktopSidebarExpanded).toBe(false);
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', metaKey: true, bubbles: true, cancelable: true }));
+    });
+    expect(useUiStore.getState().desktopSidebarExpanded).toBe(true);
+  });
+
+  it('does not hijack Cmd+B inside editable targets', () => {
+    useUiStore.setState({ desktopSidebarExpanded: true });
+    render(<Harness />);
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', metaKey: true, bubbles: true, cancelable: true }));
+
+    expect(useUiStore.getState().desktopSidebarExpanded).toBe(true);
+    input.remove();
   });
 });

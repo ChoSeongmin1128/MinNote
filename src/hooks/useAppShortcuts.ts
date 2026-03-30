@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useBlockController, useDocumentController } from '../app/controllers';
+import { useIsMobileViewport } from './useIsMobileViewport';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
+import { useUiStore } from '../stores/uiStore';
 import { resetHoldState } from '../lib/backspaceHoldState';
 
 function isEditableTarget(target: EventTarget | null) {
@@ -11,6 +13,18 @@ function isEditableTarget(target: EventTarget | null) {
   return Boolean(
     target.closest(
       'input, textarea, [contenteditable="true"], [contenteditable=""], .cm-editor, .cm-content, .ProseMirror',
+    ),
+  );
+}
+
+function isBlockEditorTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest(
+      '.block-editor, .plain-editor-input, .ProseMirror, .cm-editor, .cm-content',
     ),
   );
 }
@@ -32,6 +46,11 @@ export function useAppShortcuts() {
   const selectedBlockIds = useDocumentSessionStore((state) => state.selectedBlockIds);
   const setBlockSelected = useDocumentSessionStore((state) => state.setBlockSelected);
   const setAllBlocksSelected = useDocumentSessionStore((state) => state.setAllBlocksSelected);
+  const isMobileViewport = useIsMobileViewport();
+  const desktopSidebarExpanded = useUiStore((state) => state.desktopSidebarExpanded);
+  const mobileSidebarOpen = useUiStore((state) => state.mobileSidebarOpen);
+  const setDesktopSidebarExpanded = useUiStore((state) => state.setDesktopSidebarExpanded);
+  const setMobileSidebarOpen = useUiStore((state) => state.setMobileSidebarOpen);
 
   const lastSelectAllRef = useRef(0);
   const selectAllStageRef = useRef(0);
@@ -58,9 +77,31 @@ export function useAppShortcuts() {
         return;
       }
 
+      if (event.key.toLowerCase() === 'b' && !isEditableTarget(event.target)) {
+        event.preventDefault();
+        if (isMobileViewport) {
+          setMobileSidebarOpen(!mobileSidebarOpen);
+        } else {
+          setDesktopSidebarExpanded(!desktopSidebarExpanded);
+        }
+        return;
+      }
+
       if (event.key.toLowerCase() === 's') {
         event.preventDefault();
         void flushCurrentDocument();
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'v' && event.shiftKey) {
+        if (!isBlockEditorTarget(event.target)) {
+          return;
+        }
+        const activeEditor = useDocumentSessionStore.getState().activeEditorRef?.current;
+        if (activeEditor) {
+          event.preventDefault();
+          void activeEditor.pastePlainText();
+        }
         return;
       }
 
@@ -163,12 +204,17 @@ export function useAppShortcuts() {
     deleteSelectedBlocks,
     flushCurrentDocument,
     isBlockClipboardText,
+    isMobileViewport,
+    desktopSidebarExpanded,
+    mobileSidebarOpen,
     pasteBlocks,
     redoBlockOperation,
     selectedBlockId,
     selectedBlockIds.length,
+    setDesktopSidebarExpanded,
     setAllBlocksSelected,
     setBlockSelected,
+    setMobileSidebarOpen,
     undoBlockOperation,
   ]);
 }

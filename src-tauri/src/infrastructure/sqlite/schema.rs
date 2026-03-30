@@ -49,6 +49,10 @@ impl SqliteStore {
     self.ensure_app_state_value("default_block_tint_preset", DEFAULT_BLOCK_TINT_PRESET)?;
     self.ensure_app_state_value("default_document_surface_tone_preset", DEFAULT_DOCUMENT_SURFACE_TONE_PRESET)?;
     self.ensure_app_state_value("default_block_kind", DEFAULT_BLOCK_KIND)?;
+    self.ensure_app_state_value("body_font_family", DEFAULT_BODY_FONT_FAMILY)?;
+    self.ensure_app_state_value("body_font_size_px", DEFAULT_BODY_FONT_SIZE_PX)?;
+    self.ensure_app_state_value("code_font_family", DEFAULT_CODE_FONT_FAMILY)?;
+    self.ensure_app_state_value("code_font_size_px", DEFAULT_CODE_FONT_SIZE_PX)?;
     self.ensure_app_state_value("menu_bar_icon_enabled", DEFAULT_MENU_BAR_ICON_ENABLED)?;
     self.ensure_app_state_value("always_on_top_enabled", DEFAULT_ALWAYS_ON_TOP_ENABLED)?;
     self.ensure_app_state_value("window_opacity_percent", DEFAULT_WINDOW_OPACITY_PERCENT)?;

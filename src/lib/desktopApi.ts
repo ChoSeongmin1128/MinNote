@@ -5,6 +5,8 @@ import type {
   BlockRestoreDto,
   BlockTintPreset,
   BootstrapPayload,
+  BodyFontFamily,
+  CodeFontFamily,
   DocumentSurfaceTonePreset,
   DocumentDto,
   DocumentSummaryDto,
@@ -109,6 +111,18 @@ export const desktopApi = {
   },
   setDefaultDocumentSurfaceTonePreset(preset: DocumentSurfaceTonePreset) {
     return call<DocumentSurfaceTonePreset>('set_default_document_surface_tone_preset', { preset });
+  },
+  setBodyFontFamily(fontFamily: BodyFontFamily) {
+    return call<BodyFontFamily>('set_body_font_family', { fontFamily });
+  },
+  setBodyFontSizePx(size: number) {
+    return call<number>('set_body_font_size_px', { size });
+  },
+  setCodeFontFamily(fontFamily: CodeFontFamily) {
+    return call<CodeFontFamily>('set_code_font_family', { fontFamily });
+  },
+  setCodeFontSizePx(size: number) {
+    return call<number>('set_code_font_size_px', { size });
   },
   setDocumentBlockTintOverride(documentId: string, blockTintOverride: BlockTintPreset | null) {
     return call<DocumentDto>('set_document_block_tint_override', { documentId, blockTintOverride });

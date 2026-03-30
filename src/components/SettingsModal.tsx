@@ -1,8 +1,17 @@
 import { MoonStar, MonitorCog, SunMedium, X } from 'lucide-react';
 import { useState } from 'react';
 import { usePreferencesController, useWorkspaceController } from '../app/controllers';
+import { useEditorTypographyControl } from '../hooks/useEditorTypographyControl';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import { DOCUMENT_SURFACE_TONE_PRESETS } from '../lib/documentSurfaceTone';
+import {
+  BODY_FONT_OPTIONS,
+  CODE_FONT_OPTIONS,
+  MAX_BODY_FONT_SIZE_PX,
+  MAX_CODE_FONT_SIZE_PX,
+  MIN_BODY_FONT_SIZE_PX,
+  MIN_CODE_FONT_SIZE_PX,
+} from '../lib/editorTypography';
 import type { BlockKind, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import {
@@ -12,6 +21,7 @@ import {
 import { useWindowOpacityControl } from '../hooks/useWindowOpacityControl';
 import { useUpdaterStore } from '../stores/updaterStore';
 import { SettingsDangerZoneSection } from './settings/SettingsDangerZoneSection';
+import { SettingsFontSection } from './settings/SettingsFontSection';
 import { SettingsThemeDefaultsSection } from './settings/SettingsThemeDefaultsSection';
 import { SettingsUpdateSection } from './settings/SettingsUpdateSection';
 import { SettingsWindowSection } from './settings/SettingsWindowSection';
@@ -55,6 +65,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setDefaultBlockTintPreset,
     setDefaultDocumentSurfaceTonePreset,
     setGlobalToggleShortcut,
+    setBodyFontFamily,
+    setCodeFontFamily,
     setMenuBarIconEnabled,
     setThemeMode,
   } = usePreferencesController();
@@ -63,6 +75,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
   const defaultBlockKind = useWorkspaceStore((state) => state.defaultBlockKind);
+  const bodyFontFamily = useWorkspaceStore((state) => state.bodyFontFamily);
+  const codeFontFamily = useWorkspaceStore((state) => state.codeFontFamily);
   const menuBarIconEnabled = useWorkspaceStore((state) => state.menuBarIconEnabled);
   const alwaysOnTopEnabled = useWorkspaceStore((state) => state.alwaysOnTopEnabled);
   const globalToggleShortcut = useWorkspaceStore((state) => state.globalToggleShortcut);
@@ -71,6 +85,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const windowPreferenceError = useWorkspaceStore((state) => state.windowPreferenceError);
   const appUpdateStatus = useUpdaterStore((state) => state.appUpdateStatus);
   const { draftOpacity, previewOpacity, commitOpacity } = useWindowOpacityControl();
+  const {
+    draftBodyFontSizePx,
+    draftCodeFontSizePx,
+    previewBodyFontSizePx,
+    commitBodyFontSizePx,
+    previewCodeFontSizePx,
+    commitCodeFontSizePx,
+  } = useEditorTypographyControl();
   const [isConfirmOpen, setConfirmOpen] = useState(false);
 
   if (!isOpen) {
@@ -101,6 +123,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           onDefaultBlockKindChange={setDefaultBlockKind}
           onDefaultBlockTintPresetChange={setDefaultBlockTintPreset}
           onDefaultDocumentSurfaceTonePresetChange={setDefaultDocumentSurfaceTonePreset}
+        />
+
+        <SettingsFontSection
+          bodyFontFamily={bodyFontFamily}
+          bodyFontSizePx={draftBodyFontSizePx}
+          codeFontFamily={codeFontFamily}
+          codeFontSizePx={draftCodeFontSizePx}
+          bodyFontOptions={BODY_FONT_OPTIONS}
+          codeFontOptions={CODE_FONT_OPTIONS}
+          minBodyFontSizePx={MIN_BODY_FONT_SIZE_PX}
+          maxBodyFontSizePx={MAX_BODY_FONT_SIZE_PX}
+          minCodeFontSizePx={MIN_CODE_FONT_SIZE_PX}
+          maxCodeFontSizePx={MAX_CODE_FONT_SIZE_PX}
+          onBodyFontFamilyChange={setBodyFontFamily}
+          onPreviewBodyFontSizePx={previewBodyFontSizePx}
+          onCommitBodyFontSizePx={commitBodyFontSizePx}
+          onCodeFontFamilyChange={setCodeFontFamily}
+          onPreviewCodeFontSizePx={previewCodeFontSizePx}
+          onCommitCodeFontSizePx={commitCodeFontSizePx}
         />
 
         <SettingsWindowSection

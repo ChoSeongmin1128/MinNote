@@ -6,6 +6,7 @@ import {
   replaceBlockNoteMarkdown,
 } from '../../lib/blocknoteBridge';
 import { normalizeMarkdownContent } from '../../lib/markdown';
+import { looksLikeMarkdown } from '../../lib/markdown';
 import type { BlockEditorHandle } from '../../lib/editorHandle';
 import type { BlockCaretPlacement } from '../../lib/types';
 import { useResolvedTheme } from '../../hooks/useResolvedTheme';
@@ -61,6 +62,7 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
   const editor = useCreateBlockNote(
     {
       schema: markdownSchema,
+      tabBehavior: 'prefer-indent',
       dictionary: {
         ...ko,
         placeholders: {
@@ -161,6 +163,34 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
     root.addEventListener('keydown', handleKeyDown, true);
     return () => root.removeEventListener('keydown', handleKeyDown, true);
   }, [editor, emitSelectionVisualState, getCurrentMarkdown, onCreateBelow, onDeleteIfEmpty, onNavigateNext, onNavigatePrevious]);
+
+  useEffect(() => {
+    const root = editorRootRef.current;
+    if (!root) {
+      return;
+    }
+
+    const handlePaste = (event: ClipboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      const text = event.clipboardData?.getData('text/plain') ?? '';
+      if (!text || !looksLikeMarkdown(text)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      isWholeBlockSelectedRef.current = false;
+      editor.focus();
+      editor.pasteMarkdown(text);
+      emitSelectionVisualState();
+    };
+
+    root.addEventListener('paste', handlePaste, true);
+    return () => root.removeEventListener('paste', handlePaste, true);
+  }, [editor, emitSelectionVisualState]);
 
   useEffect(() => {
     if (!focusPlacement) {

@@ -1,6 +1,8 @@
 import type {
   BlockKind,
   BlockTintPreset,
+  BodyFontFamily,
+  CodeFontFamily,
   DocumentSurfaceTonePreset,
   ThemeMode,
 } from '../../lib/types';
@@ -29,6 +31,10 @@ export interface BackendPort {
   setDefaultDocumentSurfaceTonePreset(
     preset: DocumentSurfaceTonePreset,
   ): Promise<DocumentSurfaceTonePreset>;
+  setBodyFontFamily(fontFamily: BodyFontFamily): Promise<BodyFontFamily>;
+  setBodyFontSizePx(size: number): Promise<number>;
+  setCodeFontFamily(fontFamily: CodeFontFamily): Promise<CodeFontFamily>;
+  setCodeFontSizePx(size: number): Promise<number>;
   setDocumentBlockTintOverride(documentId: string, blockTintOverride: BlockTintPreset | null): Promise<DocumentVm>;
   setDocumentSurfaceToneOverride(
     documentId: string,

@@ -1,6 +1,8 @@
 import type {
   BlockKind,
   BlockTintPreset,
+  BodyFontFamily,
+  CodeFontFamily,
   DocumentSurfaceTonePreset,
   ThemeMode,
 } from '../../lib/types';
@@ -14,6 +16,10 @@ export interface WorkspaceBootstrapState {
   defaultBlockTintPreset: BlockTintPreset;
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
+  bodyFontFamily: BodyFontFamily;
+  bodyFontSizePx: number;
+  codeFontFamily: CodeFontFamily;
+  codeFontSizePx: number;
   menuBarIconEnabled: boolean;
   alwaysOnTopEnabled: boolean;
   windowOpacityPercent: number;

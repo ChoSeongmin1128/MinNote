@@ -45,6 +45,10 @@ export function applyBootstrapPayloadState(
   preferences.setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
   preferences.setDefaultDocumentSurfaceTonePreset(payload.defaultDocumentSurfaceTonePreset);
   preferences.setDefaultBlockKind(payload.defaultBlockKind);
+  preferences.setBodyFontFamily(payload.bodyFontFamily);
+  preferences.setBodyFontSizePx(payload.bodyFontSizePx);
+  preferences.setCodeFontFamily(payload.codeFontFamily);
+  preferences.setCodeFontSizePx(payload.codeFontSizePx);
   preferences.setMenuBarIconEnabled(payload.menuBarIconEnabled);
   preferences.setAlwaysOnTopEnabled(payload.alwaysOnTopEnabled);
   preferences.setWindowOpacityPercent(payload.windowOpacityPercent);

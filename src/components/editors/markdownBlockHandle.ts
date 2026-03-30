@@ -1,5 +1,6 @@
 import type { MutableRefObject } from 'react';
 import {
+  insertBlockNotePlainText,
   clearBlockNoteContent,
   deleteBlockNoteSelection,
   selectAllBlockNote,
@@ -66,6 +67,17 @@ export function createMarkdownEditorHandle({
 
       editor.pasteMarkdown(text);
       return true;
+    },
+    async pastePlainText() {
+      const text = await navigator.clipboard.readText();
+      editor.focus();
+      if (!text) {
+        return false;
+      }
+
+      isWholeBlockSelectedRef.current = false;
+      emitSelectionVisualState();
+      return insertBlockNotePlainText(editor, text);
     },
     selectAll() {
       selectAllBlockNote(editor);

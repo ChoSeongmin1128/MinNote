@@ -51,6 +51,24 @@
   --header-surface-bg: color-mix(in srgb, var(--bg) 78%, transparent);
   --canvas-surface-bg: var(--bg);
   --document-surface-bg: var(--canvas-surface-bg);
+  --editor-body-font-family:
+    'SF Pro Display',
+    'SF Pro Text',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  --editor-body-font-size: 16px;
+  --editor-code-font-family:
+    ui-monospace,
+    'SF Mono',
+    'Menlo',
+    'Monaco',
+    'Cascadia Mono',
+    'Segoe UI Mono',
+    monospace;
+  --editor-code-font-size: 14px;
   font-family:
     'SF Pro Display',
     'SF Pro Text',
@@ -295,7 +313,7 @@ button {
 
 .document-card-header {
   min-width: 0;
-  padding-right: 20px;
+  padding-right: 28px;
 }
 
 .workspace-status,
@@ -362,8 +380,9 @@ button {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 1px;
+  gap: 8px;
   overflow: auto;
+  padding: 2px 0;
 }
 
 .document-card {
@@ -371,24 +390,30 @@ button {
   display: flex;
   width: 100%;
   flex-direction: column;
-  gap: 1px;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
+  gap: 6px;
+  border: 1.5px solid color-mix(in srgb, CanvasText 6%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 95%, CanvasText 5%);
   color: inherit;
-  padding: 7px 8px;
+  padding: 10px 12px;
   text-align: left;
   cursor: pointer;
-  transition: background-color 100ms ease, box-shadow 100ms ease;
+  box-shadow: 0 1px 3px color-mix(in srgb, CanvasText 3%, transparent);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease, transform 120ms ease;
 }
 
 .document-card:hover {
-  background: color-mix(in srgb, CanvasText 4%, transparent);
+  border-color: color-mix(in srgb, CanvasText 10%, transparent);
+  background: color-mix(in srgb, var(--bg) 93%, CanvasText 7%);
+  transform: translateY(-1px);
 }
 
 .document-card.is-active {
-  background: color-mix(in srgb, var(--brand-500) 8%, transparent);
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--brand-500) 86%, transparent);
+  border-color: color-mix(in srgb, Highlight 75%, CanvasText 8%);
+  background: color-mix(in srgb, Highlight 10%, var(--bg) 90%);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, Highlight 26%, transparent),
+    0 1px 3px color-mix(in srgb, CanvasText 3%, transparent);
 }
 
 .document-card:focus-visible {
@@ -414,8 +439,9 @@ button {
 
 .document-card-sub {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   overflow: hidden;
 }
 
@@ -425,6 +451,7 @@ button {
 }
 
 .document-preview {
+  width: 100%;
   overflow: hidden;
   color: var(--text-soft);
   font-size: 0.72rem;
@@ -441,13 +468,33 @@ button {
 .trash-section-header {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: space-between;
+  gap: 8px;
   padding: 2px 8px 5px;
   color: var(--text-soft);
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.trash-empty-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.trash-empty-header-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+
+.trash-empty-header-button:hover {
+  color: var(--danger);
 }
 
 .trash-card {
@@ -486,27 +533,11 @@ button {
   opacity: 1;
 }
 
-.trash-empty-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px 2px;
-}
-
-.trash-empty-button {
-  font-size: 0.75rem;
-  color: var(--text-soft);
-  padding: 3px 6px;
-}
-
-.trash-empty-button:hover {
-  color: var(--danger);
-}
-
 .trash-empty-confirm-label {
-  flex: 1;
   font-size: 0.75rem;
   color: var(--text-soft);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .trash-empty-cancel {
@@ -1360,9 +1391,9 @@ button {
 
 .document-card-action {
   position: absolute;
-  top: 50%;
+  top: 8px;
   right: 8px;
-  transform: translateY(-50%);
+  transform: none;
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease;
@@ -1510,7 +1541,8 @@ button {
 }
 
 .settings-range-group,
-.settings-shortcut-group {
+.settings-shortcut-group,
+.settings-font-group {
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -2251,12 +2283,12 @@ button {
   --bn-colors-side-menu: transparent;
   --bn-border-radius: 0;
   color: var(--text);
-  font-family: inherit;
+  font-family: var(--editor-body-font-family);
 }
 
 .markdown-blocknote-shell .bn-default-styles {
-  font-family: inherit;
-  font-size: 1rem;
+  font-family: var(--editor-body-font-family);
+  font-size: var(--editor-body-font-size);
 }
 
 .markdown-blocknote-shell .bn-editor {
@@ -2265,6 +2297,8 @@ button {
   background: transparent;
   border-radius: 0;
   color: var(--text);
+  font-family: var(--editor-body-font-family);
+  font-size: var(--editor-body-font-size);
 }
 
 .markdown-blocknote-shell .ProseMirror {
@@ -2290,14 +2324,8 @@ button {
 
 .markdown-blocknote-shell .bn-block-content[data-content-type='codeBlock'] > pre {
   padding: 22px 18px 18px;
-  font-family:
-    'SF Mono',
-    'Menlo',
-    'Monaco',
-    'Cascadia Mono',
-    'Segoe UI Mono',
-    monospace;
-  font-size: 0.9rem;
+  font-family: var(--editor-code-font-family);
+  font-size: var(--editor-code-font-size);
 }
 
 .markdown-blocknote-shell .bn-block-content[data-content-type='codeBlock'] > div > select {
@@ -2381,14 +2409,8 @@ button {
 
 .plain-editor-input.is-code,
 .plain-editor-highlight {
-  font-family:
-    'SF Mono',
-    'Menlo',
-    'Monaco',
-    'Cascadia Mono',
-    'Segoe UI Mono',
-    monospace;
-  font-size: 0.9rem;
+  font-family: var(--editor-code-font-family);
+  font-size: var(--editor-code-font-size);
 }
 
 .plain-editor-input.is-code {
@@ -2411,6 +2433,8 @@ button {
   overflow: hidden;
   padding: 1px 0;
   color: var(--text);
+  font-family: var(--editor-body-font-family);
+  font-size: var(--editor-body-font-size);
   white-space: pre-wrap;
   word-break: break-word;
 }

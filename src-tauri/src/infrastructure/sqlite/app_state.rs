@@ -83,6 +83,30 @@ impl AppStateRepository for SqliteStore {
       BlockKind::Markdown,
       BlockKind::try_from_str,
     )?;
+    let body_font_family = parse_optional_enum(
+      self.get_state_value("body_font_family")?,
+      "본문 글꼴",
+      BodyFontFamily::SystemSans,
+      BodyFontFamily::try_from_str,
+    )?;
+    let body_font_size_px = parse_u8_setting(
+      self.get_state_value("body_font_size_px")?,
+      "본문 글자 크기",
+      16,
+      14..=20,
+    )?;
+    let code_font_family = parse_optional_enum(
+      self.get_state_value("code_font_family")?,
+      "코드 글꼴",
+      CodeFontFamily::SystemMono,
+      CodeFontFamily::try_from_str,
+    )?;
+    let code_font_size_px = parse_u8_setting(
+      self.get_state_value("code_font_size_px")?,
+      "코드 글자 크기",
+      14,
+      12..=18,
+    )?;
     let always_on_top_enabled = parse_bool_setting(
       self.get_state_value("always_on_top_enabled")?,
       "항상 위에 고정",
@@ -103,6 +127,10 @@ impl AppStateRepository for SqliteStore {
       default_block_tint_preset,
       default_document_surface_tone_preset,
       default_block_kind,
+      body_font_family,
+      body_font_size_px,
+      code_font_family,
+      code_font_size_px,
       menu_bar_icon_enabled,
       always_on_top_enabled,
       window_opacity_percent,
@@ -135,6 +163,26 @@ impl AppStateRepository for SqliteStore {
 
   fn set_default_block_kind(&mut self, kind: BlockKind) -> Result<(), AppError> {
     self.set_state_value("default_block_kind", kind.as_str())?;
+    Ok(())
+  }
+
+  fn set_body_font_family(&mut self, font_family: BodyFontFamily) -> Result<(), AppError> {
+    self.set_state_value("body_font_family", font_family.as_str())?;
+    Ok(())
+  }
+
+  fn set_body_font_size_px(&mut self, size: u8) -> Result<(), AppError> {
+    self.set_state_value("body_font_size_px", &size.to_string())?;
+    Ok(())
+  }
+
+  fn set_code_font_family(&mut self, font_family: CodeFontFamily) -> Result<(), AppError> {
+    self.set_state_value("code_font_family", font_family.as_str())?;
+    Ok(())
+  }
+
+  fn set_code_font_size_px(&mut self, size: u8) -> Result<(), AppError> {
+    self.set_state_value("code_font_size_px", &size.to_string())?;
     Ok(())
   }
 
@@ -200,6 +248,36 @@ mod tests {
     assert_eq!(
       error.to_string(),
       "저장된 메뉴바 아이콘 설정이 손상되었습니다: maybe",
+    );
+  }
+
+  #[test]
+  fn invalid_body_font_family_returns_validation_error() {
+    let store = test_store();
+    store
+      .set_state_value("body_font_family", "broken-font")
+      .expect("state value should be written");
+
+    let error = store.get_app_settings().expect_err("invalid body font should fail");
+
+    assert_eq!(
+      error.to_string(),
+      "저장된 본문 글꼴 설정이 손상되었습니다: broken-font",
+    );
+  }
+
+  #[test]
+  fn invalid_code_font_size_returns_validation_error() {
+    let store = test_store();
+    store
+      .set_state_value("code_font_size_px", "40")
+      .expect("state value should be written");
+
+    let error = store.get_app_settings().expect_err("invalid code font size should fail");
+
+    assert_eq!(
+      error.to_string(),
+      "저장된 코드 글자 크기 설정이 손상되었습니다: 40",
     );
   }
 }

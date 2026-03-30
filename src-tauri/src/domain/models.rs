@@ -131,6 +131,63 @@ impl ThemeMode {
   }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum BodyFontFamily {
+  SystemSans,
+  SystemSerif,
+  SystemRounded,
+}
+
+impl BodyFontFamily {
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      Self::SystemSans => "system-sans",
+      Self::SystemSerif => "system-serif",
+      Self::SystemRounded => "system-rounded",
+    }
+  }
+
+  pub fn try_from_str(value: &str) -> Result<Self, AppError> {
+    match value {
+      "system-sans" => Ok(Self::SystemSans),
+      "system-serif" => Ok(Self::SystemSerif),
+      "system-rounded" => Ok(Self::SystemRounded),
+      _ => Err(AppError::validation(format!("알 수 없는 본문 글꼴입니다: {value}"))),
+    }
+  }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum CodeFontFamily {
+  SystemMono,
+  SfMono,
+  Menlo,
+  Monaco,
+}
+
+impl CodeFontFamily {
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      Self::SystemMono => "system-mono",
+      Self::SfMono => "sf-mono",
+      Self::Menlo => "menlo",
+      Self::Monaco => "monaco",
+    }
+  }
+
+  pub fn try_from_str(value: &str) -> Result<Self, AppError> {
+    match value {
+      "system-mono" => Ok(Self::SystemMono),
+      "sf-mono" => Ok(Self::SfMono),
+      "menlo" => Ok(Self::Menlo),
+      "monaco" => Ok(Self::Monaco),
+      _ => Err(AppError::validation(format!("알 수 없는 코드 글꼴입니다: {value}"))),
+    }
+  }
+}
+
 #[derive(Debug, Clone)]
 pub struct Document {
   pub id: String,
@@ -180,6 +237,10 @@ pub struct AppSettings {
   pub default_block_tint_preset: BlockTintPreset,
   pub default_document_surface_tone_preset: DocumentSurfaceTonePreset,
   pub default_block_kind: BlockKind,
+  pub body_font_family: BodyFontFamily,
+  pub body_font_size_px: u8,
+  pub code_font_family: CodeFontFamily,
+  pub code_font_size_px: u8,
   pub menu_bar_icon_enabled: bool,
   pub always_on_top_enabled: bool,
   pub window_opacity_percent: u8,

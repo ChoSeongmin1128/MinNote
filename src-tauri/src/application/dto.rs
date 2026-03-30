@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::domain::models::{Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode};
+use crate::domain::models::{Block, BlockKind, BlockTintPreset, BodyFontFamily, CodeFontFamily, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode};
 use crate::error::AppError;
 
 #[derive(Debug, Serialize)]
@@ -60,6 +60,10 @@ pub struct BootstrapPayload {
   pub default_block_tint_preset: BlockTintPreset,
   pub default_document_surface_tone_preset: DocumentSurfaceTonePreset,
   pub default_block_kind: BlockKind,
+  pub body_font_family: BodyFontFamily,
+  pub body_font_size_px: u8,
+  pub code_font_family: CodeFontFamily,
+  pub code_font_size_px: u8,
   pub menu_bar_icon_enabled: bool,
   pub always_on_top_enabled: bool,
   pub window_opacity_percent: u8,

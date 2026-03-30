@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::application::dto::DocumentDto;
 use crate::application::services;
-use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, ThemeMode};
+use crate::domain::models::{BlockKind, BlockTintPreset, BodyFontFamily, CodeFontFamily, DocumentSurfaceTonePreset, ThemeMode};
 use crate::state::AppState;
 
 use super::helpers::{
@@ -67,6 +67,38 @@ pub fn set_default_block_kind(
   kind: BlockKind,
 ) -> Result<BlockKind, String> {
   with_repository(state, |repository| services::set_default_block_kind(repository, kind))
+}
+
+#[tauri::command]
+pub fn set_body_font_family(
+  state: State<'_, AppState>,
+  font_family: BodyFontFamily,
+) -> Result<BodyFontFamily, String> {
+  with_repository(state, |repository| services::set_body_font_family(repository, font_family))
+}
+
+#[tauri::command]
+pub fn set_body_font_size_px(
+  state: State<'_, AppState>,
+  size: u8,
+) -> Result<u8, String> {
+  with_repository(state, |repository| services::set_body_font_size_px(repository, size))
+}
+
+#[tauri::command]
+pub fn set_code_font_family(
+  state: State<'_, AppState>,
+  font_family: CodeFontFamily,
+) -> Result<CodeFontFamily, String> {
+  with_repository(state, |repository| services::set_code_font_family(repository, font_family))
+}
+
+#[tauri::command]
+pub fn set_code_font_size_px(
+  state: State<'_, AppState>,
+  size: u8,
+) -> Result<u8, String> {
+  with_repository(state, |repository| services::set_code_font_size_px(repository, size))
 }
 
 #[tauri::command]

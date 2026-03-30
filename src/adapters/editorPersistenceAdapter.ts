@@ -4,6 +4,7 @@ import type {
   EditorPersistencePort,
   PendingBlockSave,
 } from '../application/ports/editorPersistencePort';
+import { normalizeMarkdownContent } from '../lib/markdown';
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -34,7 +35,7 @@ export function createEditorPersistenceAdapter(backend: BackendPort): EditorPers
     }
 
     if (pending.kind === 'markdown') {
-      await backend.updateMarkdownBlock(blockId, pending.content);
+      await backend.updateMarkdownBlock(blockId, normalizeMarkdownContent(pending.content));
     } else if (pending.kind === 'code') {
       await backend.updateCodeBlock(blockId, pending.content, pending.language);
     } else {

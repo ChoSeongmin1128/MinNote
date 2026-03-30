@@ -3,6 +3,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
   BlockKind,
   BlockTintPreset,
+  BodyFontFamily,
+  CodeFontFamily,
   DocumentSurfaceTonePreset,
   ThemeMode,
 } from '../lib/types';
@@ -18,6 +20,10 @@ interface WorkspaceState {
   defaultBlockTintPreset: BlockTintPreset;
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
+  bodyFontFamily: BodyFontFamily;
+  bodyFontSizePx: number;
+  codeFontFamily: CodeFontFamily;
+  codeFontSizePx: number;
   themeMode: ThemeMode;
   menuBarIconEnabled: boolean;
   alwaysOnTopEnabled: boolean;
@@ -37,6 +43,10 @@ interface WorkspaceState {
   setDefaultBlockTintPreset: (preset: BlockTintPreset) => void;
   setDefaultDocumentSurfaceTonePreset: (preset: DocumentSurfaceTonePreset) => void;
   setDefaultBlockKind: (kind: BlockKind) => void;
+  setBodyFontFamily: (fontFamily: BodyFontFamily) => void;
+  setBodyFontSizePx: (size: number) => void;
+  setCodeFontFamily: (fontFamily: CodeFontFamily) => void;
+  setCodeFontSizePx: (size: number) => void;
   setThemeMode: (themeMode: ThemeMode) => void;
   setMenuBarIconEnabled: (value: boolean) => void;
   setAlwaysOnTopEnabled: (value: boolean) => void;
@@ -62,6 +72,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   defaultBlockTintPreset: 'mist',
   defaultDocumentSurfaceTonePreset: 'default',
   defaultBlockKind: 'markdown' as BlockKind,
+  bodyFontFamily: 'system-sans',
+  bodyFontSizePx: 16,
+  codeFontFamily: 'system-mono',
+  codeFontSizePx: 14,
   themeMode: 'system',
   menuBarIconEnabled: false,
   alwaysOnTopEnabled: false,
@@ -91,6 +105,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   setDefaultBlockTintPreset: (defaultBlockTintPreset) => set({ defaultBlockTintPreset }),
   setDefaultDocumentSurfaceTonePreset: (defaultDocumentSurfaceTonePreset) => set({ defaultDocumentSurfaceTonePreset }),
   setDefaultBlockKind: (defaultBlockKind) => set({ defaultBlockKind }),
+  setBodyFontFamily: (bodyFontFamily) => set({ bodyFontFamily }),
+  setBodyFontSizePx: (bodyFontSizePx) => set({ bodyFontSizePx }),
+  setCodeFontFamily: (codeFontFamily) => set({ codeFontFamily }),
+  setCodeFontSizePx: (codeFontSizePx) => set({ codeFontSizePx }),
   setThemeMode: (themeMode) => set({ themeMode }),
   setMenuBarIconEnabled: (menuBarIconEnabled) => set({ menuBarIconEnabled }),
   setAlwaysOnTopEnabled: (alwaysOnTopEnabled) => set({ alwaysOnTopEnabled }),

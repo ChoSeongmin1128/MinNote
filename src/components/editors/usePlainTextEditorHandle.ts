@@ -67,6 +67,22 @@ export function usePlainTextEditorHandle({
         syncTextareaHeight(textarea);
         return true;
       },
+      async pastePlainText() {
+        const textarea = textareaRef.current;
+        if (!textarea) return false;
+
+        const text = await navigator.clipboard.readText();
+        const { selectionStart, selectionEnd } = textarea;
+        const value = getValue();
+        const nextValue = `${value.slice(0, selectionStart)}${text}${value.slice(selectionEnd)}`;
+        const nextCaret = selectionStart + text.length;
+        textarea.value = nextValue;
+        emitChange(nextValue);
+        textarea.focus();
+        textarea.setSelectionRange(nextCaret, nextCaret);
+        syncTextareaHeight(textarea);
+        return true;
+      },
       selectAll() {
         const textarea = textareaRef.current;
         if (!textarea) return false;

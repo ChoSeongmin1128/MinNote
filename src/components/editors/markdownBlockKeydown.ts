@@ -1,9 +1,13 @@
 import type { MutableRefObject } from 'react';
 import {
+  canNestBlockNote,
+  canUnnestBlockNote,
   isAtBlockNoteBoundary,
   isBlockNoteSelectionEmpty,
+  nestBlockNote,
   replaceBlockNoteArrowShortcut,
   selectAllBlockNote,
+  unnestBlockNote,
   type BlockNoteEditorLike,
 } from '../../lib/blocknoteBridge';
 import { shouldReplaceMarkdownArrow } from '../../lib/markdownEditorBehavior';
@@ -108,6 +112,33 @@ export function createMarkdownKeydownHandler({
             emitSelectionVisualState();
           });
         }
+      }
+      return;
+    }
+
+    if (!isMeta && event.key === 'Tab') {
+      const shouldUnnest = event.shiftKey;
+      const supportsStructureIndent =
+        typeof editor.canNestBlock === 'function'
+        || typeof editor.canUnnestBlock === 'function';
+      const canTransform = shouldUnnest ? canUnnestBlockNote(editor) : canNestBlockNote(editor);
+      if (canTransform) {
+        event.preventDefault();
+        event.stopPropagation();
+        isWholeBlockSelectedRef.current = false;
+        if (shouldUnnest) {
+          unnestBlockNote(editor);
+        } else {
+          nestBlockNote(editor);
+        }
+        emitSelectionVisualState();
+        return;
+      }
+
+      isWholeBlockSelectedRef.current = false;
+      emitSelectionVisualState();
+      if (supportsStructureIndent) {
+        event.preventDefault();
       }
       return;
     }

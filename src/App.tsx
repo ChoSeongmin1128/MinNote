@@ -11,6 +11,7 @@ import { WindowMenu } from './components/WindowMenu';
 import { useAppUpdater } from './hooks/useAppUpdater';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
+import { applyEditorTypographyCssVars } from './lib/editorTypography';
 import { useWorkspaceStore } from './stores/workspaceStore';
 import { useDocumentSessionStore } from './stores/documentSessionStore';
 import { useUiStore } from './stores/uiStore';
@@ -42,6 +43,10 @@ function App() {
   const appUpdateStatus = useUpdaterStore((state) => state.appUpdateStatus);
   const error = useWorkspaceStore((state) => state.error);
   const themeMode = useWorkspaceStore((state) => state.themeMode);
+  const bodyFontFamily = useWorkspaceStore((state) => state.bodyFontFamily);
+  const bodyFontSizePx = useWorkspaceStore((state) => state.bodyFontSizePx);
+  const codeFontFamily = useWorkspaceStore((state) => state.codeFontFamily);
+  const codeFontSizePx = useWorkspaceStore((state) => state.codeFontSizePx);
   const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
   const isSettingsOpen = useUiStore((state) => state.isSettingsOpen);
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
@@ -100,6 +105,15 @@ function App() {
     document.documentElement.dataset.themeMode = themeMode;
     document.documentElement.style.colorScheme = themeMode === 'system' ? 'light dark' : themeMode;
   }, [themeMode]);
+
+  useEffect(() => {
+    applyEditorTypographyCssVars(document.documentElement.style, {
+      bodyFontFamily,
+      bodyFontSizePx,
+      codeFontFamily,
+      codeFontSizePx,
+    });
+  }, [bodyFontFamily, bodyFontSizePx, codeFontFamily, codeFontSizePx]);
 
   const appSurfaceTone =
     currentDocument?.documentSurfaceToneOverride ?? defaultDocumentSurfaceTonePreset;

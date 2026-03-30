@@ -1,4 +1,4 @@
-use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, ThemeMode};
+use crate::domain::models::{BlockKind, BlockTintPreset, BodyFontFamily, CodeFontFamily, DocumentSurfaceTonePreset, ThemeMode};
 use crate::error::AppError;
 use crate::ports::repositories::AppRepository;
 
@@ -29,6 +29,46 @@ pub fn set_default_block_kind(
 ) -> Result<BlockKind, AppError> {
   repository.set_default_block_kind(kind.clone())?;
   Ok(kind)
+}
+
+pub fn set_body_font_family(
+  repository: &mut dyn AppRepository,
+  font_family: BodyFontFamily,
+) -> Result<BodyFontFamily, AppError> {
+  repository.set_body_font_family(font_family.clone())?;
+  Ok(font_family)
+}
+
+pub fn set_body_font_size_px(
+  repository: &mut dyn AppRepository,
+  size: u8,
+) -> Result<u8, AppError> {
+  if !(14..=20).contains(&size) {
+    return Err(AppError::validation("본문 글자 크기는 14px에서 20px 사이여야 합니다."));
+  }
+
+  repository.set_body_font_size_px(size)?;
+  Ok(size)
+}
+
+pub fn set_code_font_family(
+  repository: &mut dyn AppRepository,
+  font_family: CodeFontFamily,
+) -> Result<CodeFontFamily, AppError> {
+  repository.set_code_font_family(font_family.clone())?;
+  Ok(font_family)
+}
+
+pub fn set_code_font_size_px(
+  repository: &mut dyn AppRepository,
+  size: u8,
+) -> Result<u8, AppError> {
+  if !(12..=18).contains(&size) {
+    return Err(AppError::validation("코드 글자 크기는 12px에서 18px 사이여야 합니다."));
+  }
+
+  repository.set_code_font_size_px(size)?;
+  Ok(size)
 }
 
 pub fn set_menu_bar_icon_enabled(

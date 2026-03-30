@@ -15,6 +15,8 @@ export type DocumentSurfaceTonePreset =
   | 'slate'
   | 'dusk';
 export type ThemeMode = 'system' | 'light' | 'dark';
+export type BodyFontFamily = 'system-sans' | 'system-serif' | 'system-rounded';
+export type CodeFontFamily = 'system-mono' | 'sf-mono' | 'menlo' | 'monaco';
 
 export type JsonValue =
   | string
@@ -58,6 +60,10 @@ export interface BootstrapPayload {
   defaultBlockTintPreset: BlockTintPreset;
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
+  bodyFontFamily: BodyFontFamily;
+  bodyFontSizePx: number;
+  codeFontFamily: CodeFontFamily;
+  codeFontSizePx: number;
   menuBarIconEnabled: boolean;
   alwaysOnTopEnabled: boolean;
   windowOpacityPercent: number;

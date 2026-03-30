@@ -5,6 +5,8 @@ use crate::domain::models::{
   Block,
   BlockKind,
   BlockTintPreset,
+  BodyFontFamily,
+  CodeFontFamily,
   Document,
   DocumentSummary,
   DocumentSurfaceTonePreset,
@@ -65,6 +67,10 @@ impl MockRepository {
         default_block_tint_preset: BlockTintPreset::OceanSand,
         default_document_surface_tone_preset: DocumentSurfaceTonePreset::Paper,
         default_block_kind,
+        body_font_family: BodyFontFamily::SystemSans,
+        body_font_size_px: 16,
+        code_font_family: CodeFontFamily::SystemMono,
+        code_font_size_px: 14,
         menu_bar_icon_enabled: false,
         always_on_top_enabled: true,
         window_opacity_percent: 84,
@@ -149,6 +155,10 @@ impl AppStateRepository for MockRepository {
     &mut self,
     _preset: DocumentSurfaceTonePreset,
   ) -> Result<(), AppError> { Ok(()) }
+  fn set_body_font_family(&mut self, _font_family: BodyFontFamily) -> Result<(), AppError> { Ok(()) }
+  fn set_body_font_size_px(&mut self, _size: u8) -> Result<(), AppError> { Ok(()) }
+  fn set_code_font_family(&mut self, _font_family: CodeFontFamily) -> Result<(), AppError> { Ok(()) }
+  fn set_code_font_size_px(&mut self, _size: u8) -> Result<(), AppError> { Ok(()) }
   fn set_menu_bar_icon_enabled(&mut self, _enabled: bool) -> Result<(), AppError> { Ok(()) }
   fn set_default_block_kind(&mut self, _kind: BlockKind) -> Result<(), AppError> { Ok(()) }
   fn set_always_on_top_enabled(&mut self, _enabled: bool) -> Result<(), AppError> { Ok(()) }

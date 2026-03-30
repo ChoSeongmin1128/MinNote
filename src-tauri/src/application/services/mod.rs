@@ -30,6 +30,10 @@ pub use documents::{
 };
 pub use preferences::{
   set_always_on_top_enabled,
+  set_body_font_family,
+  set_body_font_size_px,
+  set_code_font_family,
+  set_code_font_size_px,
   set_default_block_kind,
   set_default_block_tint_preset,
   set_default_document_surface_tone_preset,

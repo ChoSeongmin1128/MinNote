@@ -58,6 +58,50 @@ export function createPreferencesUseCases({
     }
   }
 
+  async function setBodyFontFamily(fontFamily: Parameters<BackendPort['setBodyFontFamily']>[0]) {
+    try {
+      const result = await backend.setBodyFontFamily(fontFamily);
+      workspace.clearError();
+      preferences.setBodyFontFamily(result);
+    } catch (error) {
+      workspace.setError(normalizeErrorMessage(error, '본문 글꼴을 변경하지 못했습니다.'));
+    }
+  }
+
+  async function setBodyFontSizePx(size: Parameters<BackendPort['setBodyFontSizePx']>[0]) {
+    try {
+      const result = await backend.setBodyFontSizePx(size);
+      workspace.clearError();
+      preferences.setBodyFontSizePx(result);
+      return result;
+    } catch (error) {
+      workspace.setError(normalizeErrorMessage(error, '본문 글자 크기를 변경하지 못했습니다.'));
+      throw error;
+    }
+  }
+
+  async function setCodeFontFamily(fontFamily: Parameters<BackendPort['setCodeFontFamily']>[0]) {
+    try {
+      const result = await backend.setCodeFontFamily(fontFamily);
+      workspace.clearError();
+      preferences.setCodeFontFamily(result);
+    } catch (error) {
+      workspace.setError(normalizeErrorMessage(error, '코드 글꼴을 변경하지 못했습니다.'));
+    }
+  }
+
+  async function setCodeFontSizePx(size: Parameters<BackendPort['setCodeFontSizePx']>[0]) {
+    try {
+      const result = await backend.setCodeFontSizePx(size);
+      workspace.clearError();
+      preferences.setCodeFontSizePx(result);
+      return result;
+    } catch (error) {
+      workspace.setError(normalizeErrorMessage(error, '코드 글자 크기를 변경하지 못했습니다.'));
+      throw error;
+    }
+  }
+
   async function setMenuBarIconEnabled(enabled: boolean) {
     try {
       const result = await backend.setMenuBarIconEnabled(enabled);
@@ -148,6 +192,10 @@ export function createPreferencesUseCases({
     setDefaultBlockTintPreset,
     setDefaultDocumentSurfaceTonePreset,
     setDefaultBlockKind,
+    setBodyFontFamily,
+    setBodyFontSizePx,
+    setCodeFontFamily,
+    setCodeFontSizePx,
     setMenuBarIconEnabled,
     setAlwaysOnTopEnabled,
     previewWindowOpacityPercent,
