@@ -16,7 +16,7 @@ mod common;
 mod documents;
 mod schema;
 mod search;
-mod sync;
+pub(crate) mod sync;
 
 const SEARCH_INDEX_TABLE: &str = "search_index";
 const DEFAULT_THEME_MODE: &str = "system";

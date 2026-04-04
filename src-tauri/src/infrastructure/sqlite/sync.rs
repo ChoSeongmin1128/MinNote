@@ -118,9 +118,27 @@ struct StoredCloudKitState {
   sync_enabled: bool,
 }
 
-struct BuiltApplyOperations {
+pub(crate) struct BuiltApplyOperations {
   request: ApplyOperationsRequest,
   entries_by_record_name: HashMap<String, SyncOutboxEntry>,
+}
+
+pub(crate) enum SyncRunPreparation {
+  Disabled(ICloudSyncStatus),
+  Ready {
+    server_change_token: Option<String>,
+    has_server_change_token: bool,
+  },
+}
+
+impl BuiltApplyOperations {
+  pub(crate) fn request(&self) -> &ApplyOperationsRequest {
+    &self.request
+  }
+
+  pub(crate) fn has_operations(&self) -> bool {
+    self.request.has_operations()
+  }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -129,6 +147,96 @@ struct ApplyResponseStats {
 }
 
 impl SqliteStore {
+  pub(crate) fn begin_icloud_sync_run(&mut self) -> Result<SyncRunPreparation, AppError> {
+    let stored = self.read_cloudkit_state()?;
+    if !stored.sync_enabled {
+      return Ok(SyncRunPreparation::Disabled(self.get_icloud_sync_status()?));
+    }
+
+    let started_at = Self::now();
+    self.connection.execute(
+      "UPDATE cloudkit_state
+       SET last_sync_started_at_ms = ?1,
+           last_error_code = NULL,
+           last_error_message = NULL
+       WHERE scope = ?2",
+      params![started_at, ICLOUD_SCOPE_PRIVATE],
+    )?;
+
+    Ok(SyncRunPreparation::Ready {
+      has_server_change_token: stored.server_change_token.is_some(),
+      server_change_token: stored.server_change_token,
+    })
+  }
+
+  pub(crate) fn handle_unavailable_account_status(
+    &mut self,
+    account_status: ICloudAccountStatus,
+  ) -> Result<ICloudSyncStatus, AppError> {
+    self.set_cloudkit_account_status(account_status.clone())?;
+    let message = match account_status {
+      ICloudAccountStatus::NoAccount => "iCloud 계정에 로그인되어 있지 않습니다.",
+      ICloudAccountStatus::Restricted => "현재 iCloud 동기화를 사용할 수 없습니다.",
+      ICloudAccountStatus::TemporarilyUnavailable => "iCloud 상태를 잠시 확인할 수 없습니다.",
+      ICloudAccountStatus::CouldNotDetermine => "iCloud 계정 상태를 확인하지 못했습니다.",
+      _ => "iCloud 계정을 사용할 수 없습니다.",
+    };
+    self.mark_sync_error("account_unavailable", message)?;
+    self.get_icloud_sync_status()
+  }
+
+  pub(crate) fn apply_remote_changes_and_build_operations(
+    &mut self,
+    has_server_change_token: bool,
+    changes: &FetchChangesResponse,
+  ) -> Result<BuiltApplyOperations, AppError> {
+    self.apply_remote_changes(changes)?;
+    if !has_server_change_token && changes.is_empty() {
+      self.queue_all_active_documents_for_sync()?;
+    }
+    self.build_apply_operations()
+  }
+
+  pub(crate) fn complete_icloud_sync_run(
+    &mut self,
+    account_status: ICloudAccountStatus,
+    changes: &FetchChangesResponse,
+    built: &BuiltApplyOperations,
+    response: Option<&ApplyOperationsResponse>,
+  ) -> Result<ICloudSyncStatus, AppError> {
+    let mut apply_stats = ApplyResponseStats::default();
+    if let Some(response) = response {
+      apply_stats = self.process_apply_response(&built.entries_by_record_name, response)?;
+      self.apply_remote_changes(&FetchChangesResponse {
+        documents: response.server_changed.documents.clone(),
+        blocks: response.server_changed.blocks.clone(),
+        document_tombstones: response.server_changed.document_tombstones.clone(),
+        block_tombstones: response.server_changed.block_tombstones.clone(),
+        next_server_change_token: None,
+      })?;
+    }
+
+    if let Some(token) = &changes.next_server_change_token {
+      self.connection.execute(
+        "UPDATE cloudkit_state
+         SET server_change_token = ?1
+         WHERE scope = ?2",
+        params![token, ICLOUD_SCOPE_PRIVATE],
+      )?;
+    }
+
+    self.purge_expired_tombstones(Self::now())?;
+    self.ensure_sync_completion_succeeded(apply_stats)?;
+    self.mark_sync_success(account_status)?;
+    self.get_icloud_sync_status()
+  }
+
+  pub(crate) fn finish_failed_icloud_sync(&mut self, error: &AppError) -> Result<ICloudSyncStatus, AppError> {
+    let (code, message) = classify_sync_error(error);
+    self.mark_sync_error(code, &message)?;
+    self.get_icloud_sync_status()
+  }
+
   pub(crate) fn ensure_cloudkit_state_row(&self) -> Result<(), AppError> {
     self.connection.execute(
       "INSERT INTO cloudkit_state (
@@ -517,7 +625,7 @@ impl SqliteStore {
     ).map_err(AppError::from)
   }
 
-  fn set_cloudkit_account_status(&self, account_status: ICloudAccountStatus) -> Result<(), AppError> {
+  pub(crate) fn set_cloudkit_account_status(&self, account_status: ICloudAccountStatus) -> Result<(), AppError> {
     self.connection.execute(
       "UPDATE cloudkit_state SET account_status = ?1 WHERE scope = ?2",
       params![account_status.as_str(), ICLOUD_SCOPE_PRIVATE],
@@ -1337,6 +1445,41 @@ fn compare_logical_clock(
       std::cmp::Ordering::Equal => 0,
     },
   }
+}
+
+fn classify_sync_error(error: &AppError) -> (&'static str, String) {
+  match error {
+    AppError::Validation(message) if is_connectivity_error_message(message) => (
+      "network_unavailable",
+      "인터넷 연결을 확인한 뒤 다시 시도해 주세요.".to_string(),
+    ),
+    AppError::Validation(message) if message.contains("Zone does not exist") => (
+      "zone_not_ready",
+      "iCloud 동기화 영역을 아직 준비하는 중입니다. 잠시 후 다시 시도해 주세요.".to_string(),
+    ),
+    AppError::Validation(message) => ("sync_failed", message.clone()),
+    _ => ("sync_failed", error.to_string()),
+  }
+}
+
+fn is_connectivity_error_message(message: &str) -> bool {
+  let lower = message.to_ascii_lowercase();
+  [
+    "nsurlerrordomain:-1009",
+    "nsurlerrordomain:-1005",
+    "nsurlerrordomain:-1001",
+    "not connected to the internet",
+    "internet connection appears to be offline",
+    "network connection was lost",
+    "network is offline",
+    "network unavailable",
+    "could not connect to the server",
+    "connection was lost",
+    "timed out",
+    "offline",
+  ]
+  .iter()
+  .any(|pattern| lower.contains(pattern))
 }
 
 impl FetchChangesResponse {

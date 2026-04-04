@@ -32,7 +32,9 @@ struct Main {
         throw BridgeError.invalidCommand(command)
       }
     } catch {
-      FileHandle.standardError.write((error.localizedDescription + "\n").data(using: .utf8)!)
+      let nsError = error as NSError
+      let message = "[\(nsError.domain):\(nsError.code)] \(error.localizedDescription)\n"
+      FileHandle.standardError.write(message.data(using: .utf8)!)
       Foundation.exit(1)
     }
   }
