@@ -17,7 +17,14 @@ export type DocumentSurfaceTonePreset =
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type BodyFontFamily = 'system-sans' | 'system-serif' | 'system-rounded';
 export type CodeFontFamily = 'system-mono' | 'sf-mono' | 'menlo' | 'monaco';
-export type ICloudSyncState = 'disabled' | 'checking' | 'syncing' | 'idle' | 'error';
+export type ICloudSyncState =
+  | 'disabled'
+  | 'pending'
+  | 'checking'
+  | 'syncing'
+  | 'idle'
+  | 'offline'
+  | 'error';
 export type ICloudAccountStatus =
   | 'unknown'
   | 'available'
@@ -92,6 +99,7 @@ export interface ICloudSyncStatus {
   enabled: boolean;
   state: ICloudSyncState;
   accountStatus: ICloudAccountStatus;
+  pendingOperationCount: number;
   lastSyncStartedAtMs: number | null;
   lastSyncSucceededAtMs: number | null;
   lastErrorCode: string | null;
@@ -103,7 +111,7 @@ export interface ICloudSyncDebugInfoDto {
   bridgeError: string | null;
   zoneName: string;
   serverChangeTokenPresent: boolean;
-  outboxCount: number;
+  pendingOperationCount: number;
   tombstoneCount: number;
   deviceIdSuffix: string;
 }

@@ -112,6 +112,15 @@ export const backendPort: BackendPort = {
   runICloudSync() {
     return desktopApi.runICloudSync();
   },
+  resetICloudSyncCheckpoint() {
+    return desktopApi.resetICloudSyncCheckpoint();
+  },
+  forceUploadAllDocuments() {
+    return desktopApi.forceUploadAllDocuments();
+  },
+  forceRedownloadFromCloud() {
+    return desktopApi.forceRedownloadFromCloud();
+  },
   setMenuBarIconEnabled(enabled) {
     return desktopApi.setMenuBarIconEnabled(enabled);
   },

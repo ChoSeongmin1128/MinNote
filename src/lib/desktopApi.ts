@@ -162,6 +162,15 @@ export const desktopApi = {
   runICloudSync() {
     return call<ICloudSyncStatus>('run_icloud_sync');
   },
+  resetICloudSyncCheckpoint() {
+    return call<ICloudSyncStatus>('reset_icloud_sync_checkpoint');
+  },
+  forceUploadAllDocuments() {
+    return call<ICloudSyncStatus>('force_upload_all_documents');
+  },
+  forceRedownloadFromCloud() {
+    return call<ICloudSyncStatus>('force_redownload_from_cloud');
+  },
   setMenuBarIconEnabled(enabled: boolean) {
     return call<boolean>('set_menu_bar_icon_enabled', { enabled });
   },

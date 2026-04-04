@@ -90,7 +90,10 @@ impl DocumentRepository for SqliteStore {
 
     self.create_empty_block(&document.id, 0, BlockKind::Markdown)?;
     let document = self.finish_document_structure_mutation(&document.id)?;
-    self.queue_document_snapshot(&document.id)?;
+    self.record_document_created(&document.id)?;
+    for block in self.list_blocks(&document.id)? {
+      self.record_block_created(&block.id, &document.id)?;
+    }
     Ok(document)
   }
 
@@ -101,7 +104,7 @@ impl DocumentRepository for SqliteStore {
       params![normalized, document_id],
     )?;
     let document = self.finish_document_mutation(document_id)?;
-    self.queue_document_snapshot(document_id)?;
+    self.record_document_renamed(document_id)?;
     Ok(document)
   }
 
@@ -111,7 +114,7 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
       params![now, document_id],
     )?;
-    self.queue_document_deletion(document_id, now)?;
+    self.record_document_deletion(document_id, now)?;
     Ok(())
   }
 
@@ -124,7 +127,7 @@ impl DocumentRepository for SqliteStore {
     let document = self
       .get_document(document_id)?
       .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))?;
-    self.queue_document_snapshot(document_id)?;
+    self.record_document_restored(document_id)?;
     Ok(document)
   }
 
@@ -194,7 +197,7 @@ impl DocumentRepository for SqliteStore {
     let now = Self::now();
 
     for document_id in &document_ids {
-      self.queue_document_deletion(document_id, now)?;
+      self.record_document_deletion(document_id, now)?;
     }
     self.connection.execute(&format!("DELETE FROM {SEARCH_INDEX_TABLE}"), [])?;
     self.connection.execute("DELETE FROM documents", [])?;
@@ -212,7 +215,7 @@ impl DocumentRepository for SqliteStore {
       params![value, document_id],
     )?;
     let document = self.finish_document_mutation(document_id)?;
-    self.queue_document_snapshot(document_id)?;
+    self.record_document_style_updated(document_id)?;
     Ok(document)
   }
 
@@ -227,7 +230,7 @@ impl DocumentRepository for SqliteStore {
       params![value, document_id],
     )?;
     let document = self.finish_document_mutation(document_id)?;
-    self.queue_document_snapshot(document_id)?;
+    self.record_document_style_updated(document_id)?;
     Ok(document)
   }
 

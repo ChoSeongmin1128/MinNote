@@ -1,4 +1,13 @@
-import { AlertTriangle, CheckCircle2, Cloud, CloudOff, RefreshCw, type LucideIcon } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Cloud,
+  CloudOff,
+  Download,
+  RefreshCw,
+  Upload,
+  type LucideIcon,
+} from 'lucide-react';
 import type { ICloudSyncDebugInfoDto, ICloudSyncStatus } from '../../lib/types';
 
 interface ICloudPresentation {
@@ -31,6 +40,15 @@ function getPresentation(status: ICloudSyncStatus): ICloudPresentation {
     };
   }
 
+  if (status.state === 'offline') {
+    return {
+      label: '오프라인',
+      tone: 'error',
+      icon: CloudOff,
+      spin: false,
+    };
+  }
+
   if (status.state === 'checking') {
     return { label: '확인 중', tone: 'progress', icon: RefreshCw, spin: true };
   }
@@ -44,6 +62,15 @@ function getPresentation(status: ICloudSyncStatus): ICloudPresentation {
       label: status.lastErrorMessage ? '오류' : '동기화 오류',
       tone: 'error',
       icon: AlertTriangle,
+      spin: false,
+    };
+  }
+
+  if (status.state === 'pending') {
+    return {
+      label: `업로드 대기 ${status.pendingOperationCount}건`,
+      tone: 'progress',
+      icon: Cloud,
       spin: false,
     };
   }
@@ -73,6 +100,9 @@ interface SettingsICloudSectionProps {
   onEnabledChange: (enabled: boolean) => void;
   onRunSync: () => void;
   onRefreshDebug: () => void;
+  onResetCheckpoint: () => void;
+  onForceUpload: () => void;
+  onForceRedownload: () => void;
 }
 
 export function SettingsICloudSection({
@@ -83,6 +113,9 @@ export function SettingsICloudSection({
   onEnabledChange,
   onRunSync,
   onRefreshDebug,
+  onResetCheckpoint,
+  onForceUpload,
+  onForceRedownload,
 }: SettingsICloudSectionProps) {
   const presentation = getPresentation(status);
   const Icon = presentation.icon;
@@ -145,8 +178,8 @@ export function SettingsICloudSection({
             <span>{debugInfo.zoneName}</span>
             <span>Token</span>
             <span>{debugInfo.serverChangeTokenPresent ? '있음' : '없음'}</span>
-            <span>Outbox</span>
-            <span>{debugInfo.outboxCount}</span>
+            <span>Pending</span>
+            <span>{debugInfo.pendingOperationCount}</span>
             <span>Tombstones</span>
             <span>{debugInfo.tombstoneCount}</span>
             <span>Device</span>
@@ -155,6 +188,20 @@ export function SettingsICloudSection({
         ) : null}
         {debugInfo?.bridgeError ? <p className="settings-field-hint">{debugInfo.bridgeError}</p> : null}
         {debugError ? <p className="settings-field-hint">{debugError}</p> : null}
+      </div>
+      <div className="settings-update-actions">
+        <button className="ghost-button" type="button" disabled={isBusy} onClick={onResetCheckpoint}>
+          <RefreshCw size={14} />
+          체크포인트 초기화
+        </button>
+        <button className="ghost-button" type="button" disabled={isBusy} onClick={onForceUpload}>
+          <Upload size={14} />
+          전체 다시 업로드
+        </button>
+        <button className="ghost-button" type="button" disabled={isBusy} onClick={onForceRedownload}>
+          <Download size={14} />
+          Cloud 다시 받기
+        </button>
       </div>
       {status.lastErrorMessage && (
         <p className="settings-field-hint">{status.lastErrorMessage}</p>

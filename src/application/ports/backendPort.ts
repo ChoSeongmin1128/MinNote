@@ -50,6 +50,9 @@ export interface BackendPort {
   getICloudSyncDebugInfo(): Promise<ICloudSyncDebugInfoDto>;
   setICloudSyncEnabled(enabled: boolean): Promise<ICloudSyncStatus>;
   runICloudSync(): Promise<ICloudSyncStatus>;
+  resetICloudSyncCheckpoint(): Promise<ICloudSyncStatus>;
+  forceUploadAllDocuments(): Promise<ICloudSyncStatus>;
+  forceRedownloadFromCloud(): Promise<ICloudSyncStatus>;
   setMenuBarIconEnabled(enabled: boolean): Promise<boolean>;
   setDefaultBlockKind(kind: BlockKind): Promise<BlockKind>;
   setAlwaysOnTopEnabled(enabled: boolean): Promise<boolean>;

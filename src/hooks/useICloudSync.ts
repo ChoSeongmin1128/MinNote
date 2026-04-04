@@ -15,7 +15,7 @@ export function useICloudSync(isReady: boolean) {
   const lastForegroundSyncAtRef = useRef<number>(0);
 
   useEffect(() => {
-    if (!isReady || !icloudSyncStatus.enabled) {
+    if (!isReady || !icloudSyncStatus.enabled || icloudSyncStatus.state === 'offline') {
       return;
     }
 
@@ -29,7 +29,13 @@ export function useICloudSync(isReady: boolean) {
   }, [icloudSyncStatus.enabled, isReady, runICloudSync]);
 
   useEffect(() => {
-    if (!isReady || !icloudSyncStatus.enabled || !currentDocument) {
+    if (
+      !isReady ||
+      !icloudSyncStatus.enabled ||
+      !currentDocument ||
+      icloudSyncStatus.state === 'checking' ||
+      icloudSyncStatus.state === 'syncing'
+    ) {
       return;
     }
 
@@ -40,7 +46,7 @@ export function useICloudSync(isReady: boolean) {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [currentDocument, icloudSyncStatus.enabled, isReady, runICloudSync]);
+  }, [currentDocument, icloudSyncStatus.enabled, icloudSyncStatus.state, isReady, runICloudSync]);
 
   useEffect(() => {
     if (!isReady || !icloudSyncStatus.enabled) {
@@ -87,4 +93,19 @@ export function useICloudSync(isReady: boolean) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [icloudSyncStatus.enabled, icloudSyncStatus.lastSyncSucceededAtMs, isReady, runICloudSync]);
+
+  useEffect(() => {
+    if (!isReady || !icloudSyncStatus.enabled) {
+      return;
+    }
+
+    const handleOnline = () => {
+      void runICloudSync();
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [icloudSyncStatus.enabled, isReady, runICloudSync]);
 }

@@ -237,6 +237,45 @@ export function createPreferencesUseCases({
     }
   }
 
+  async function resetICloudSyncCheckpoint() {
+    try {
+      const result = await backend.resetICloudSyncCheckpoint();
+      workspace.clearError();
+      preferences.setICloudSyncStatus(result);
+      return result;
+    } catch (error) {
+      const message = normalizeErrorMessage(error, 'iCloud 체크포인트를 초기화하지 못했습니다.');
+      workspace.setError(message);
+      throw new Error(message);
+    }
+  }
+
+  async function forceUploadAllDocuments() {
+    try {
+      const result = await backend.forceUploadAllDocuments();
+      workspace.clearError();
+      preferences.setICloudSyncStatus(result);
+      return result;
+    } catch (error) {
+      const message = normalizeErrorMessage(error, '로컬 문서를 다시 업로드하지 못했습니다.');
+      workspace.setError(message);
+      throw new Error(message);
+    }
+  }
+
+  async function forceRedownloadFromCloud() {
+    try {
+      const result = await backend.forceRedownloadFromCloud();
+      workspace.clearError();
+      preferences.setICloudSyncStatus(result);
+      return result;
+    } catch (error) {
+      const message = normalizeErrorMessage(error, 'Cloud 기준으로 다시 받지 못했습니다.');
+      workspace.setError(message);
+      throw new Error(message);
+    }
+  }
+
   return {
     setThemeMode,
     setDefaultBlockTintPreset,
@@ -253,5 +292,8 @@ export function createPreferencesUseCases({
     setGlobalToggleShortcut,
     setICloudSyncEnabled,
     runICloudSync,
+    resetICloudSyncCheckpoint,
+    forceUploadAllDocuments,
+    forceRedownloadFromCloud,
   };
 }

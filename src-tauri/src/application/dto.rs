@@ -101,7 +101,7 @@ pub struct ICloudSyncDebugInfoDto {
   pub bridge_error: Option<String>,
   pub zone_name: String,
   pub server_change_token_present: bool,
-  pub outbox_count: usize,
+  pub pending_operation_count: usize,
   pub tombstone_count: usize,
   pub device_id_suffix: String,
 }

@@ -4,6 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use rusqlite::{params, OptionalExtension};
+use serde_json::{json, Value};
 
 use crate::domain::models::{
   Block,
@@ -69,34 +70,119 @@ impl SyncEntityType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SyncOutboxOp {
-  Upsert,
-  DeleteSourceRecord,
+enum SyncOperationType {
+  DocumentCreated,
+  DocumentTouched,
+  DocumentRenamed,
+  DocumentStyleUpdated,
+  DocumentDeleted,
+  DocumentRestored,
+  BlockCreated,
+  BlockContentUpdated,
+  BlockKindChanged,
+  BlockMoved,
+  BlockDeleted,
 }
 
-impl SyncOutboxOp {
+#[allow(dead_code)]
+impl SyncOperationType {
   fn as_str(self) -> &'static str {
     match self {
-      Self::Upsert => "upsert",
-      Self::DeleteSourceRecord => "delete_source_record",
+      Self::DocumentCreated => "document_created",
+      Self::DocumentTouched => "document_touched",
+      Self::DocumentRenamed => "document_renamed",
+      Self::DocumentStyleUpdated => "document_style_updated",
+      Self::DocumentDeleted => "document_deleted",
+      Self::DocumentRestored => "document_restored",
+      Self::BlockCreated => "block_created",
+      Self::BlockContentUpdated => "block_content_updated",
+      Self::BlockKindChanged => "block_kind_changed",
+      Self::BlockMoved => "block_moved",
+      Self::BlockDeleted => "block_deleted",
     }
   }
 
   fn try_from_str(value: &str) -> Result<Self, AppError> {
     match value {
-      "upsert" => Ok(Self::Upsert),
-      "delete_source_record" => Ok(Self::DeleteSourceRecord),
-      _ => Err(AppError::validation(format!("알 수 없는 동기화 작업입니다: {value}"))),
+      "document_created" => Ok(Self::DocumentCreated),
+      "document_touched" => Ok(Self::DocumentTouched),
+      "document_renamed" => Ok(Self::DocumentRenamed),
+      "document_style_updated" => Ok(Self::DocumentStyleUpdated),
+      "document_deleted" => Ok(Self::DocumentDeleted),
+      "document_restored" => Ok(Self::DocumentRestored),
+      "block_created" => Ok(Self::BlockCreated),
+      "block_content_updated" => Ok(Self::BlockContentUpdated),
+      "block_kind_changed" => Ok(Self::BlockKindChanged),
+      "block_moved" => Ok(Self::BlockMoved),
+      "block_deleted" => Ok(Self::BlockDeleted),
+      _ => Err(AppError::validation(format!("알 수 없는 동기화 operation입니다: {value}"))),
+    }
+  }
+
+  fn is_document_active(self) -> bool {
+    matches!(
+      self,
+      Self::DocumentCreated
+        | Self::DocumentTouched
+        | Self::DocumentRenamed
+        | Self::DocumentStyleUpdated
+        | Self::DocumentRestored
+    )
+  }
+
+  fn is_document_deleted(self) -> bool {
+    matches!(self, Self::DocumentDeleted)
+  }
+
+  fn is_block_active(self) -> bool {
+    matches!(
+      self,
+      Self::BlockCreated | Self::BlockContentUpdated | Self::BlockKindChanged | Self::BlockMoved
+    )
+  }
+
+  fn is_block_deleted(self) -> bool {
+    matches!(self, Self::BlockDeleted)
+  }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SyncOperationStatus {
+  Pending,
+  Failed,
+  Superseded,
+}
+
+impl SyncOperationStatus {
+  fn as_str(self) -> &'static str {
+    match self {
+      Self::Pending => "pending",
+      Self::Failed => "failed",
+      Self::Superseded => "superseded",
+    }
+  }
+
+  fn try_from_str(value: &str) -> Result<Self, AppError> {
+    match value {
+      "pending" => Ok(Self::Pending),
+      "failed" => Ok(Self::Failed),
+      "superseded" => Ok(Self::Superseded),
+      _ => Err(AppError::validation(format!("알 수 없는 동기화 상태입니다: {value}"))),
     }
   }
 }
 
 #[derive(Debug, Clone)]
-struct SyncOutboxEntry {
+#[allow(dead_code)]
+struct SyncOperationRow {
   id: i64,
+  operation_type: SyncOperationType,
   entity_type: SyncEntityType,
   entity_id: String,
-  op: SyncOutboxOp,
+  document_id: Option<String>,
+  payload_json: Value,
+  logical_clock: i64,
+  status: SyncOperationStatus,
 }
 
 #[derive(Debug, Clone)]
@@ -120,7 +206,7 @@ struct StoredCloudKitState {
 
 pub(crate) struct BuiltApplyOperations {
   request: ApplyOperationsRequest,
-  entries_by_record_name: HashMap<String, SyncOutboxEntry>,
+  operation_ids_by_record_name: HashMap<String, Vec<i64>>,
 }
 
 pub(crate) enum SyncRunPreparation {
@@ -206,7 +292,7 @@ impl SqliteStore {
   ) -> Result<ICloudSyncStatus, AppError> {
     let mut apply_stats = ApplyResponseStats::default();
     if let Some(response) = response {
-      apply_stats = self.process_apply_response(&built.entries_by_record_name, response)?;
+      apply_stats = self.process_apply_response(&built.operation_ids_by_record_name, response)?;
       self.apply_remote_changes(&FetchChangesResponse {
         documents: response.server_changed.documents.clone(),
         blocks: response.server_changed.blocks.clone(),
@@ -272,6 +358,97 @@ impl SqliteStore {
     Ok(())
   }
 
+  pub(crate) fn ensure_sync_operations_defaults(&self) -> Result<(), AppError> {
+    self.connection.execute(
+      "UPDATE sync_operations
+       SET status = 'pending'
+       WHERE status NOT IN ('pending', 'failed', 'superseded')",
+      [],
+    )?;
+    Ok(())
+  }
+
+  pub(crate) fn migrate_legacy_sync_outbox_to_operations(&self) -> Result<(), AppError> {
+    let legacy_count = self.connection.query_row(
+      "SELECT COUNT(*) FROM sync_outbox",
+      [],
+      |row| row.get::<_, i64>(0),
+    )?;
+    if legacy_count == 0 {
+      return Ok(());
+    }
+
+    let rows = self
+      .connection
+      .prepare(
+        "SELECT entity_type, entity_id, op, queued_at_ms, attempt_count, last_error_code
+         FROM sync_outbox
+         ORDER BY queued_at_ms ASC, id ASC",
+      )?
+      .query_map([], |row| {
+        Ok((
+          row.get::<_, String>(0)?,
+          row.get::<_, String>(1)?,
+          row.get::<_, String>(2)?,
+          row.get::<_, i64>(3)?,
+          row.get::<_, i64>(4)?,
+          row.get::<_, Option<String>>(5)?,
+        ))
+      })?
+      .collect::<Result<Vec<_>, _>>()?;
+
+    for (entity_type_raw, entity_id, op_raw, queued_at_ms, attempt_count, last_error_code) in rows {
+      let entity_type = SyncEntityType::try_from_str(&entity_type_raw)?;
+      let operation_type = match (entity_type, op_raw.as_str()) {
+        (SyncEntityType::Document, _) => SyncOperationType::DocumentTouched,
+        (SyncEntityType::Block, _) => SyncOperationType::BlockContentUpdated,
+        (SyncEntityType::DocumentTombstone, _) => SyncOperationType::DocumentDeleted,
+        (SyncEntityType::BlockTombstone, _) => SyncOperationType::BlockDeleted,
+      };
+      let document_id = match entity_type {
+        SyncEntityType::Document => Some(entity_id.clone()),
+        SyncEntityType::Block => self.fetch_block(&entity_id).ok().map(|block| block.document_id),
+        SyncEntityType::DocumentTombstone => Some(entity_id.clone()),
+        SyncEntityType::BlockTombstone => self
+          .read_tombstone(SyncEntityType::BlockTombstone, &entity_id)?
+          .and_then(|row| row.parent_document_id),
+      };
+      self.connection.execute(
+        "INSERT INTO sync_operations (
+           operation_type,
+           entity_type,
+           entity_id,
+           document_id,
+           payload_json,
+           logical_clock,
+           created_at_ms,
+           attempt_count,
+           last_error_code,
+           status
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        params![
+          operation_type.as_str(),
+          entity_type.as_str(),
+          entity_id,
+          document_id,
+          json!({ "migratedFrom": "sync_outbox", "legacyOp": op_raw }).to_string(),
+          queued_at_ms,
+          queued_at_ms,
+          attempt_count,
+          last_error_code,
+          if last_error_code.is_some() {
+            SyncOperationStatus::Failed.as_str()
+          } else {
+            SyncOperationStatus::Pending.as_str()
+          },
+        ],
+      )?;
+    }
+
+    self.connection.execute("DELETE FROM sync_outbox", [])?;
+    Ok(())
+  }
+
   pub(crate) fn current_device_id(&self) -> Result<String, AppError> {
     self
       .connection
@@ -282,10 +459,15 @@ impl SqliteStore {
 
   pub(crate) fn get_icloud_sync_status(&self) -> Result<ICloudSyncStatus, AppError> {
     let stored = self.read_cloudkit_state()?;
+    let pending_operation_count = self.count_pending_operations()?;
     let state = if !stored.sync_enabled {
       ICloudSyncState::Disabled
+    } else if matches!(stored.last_error_code.as_deref(), Some("offline" | "network_unavailable")) {
+      ICloudSyncState::Offline
     } else if stored.last_error_message.is_some() {
       ICloudSyncState::Error
+    } else if pending_operation_count > 0 {
+      ICloudSyncState::Pending
     } else {
       ICloudSyncState::Idle
     };
@@ -294,6 +476,7 @@ impl SqliteStore {
       enabled: stored.sync_enabled,
       state,
       account_status: stored.account_status,
+      pending_operation_count,
       last_sync_started_at_ms: stored.last_sync_started_at_ms,
       last_sync_succeeded_at_ms: stored.last_sync_succeeded_at_ms,
       last_error_code: stored.last_error_code,
@@ -302,8 +485,8 @@ impl SqliteStore {
   }
 
   pub(crate) fn get_icloud_sync_debug_info(&self) -> Result<(usize, usize, bool, String), AppError> {
-    let outbox_count = self.connection.query_row(
-      "SELECT COUNT(*) FROM sync_outbox",
+    let pending_operation_count = self.connection.query_row(
+      "SELECT COUNT(*) FROM sync_operations WHERE status IN ('pending', 'failed')",
       [],
       |row| row.get::<_, i64>(0),
     )? as usize;
@@ -315,7 +498,7 @@ impl SqliteStore {
     let state = self.read_cloudkit_state()?;
     let device_id = self.current_device_id()?;
     Ok((
-      outbox_count,
+      pending_operation_count,
       tombstone_count,
       state.server_change_token.is_some(),
       device_id,
@@ -334,6 +517,7 @@ impl SqliteStore {
     self.get_icloud_sync_status()
   }
 
+  #[allow(dead_code)]
   pub(crate) fn run_icloud_sync(&mut self, bridge: &CloudKitBridge) -> Result<ICloudSyncStatus, AppError> {
     let stored = self.read_cloudkit_state()?;
     if !stored.sync_enabled {
@@ -376,7 +560,7 @@ impl SqliteStore {
     let mut apply_stats = ApplyResponseStats::default();
     if built.request.has_operations() {
       let response = bridge.apply_operations(&built.request)?;
-      apply_stats = self.process_apply_response(&built.entries_by_record_name, &response)?;
+      apply_stats = self.process_apply_response(&built.operation_ids_by_record_name, &response)?;
       self.apply_remote_changes(&FetchChangesResponse {
         documents: response.server_changed.documents.clone(),
         blocks: response.server_changed.blocks.clone(),
@@ -401,6 +585,7 @@ impl SqliteStore {
     self.get_icloud_sync_status()
   }
 
+  #[allow(dead_code)]
   fn fetch_remote_changes_with_zone_retry(
     &self,
     bridge: &CloudKitBridge,
@@ -448,68 +633,30 @@ impl SqliteStore {
 
     for (entity_type, entity_id) in expired {
       let entity_type = SyncEntityType::try_from_str(&entity_type)?;
-      self.upsert_outbox(entity_type, &entity_id, SyncOutboxOp::DeleteSourceRecord)?;
+      let operation_type = match entity_type {
+        SyncEntityType::Document => SyncOperationType::DocumentTouched,
+        SyncEntityType::Block => SyncOperationType::BlockContentUpdated,
+        SyncEntityType::DocumentTombstone => SyncOperationType::DocumentDeleted,
+        SyncEntityType::BlockTombstone => SyncOperationType::BlockDeleted,
+      };
+      let document_id = match entity_type {
+        SyncEntityType::Document | SyncEntityType::DocumentTombstone => Some(entity_id.clone()),
+        SyncEntityType::Block => self.fetch_block(&entity_id).ok().map(|block| block.document_id),
+        SyncEntityType::BlockTombstone => self
+          .read_tombstone(SyncEntityType::BlockTombstone, &entity_id)?
+          .and_then(|row| row.parent_document_id),
+      };
+      self.enqueue_sync_operation(
+        operation_type,
+        entity_type,
+        &entity_id,
+        document_id.as_deref(),
+        json!({ "purged": true }),
+        now_ms,
+      )?;
       self.connection.execute(
         "DELETE FROM sync_tombstones WHERE entity_type = ?1 AND entity_id = ?2",
         params![entity_type.as_str(), entity_id],
-      )?;
-    }
-
-    Ok(())
-  }
-
-  pub(crate) fn queue_document_snapshot(&mut self, document_id: &str) -> Result<(), AppError> {
-    let document = match self.get_document(document_id)? {
-      Some(document) => document,
-      None => return Ok(()),
-    };
-    let blocks = self.list_blocks(document_id)?;
-
-    self.connection.execute(
-      "DELETE FROM sync_tombstones
-       WHERE (entity_type = ?1 AND entity_id = ?2)
-          OR (entity_type = ?3 AND parent_document_id = ?2)",
-      params![
-        SyncEntityType::DocumentTombstone.as_str(),
-        document_id,
-        SyncEntityType::BlockTombstone.as_str(),
-      ],
-    )?;
-
-    self.cancel_outbox(SyncEntityType::Document, document_id, Some(SyncOutboxOp::DeleteSourceRecord))?;
-    self.cancel_outbox(
-      SyncEntityType::DocumentTombstone,
-      document_id,
-      Some(SyncOutboxOp::Upsert),
-    )?;
-    self.upsert_outbox(SyncEntityType::Document, document_id, SyncOutboxOp::Upsert)?;
-    self.upsert_outbox(
-      SyncEntityType::DocumentTombstone,
-      document_id,
-      SyncOutboxOp::DeleteSourceRecord,
-    )?;
-
-    let block_ids = blocks.iter().map(|block| block.id.clone()).collect::<Vec<_>>();
-    for block in blocks {
-      self.cancel_outbox(SyncEntityType::Block, &block.id, Some(SyncOutboxOp::DeleteSourceRecord))?;
-      self.cancel_outbox(SyncEntityType::BlockTombstone, &block.id, Some(SyncOutboxOp::Upsert))?;
-      self.upsert_outbox(SyncEntityType::Block, &block.id, SyncOutboxOp::Upsert)?;
-      self.upsert_outbox(
-        SyncEntityType::BlockTombstone,
-        &block.id,
-        SyncOutboxOp::DeleteSourceRecord,
-      )?;
-    }
-
-    if document.deleted_at.is_none() {
-      return Ok(());
-    }
-
-    for block_id in block_ids {
-      self.upsert_outbox(
-        SyncEntityType::BlockTombstone,
-        &block_id,
-        SyncOutboxOp::DeleteSourceRecord,
       )?;
     }
 
@@ -529,13 +676,103 @@ impl SqliteStore {
       .collect::<Result<Vec<_>, _>>()?;
 
     for document_id in document_ids {
-      self.queue_document_snapshot(&document_id)?;
+      self.enqueue_document_projection_operations(&document_id)?;
     }
 
     Ok(())
   }
 
-  pub(crate) fn queue_document_deletion(&mut self, document_id: &str, deleted_at_ms: i64) -> Result<(), AppError> {
+  pub(crate) fn record_document_created(&mut self, document_id: &str) -> Result<(), AppError> {
+    let logical_clock = self
+      .get_document(document_id)?
+      .map(|document| document.updated_at)
+      .unwrap_or_else(Self::now);
+    self.clear_document_tombstones(document_id)?;
+    self.enqueue_sync_operation(
+      SyncOperationType::DocumentCreated,
+      SyncEntityType::Document,
+      document_id,
+      Some(document_id),
+      json!({}),
+      logical_clock,
+    )
+  }
+
+  pub(crate) fn record_document_renamed(&mut self, document_id: &str) -> Result<(), AppError> {
+    let document = self
+      .get_document(document_id)?
+      .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))?;
+    self.enqueue_sync_operation(
+      SyncOperationType::DocumentRenamed,
+      SyncEntityType::Document,
+      document_id,
+      Some(document_id),
+      json!({ "title": document.title }),
+      document.updated_at,
+    )
+  }
+
+  pub(crate) fn record_document_style_updated(&mut self, document_id: &str) -> Result<(), AppError> {
+    let document = self
+      .get_document(document_id)?
+      .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))?;
+    self.enqueue_sync_operation(
+      SyncOperationType::DocumentStyleUpdated,
+      SyncEntityType::Document,
+      document_id,
+      Some(document_id),
+      json!({
+        "blockTintOverride": document.block_tint_override.map(|value| value.as_str().to_string()),
+        "documentSurfaceToneOverride": document.document_surface_tone_override.map(|value| value.as_str().to_string()),
+      }),
+      document.updated_at,
+    )
+  }
+
+  pub(crate) fn record_document_touch(&mut self, document_id: &str) -> Result<(), AppError> {
+    let logical_clock = self
+      .get_document(document_id)?
+      .map(|document| document.updated_at)
+      .unwrap_or_else(Self::now);
+    self.enqueue_sync_operation(
+      SyncOperationType::DocumentTouched,
+      SyncEntityType::Document,
+      document_id,
+      Some(document_id),
+      json!({}),
+      logical_clock,
+    )
+  }
+
+  pub(crate) fn enqueue_document_projection_operations(&mut self, document_id: &str) -> Result<(), AppError> {
+    let document = match self.get_document(document_id)? {
+      Some(document) => document,
+      None => return Ok(()),
+    };
+
+    if document.deleted_at.is_some() {
+      return self.record_document_deletion(document_id, document.deleted_at.unwrap_or_else(Self::now));
+    }
+
+    self.clear_document_tombstones(document_id)?;
+    self.record_document_touch(document_id)?;
+
+    for block in self.list_blocks(document_id)? {
+      self.clear_block_tombstone(&block.id)?;
+      self.enqueue_sync_operation(
+        SyncOperationType::BlockContentUpdated,
+        SyncEntityType::Block,
+        &block.id,
+        Some(document_id),
+        json!({}),
+        block.updated_at,
+      )?;
+    }
+
+    Ok(())
+  }
+
+  pub(crate) fn record_document_deletion(&mut self, document_id: &str, deleted_at_ms: i64) -> Result<(), AppError> {
     let device_id = self.current_device_id()?;
     let blocks = self.list_blocks(document_id)?;
 
@@ -553,17 +790,13 @@ impl SqliteStore {
       deleted_at_ms,
       &self.current_device_id()?,
     )?;
-    self.cancel_outbox(SyncEntityType::Document, document_id, None)?;
-    self.cancel_outbox(SyncEntityType::DocumentTombstone, document_id, Some(SyncOutboxOp::DeleteSourceRecord))?;
-    self.upsert_outbox(
+    self.enqueue_sync_operation(
+      SyncOperationType::DocumentDeleted,
       SyncEntityType::DocumentTombstone,
       document_id,
-      SyncOutboxOp::Upsert,
-    )?;
-    self.upsert_outbox(
-      SyncEntityType::Document,
-      document_id,
-      SyncOutboxOp::DeleteSourceRecord,
+      Some(document_id),
+      json!({ "deletedAtMs": deleted_at_ms }),
+      deleted_at_ms,
     )?;
 
     for block in blocks {
@@ -574,16 +807,115 @@ impl SqliteStore {
         deleted_at_ms,
         &self.current_device_id()?,
       )?;
-      self.cancel_outbox(SyncEntityType::Block, &block.id, None)?;
-      self.cancel_outbox(SyncEntityType::BlockTombstone, &block.id, Some(SyncOutboxOp::DeleteSourceRecord))?;
-      self.upsert_outbox(SyncEntityType::BlockTombstone, &block.id, SyncOutboxOp::Upsert)?;
-      self.upsert_outbox(SyncEntityType::Block, &block.id, SyncOutboxOp::DeleteSourceRecord)?;
+      self.enqueue_sync_operation(
+        SyncOperationType::BlockDeleted,
+        SyncEntityType::BlockTombstone,
+        &block.id,
+        Some(document_id),
+        json!({ "deletedAtMs": deleted_at_ms }),
+        deleted_at_ms,
+      )?;
     }
 
     Ok(())
   }
 
-  pub(crate) fn queue_block_deletion(
+  pub(crate) fn record_document_restored(&mut self, document_id: &str) -> Result<(), AppError> {
+    self.clear_document_tombstones(document_id)?;
+    self.enqueue_sync_operation(
+      SyncOperationType::DocumentRestored,
+      SyncEntityType::Document,
+      document_id,
+      Some(document_id),
+      json!({}),
+      self
+        .get_document(document_id)?
+        .map(|document| document.updated_at)
+        .unwrap_or_else(Self::now),
+    )?;
+
+    for block in self.list_blocks(document_id)? {
+      self.clear_block_tombstone(&block.id)?;
+      self.enqueue_sync_operation(
+        SyncOperationType::BlockCreated,
+        SyncEntityType::Block,
+        &block.id,
+        Some(document_id),
+        json!({}),
+        block.updated_at,
+      )?;
+    }
+
+    Ok(())
+  }
+
+  pub(crate) fn record_block_created(&mut self, block_id: &str, document_id: &str) -> Result<(), AppError> {
+    let block = self.fetch_block(block_id)?;
+    self.clear_block_tombstone(block_id)?;
+    self.record_document_touch(document_id)?;
+    self.enqueue_sync_operation(
+      SyncOperationType::BlockCreated,
+      SyncEntityType::Block,
+      block_id,
+      Some(document_id),
+      json!({ "position": block.position }),
+      block.updated_at,
+    )
+  }
+
+  pub(crate) fn record_block_content_updated(&mut self, block_id: &str, document_id: &str) -> Result<(), AppError> {
+    let block = self.fetch_block(block_id)?;
+    self.record_document_touch(document_id)?;
+    self.enqueue_sync_operation(
+      SyncOperationType::BlockContentUpdated,
+      SyncEntityType::Block,
+      block_id,
+      Some(document_id),
+      json!({}),
+      block.updated_at,
+    )
+  }
+
+  pub(crate) fn record_block_kind_changed(&mut self, block_id: &str, document_id: &str) -> Result<(), AppError> {
+    let block = self.fetch_block(block_id)?;
+    self.record_document_touch(document_id)?;
+    self.enqueue_sync_operation(
+      SyncOperationType::BlockKindChanged,
+      SyncEntityType::Block,
+      block_id,
+      Some(document_id),
+      json!({ "kind": block.kind.as_str() }),
+      block.updated_at,
+    )
+  }
+
+  pub(crate) fn record_block_moved(
+    &mut self,
+    block_id: &str,
+    document_id: &str,
+    target_position: i64,
+  ) -> Result<(), AppError> {
+    self.record_document_touch(document_id)?;
+    let now = Self::now();
+    for block in self.list_blocks(document_id)? {
+      let payload = if block.id == block_id {
+        json!({ "targetPosition": target_position })
+      } else {
+        json!({ "targetPosition": block.position })
+      };
+      self.enqueue_sync_operation(
+        SyncOperationType::BlockMoved,
+        SyncEntityType::Block,
+        &block.id,
+        Some(document_id),
+        payload,
+        now,
+      )?;
+    }
+    Ok(())
+  }
+
+  pub(crate) fn record_block_deletion(
     &mut self,
     block_id: &str,
     document_id: &str,
@@ -596,10 +928,176 @@ impl SqliteStore {
       deleted_at_ms,
       &self.current_device_id()?,
     )?;
-    self.cancel_outbox(SyncEntityType::Block, block_id, None)?;
-    self.cancel_outbox(SyncEntityType::BlockTombstone, block_id, Some(SyncOutboxOp::DeleteSourceRecord))?;
-    self.upsert_outbox(SyncEntityType::BlockTombstone, block_id, SyncOutboxOp::Upsert)?;
-    self.upsert_outbox(SyncEntityType::Block, block_id, SyncOutboxOp::DeleteSourceRecord)?;
+    self.record_document_touch(document_id)?;
+    self.enqueue_sync_operation(
+      SyncOperationType::BlockDeleted,
+      SyncEntityType::BlockTombstone,
+      block_id,
+      Some(document_id),
+      json!({ "deletedAtMs": deleted_at_ms }),
+      deleted_at_ms,
+    )
+  }
+
+  pub(crate) fn reset_icloud_sync_checkpoint(&mut self) -> Result<ICloudSyncStatus, AppError> {
+    self.connection.execute(
+      "UPDATE cloudkit_state
+       SET server_change_token = NULL,
+           last_error_code = NULL,
+           last_error_message = NULL
+       WHERE scope = ?1",
+      params![ICLOUD_SCOPE_PRIVATE],
+    )?;
+    self.get_icloud_sync_status()
+  }
+
+  pub(crate) fn force_upload_all_documents(&mut self) -> Result<ICloudSyncStatus, AppError> {
+    self.queue_all_active_documents_for_sync()?;
+    self.get_icloud_sync_status()
+  }
+
+  pub(crate) fn force_redownload_from_cloud(&mut self) -> Result<ICloudSyncStatus, AppError> {
+    self.connection.execute("DELETE FROM sync_operations", [])?;
+    self.connection.execute("DELETE FROM sync_tombstones", [])?;
+    self.connection.execute(&format!("DELETE FROM {SEARCH_INDEX_TABLE}"), [])?;
+    self.connection.execute("DELETE FROM blocks", [])?;
+    self.connection.execute("DELETE FROM documents", [])?;
+    self.connection.execute(
+      "UPDATE cloudkit_state
+       SET server_change_token = NULL,
+           last_error_code = NULL,
+           last_error_message = NULL
+       WHERE scope = ?1",
+      params![ICLOUD_SCOPE_PRIVATE],
+    )?;
+    self.get_icloud_sync_status()
+  }
+
+  pub(crate) fn queue_document_snapshot(&mut self, document_id: &str) -> Result<(), AppError> {
+    self.enqueue_document_projection_operations(document_id)
+  }
+
+  pub(crate) fn queue_document_deletion(&mut self, document_id: &str, deleted_at_ms: i64) -> Result<(), AppError> {
+    self.record_document_deletion(document_id, deleted_at_ms)
+  }
+
+  pub(crate) fn queue_block_deletion(
+    &mut self,
+    block_id: &str,
+    document_id: &str,
+    deleted_at_ms: i64,
+  ) -> Result<(), AppError> {
+    self.record_block_deletion(block_id, document_id, deleted_at_ms)
+  }
+
+  fn clear_document_tombstones(&self, document_id: &str) -> Result<(), AppError> {
+    self.connection.execute(
+      "DELETE FROM sync_tombstones
+       WHERE (entity_type = ?1 AND entity_id = ?2)
+          OR (entity_type = ?3 AND parent_document_id = ?2)",
+      params![
+        SyncEntityType::DocumentTombstone.as_str(),
+        document_id,
+        SyncEntityType::BlockTombstone.as_str(),
+      ],
+    )?;
+    Ok(())
+  }
+
+  fn clear_block_tombstone(&self, block_id: &str) -> Result<(), AppError> {
+    self.connection.execute(
+      "DELETE FROM sync_tombstones WHERE entity_type = ?1 AND entity_id = ?2",
+      params![SyncEntityType::BlockTombstone.as_str(), block_id],
+    )?;
+    Ok(())
+  }
+
+  fn enqueue_sync_operation(
+    &self,
+    operation_type: SyncOperationType,
+    entity_type: SyncEntityType,
+    entity_id: &str,
+    document_id: Option<&str>,
+    payload_json: Value,
+    logical_clock: i64,
+  ) -> Result<(), AppError> {
+    self.supersede_existing_operations(operation_type, entity_type, entity_id)?;
+    self.connection.execute(
+      "INSERT INTO sync_operations (
+         operation_type,
+         entity_type,
+         entity_id,
+         document_id,
+         payload_json,
+         logical_clock,
+         created_at_ms,
+         attempt_count,
+         last_error_code,
+         status
+       ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, NULL, ?8)",
+      params![
+        operation_type.as_str(),
+        entity_type.as_str(),
+        entity_id,
+        document_id,
+        payload_json.to_string(),
+        logical_clock,
+        Self::now(),
+        SyncOperationStatus::Pending.as_str(),
+      ],
+    )?;
+    Ok(())
+  }
+
+  fn supersede_existing_operations(
+    &self,
+    operation_type: SyncOperationType,
+    entity_type: SyncEntityType,
+    entity_id: &str,
+  ) -> Result<(), AppError> {
+    let predicate = match operation_type {
+      SyncOperationType::DocumentDeleted | SyncOperationType::DocumentRestored => {
+        "entity_type = ?1 AND entity_id = ?2 AND status IN ('pending', 'failed')"
+      }
+      SyncOperationType::DocumentCreated
+      | SyncOperationType::DocumentTouched
+      | SyncOperationType::DocumentRenamed
+      | SyncOperationType::DocumentStyleUpdated => {
+        "entity_type = ?1 AND entity_id = ?2 AND status IN ('pending', 'failed')
+         AND operation_type IN ('document_created', 'document_touched', 'document_renamed', 'document_style_updated', 'document_restored')"
+      }
+      SyncOperationType::BlockDeleted => {
+        "entity_type = ?1 AND entity_id = ?2 AND status IN ('pending', 'failed')"
+      }
+      SyncOperationType::BlockCreated
+      | SyncOperationType::BlockContentUpdated
+      | SyncOperationType::BlockKindChanged
+      | SyncOperationType::BlockMoved => {
+        "entity_type = ?1 AND entity_id = ?2 AND status IN ('pending', 'failed')
+         AND operation_type IN ('block_created', 'block_content_updated', 'block_kind_changed', 'block_moved')"
+      }
+    };
+
+    self.connection.execute(
+      &format!(
+        "UPDATE sync_operations
+         SET status = 'superseded'
+         WHERE {predicate}"
+      ),
+      params![entity_type.as_str(), entity_id],
+    )?;
+    Ok(())
+  }
+
+  fn discard_pending_operations(&self, entity_type: SyncEntityType, entity_id: &str) -> Result<(), AppError> {
+    self.connection.execute(
+      "UPDATE sync_operations
+       SET status = 'superseded'
+       WHERE entity_type = ?1
+         AND entity_id = ?2
+         AND status IN ('pending', 'failed')",
+      params![entity_type.as_str(), entity_id],
+    )?;
     Ok(())
   }
 
@@ -658,9 +1156,9 @@ impl SqliteStore {
     Ok(())
   }
 
-  fn count_outbox(&self) -> Result<usize, AppError> {
+  fn count_pending_operations(&self) -> Result<usize, AppError> {
     let count = self.connection.query_row(
-      "SELECT COUNT(*) FROM sync_outbox",
+      "SELECT COUNT(*) FROM sync_operations WHERE status IN ('pending', 'failed')",
       [],
       |row| row.get::<_, i64>(0),
     )?;
@@ -677,16 +1175,6 @@ impl SqliteStore {
         apply_stats.failed_count
       );
       self.mark_sync_error("apply_partial_failure", &message)?;
-      return Err(AppError::validation(message));
-    }
-
-    let remaining_outbox = self.count_outbox()?;
-    if remaining_outbox > 0 {
-      let message = format!(
-        "iCloud 동기화 후에도 대기 중 변경 {}건이 남아 있습니다. 다시 시도해 주세요.",
-        remaining_outbox
-      );
-      self.mark_sync_error("pending_changes_remaining", &message)?;
       return Err(AppError::validation(message));
     }
 
@@ -751,62 +1239,28 @@ impl SqliteStore {
       .map_err(AppError::from)
   }
 
-  fn cancel_outbox(
-    &self,
-    entity_type: SyncEntityType,
-    entity_id: &str,
-    op: Option<SyncOutboxOp>,
-  ) -> Result<(), AppError> {
-    match op {
-      Some(op) => {
-        self.connection.execute(
-          "DELETE FROM sync_outbox
-           WHERE entity_type = ?1 AND entity_id = ?2 AND op = ?3",
-          params![entity_type.as_str(), entity_id, op.as_str()],
-        )?;
-      }
-      None => {
-        self.connection.execute(
-          "DELETE FROM sync_outbox
-           WHERE entity_type = ?1 AND entity_id = ?2",
-          params![entity_type.as_str(), entity_id],
-        )?;
-      }
-    }
-    Ok(())
-  }
-
-  fn upsert_outbox(
-    &self,
-    entity_type: SyncEntityType,
-    entity_id: &str,
-    op: SyncOutboxOp,
-  ) -> Result<(), AppError> {
-    self.connection.execute(
-      "INSERT INTO sync_outbox (entity_type, entity_id, op, queued_at_ms, attempt_count, last_error_code)
-       VALUES (?1, ?2, ?3, ?4, 0, NULL)
-       ON CONFLICT(entity_type, entity_id, op) DO UPDATE SET
-         queued_at_ms = excluded.queued_at_ms,
-         last_error_code = NULL",
-      params![entity_type.as_str(), entity_id, op.as_str(), Self::now()],
-    )?;
-    Ok(())
-  }
-
-  fn list_outbox(&self) -> Result<Vec<SyncOutboxEntry>, AppError> {
+  fn list_sync_operations(&self) -> Result<Vec<SyncOperationRow>, AppError> {
     self.connection
       .prepare(
-        "SELECT id, entity_type, entity_id, op
-         FROM sync_outbox
-         ORDER BY queued_at_ms ASC, id ASC",
+        "SELECT id, operation_type, entity_type, entity_id, document_id, payload_json, logical_clock, status
+         FROM sync_operations
+         WHERE status IN ('pending', 'failed')
+         ORDER BY logical_clock ASC, created_at_ms ASC, id ASC",
       )?
       .query_map([], |row| {
-        Ok(SyncOutboxEntry {
+        let payload_raw = row.get::<_, String>(5)?;
+        Ok(SyncOperationRow {
           id: row.get(0)?,
-          entity_type: SyncEntityType::try_from_str(&row.get::<_, String>(1)?)
+          operation_type: SyncOperationType::try_from_str(&row.get::<_, String>(1)?)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
-          entity_id: row.get(2)?,
-          op: SyncOutboxOp::try_from_str(&row.get::<_, String>(3)?)
+          entity_type: SyncEntityType::try_from_str(&row.get::<_, String>(2)?)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
+          entity_id: row.get(3)?,
+          document_id: row.get(4)?,
+          payload_json: serde_json::from_str(&payload_raw)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
+          logical_clock: row.get(6)?,
+          status: SyncOperationStatus::try_from_str(&row.get::<_, String>(7)?)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
         })
       })?
@@ -815,58 +1269,77 @@ impl SqliteStore {
   }
 
   fn build_apply_operations(&self) -> Result<BuiltApplyOperations, AppError> {
-    let outbox = self.list_outbox()?;
+    let operations = self.list_sync_operations()?;
     let mut save_documents = Vec::new();
     let mut save_blocks = Vec::new();
     let mut save_document_tombstones = Vec::new();
     let mut save_block_tombstones = Vec::new();
     let mut delete_record_names = Vec::new();
-    let mut entries_by_record_name = HashMap::new();
+    let mut operation_ids_by_record_name: HashMap<String, Vec<i64>> = HashMap::new();
+    let mut latest_document_operations = HashMap::<String, SyncOperationRow>::new();
+    let mut latest_block_operations = HashMap::<String, SyncOperationRow>::new();
 
-    for entry in outbox {
-      let record_name = entry.entity_type.record_name(&entry.entity_id);
-      match entry.op {
-        SyncOutboxOp::Upsert => match entry.entity_type {
-          SyncEntityType::Document => {
-            if let Some(document) = self.get_document(&entry.entity_id)? {
-              if document.deleted_at.is_none() {
-                save_documents.push(self.document_record(document)?);
-                entries_by_record_name.insert(record_name, entry);
-              }
-            }
-          }
-          SyncEntityType::Block => {
-            if let Ok(block) = self.fetch_block(&entry.entity_id) {
-              save_blocks.push(self.block_record(block)?);
-              entries_by_record_name.insert(record_name, entry);
-            }
-          }
-          SyncEntityType::DocumentTombstone => {
-            if let Some(tombstone) = self.read_tombstone(SyncEntityType::DocumentTombstone, &entry.entity_id)? {
-              save_document_tombstones.push(BridgeDocumentTombstoneRecord {
-                document_id: tombstone.entity_id,
-                deleted_at_ms: tombstone.deleted_at_ms,
-                deleted_by_device_id: tombstone.deleted_by_device_id,
-              });
-              entries_by_record_name.insert(record_name, entry);
-            }
-          }
-          SyncEntityType::BlockTombstone => {
-            if let Some(tombstone) = self.read_tombstone(SyncEntityType::BlockTombstone, &entry.entity_id)? {
-              save_block_tombstones.push(BridgeBlockTombstoneRecord {
-                block_id: tombstone.entity_id,
-                document_id: tombstone.parent_document_id.unwrap_or_default(),
-                deleted_at_ms: tombstone.deleted_at_ms,
-                deleted_by_device_id: tombstone.deleted_by_device_id,
-              });
-              entries_by_record_name.insert(record_name, entry);
-            }
-          }
-        },
-        SyncOutboxOp::DeleteSourceRecord => {
-          delete_record_names.push(record_name.clone());
-          entries_by_record_name.insert(record_name, entry);
+    for operation in operations {
+      match operation.entity_type {
+        SyncEntityType::Document | SyncEntityType::DocumentTombstone => {
+          latest_document_operations.insert(operation.entity_id.clone(), operation);
         }
+        SyncEntityType::Block | SyncEntityType::BlockTombstone => {
+          latest_block_operations.insert(operation.entity_id.clone(), operation);
+        }
+      }
+    }
+
+    for (document_id, operation) in latest_document_operations {
+      let document_record_name = SyncEntityType::Document.record_name(&document_id);
+      let document_tombstone_record_name = SyncEntityType::DocumentTombstone.record_name(&document_id);
+      if operation.operation_type.is_document_deleted() {
+        if let Some(tombstone) = self.read_tombstone(SyncEntityType::DocumentTombstone, &document_id)? {
+          save_document_tombstones.push(BridgeDocumentTombstoneRecord {
+            document_id: tombstone.entity_id,
+            deleted_at_ms: tombstone.deleted_at_ms,
+            deleted_by_device_id: tombstone.deleted_by_device_id,
+          });
+          delete_record_names.push(document_record_name.clone());
+          operation_ids_by_record_name.insert(document_tombstone_record_name, vec![operation.id]);
+          operation_ids_by_record_name.insert(document_record_name, vec![operation.id]);
+        }
+        continue;
+      }
+
+      if let Some(document) = self.get_document(&document_id)? {
+        if document.deleted_at.is_none() {
+          save_documents.push(self.document_record(document)?);
+          delete_record_names.push(document_tombstone_record_name.clone());
+          operation_ids_by_record_name.insert(document_record_name, vec![operation.id]);
+          operation_ids_by_record_name.insert(document_tombstone_record_name, vec![operation.id]);
+        }
+      }
+    }
+
+    for (block_id, operation) in latest_block_operations {
+      let block_record_name = SyncEntityType::Block.record_name(&block_id);
+      let block_tombstone_record_name = SyncEntityType::BlockTombstone.record_name(&block_id);
+      if operation.operation_type.is_block_deleted() {
+        if let Some(tombstone) = self.read_tombstone(SyncEntityType::BlockTombstone, &block_id)? {
+          save_block_tombstones.push(BridgeBlockTombstoneRecord {
+            block_id: tombstone.entity_id,
+            document_id: tombstone.parent_document_id.unwrap_or_default(),
+            deleted_at_ms: tombstone.deleted_at_ms,
+            deleted_by_device_id: tombstone.deleted_by_device_id,
+          });
+          delete_record_names.push(block_record_name.clone());
+          operation_ids_by_record_name.insert(block_tombstone_record_name, vec![operation.id]);
+          operation_ids_by_record_name.insert(block_record_name, vec![operation.id]);
+        }
+        continue;
+      }
+
+      if let Ok(block) = self.fetch_block(&block_id) {
+        save_blocks.push(self.block_record(block)?);
+        delete_record_names.push(block_tombstone_record_name.clone());
+        operation_ids_by_record_name.insert(block_record_name, vec![operation.id]);
+        operation_ids_by_record_name.insert(block_tombstone_record_name, vec![operation.id]);
       }
     }
 
@@ -879,33 +1352,38 @@ impl SqliteStore {
         save_block_tombstones,
         delete_record_names,
       },
-      entries_by_record_name,
+      operation_ids_by_record_name,
     })
   }
 
   fn process_apply_response(
     &self,
-    entries_by_record_name: &HashMap<String, SyncOutboxEntry>,
+    operation_ids_by_record_name: &HashMap<String, Vec<i64>>,
     response: &ApplyOperationsResponse,
   ) -> Result<ApplyResponseStats, AppError> {
     for saved in &response.saved_record_names {
-      if let Some(entry) = entries_by_record_name.get(saved) {
-        self.connection.execute(
-          "DELETE FROM sync_outbox WHERE id = ?1",
-          params![entry.id],
-        )?;
+      if let Some(operation_ids) = operation_ids_by_record_name.get(saved) {
+        for operation_id in operation_ids {
+          self.connection.execute(
+            "DELETE FROM sync_operations WHERE id = ?1",
+            params![operation_id],
+          )?;
+        }
       }
     }
 
     for failure in &response.failed {
-      if let Some(entry) = entries_by_record_name.get(&failure.record_name) {
-        self.connection.execute(
-          "UPDATE sync_outbox
-           SET attempt_count = attempt_count + 1,
-               last_error_code = ?1
-           WHERE id = ?2",
-          params![failure.error_code, entry.id],
-        )?;
+      if let Some(operation_ids) = operation_ids_by_record_name.get(&failure.record_name) {
+        for operation_id in operation_ids {
+          self.connection.execute(
+            "UPDATE sync_operations
+             SET attempt_count = attempt_count + 1,
+                 last_error_code = ?1,
+                 status = ?2
+             WHERE id = ?3",
+            params![failure.error_code, SyncOperationStatus::Failed.as_str(), operation_id],
+          )?;
+        }
       }
     }
 
@@ -1057,11 +1535,8 @@ impl SqliteStore {
       "DELETE FROM sync_tombstones WHERE entity_type = ?1 AND entity_id = ?2",
       params![SyncEntityType::DocumentTombstone.as_str(), remote.document_id],
     )?;
-    self.cancel_outbox(
-      SyncEntityType::DocumentTombstone,
-      &remote.document_id,
-      Some(SyncOutboxOp::Upsert),
-    )?;
+    self.discard_pending_operations(SyncEntityType::Document, &remote.document_id)?;
+    self.discard_pending_operations(SyncEntityType::DocumentTombstone, &remote.document_id)?;
     Ok(true)
   }
 
@@ -1086,12 +1561,7 @@ impl SqliteStore {
         remote.deleted_at_ms,
         &remote.deleted_by_device_id,
       ) > 0 {
-        self.queue_document_snapshot(&remote.document_id)?;
-        self.upsert_outbox(
-          SyncEntityType::DocumentTombstone,
-          &remote.document_id,
-          SyncOutboxOp::DeleteSourceRecord,
-        )?;
+        self.enqueue_document_projection_operations(&remote.document_id)?;
         return Ok(false);
       }
     }
@@ -1123,6 +1593,8 @@ impl SqliteStore {
          WHERE id = ?3",
         params![remote.deleted_at_ms, remote.deleted_by_device_id, remote.document_id],
       )?;
+      self.discard_pending_operations(SyncEntityType::Document, &remote.document_id)?;
+      self.discard_pending_operations(SyncEntityType::DocumentTombstone, &remote.document_id)?;
       return Ok(true);
     }
 
@@ -1235,11 +1707,8 @@ impl SqliteStore {
       "DELETE FROM sync_tombstones WHERE entity_type = ?1 AND entity_id = ?2",
       params![SyncEntityType::BlockTombstone.as_str(), remote.block_id],
     )?;
-    self.cancel_outbox(
-      SyncEntityType::BlockTombstone,
-      &remote.block_id,
-      Some(SyncOutboxOp::Upsert),
-    )?;
+    self.discard_pending_operations(SyncEntityType::Block, &remote.block_id)?;
+    self.discard_pending_operations(SyncEntityType::BlockTombstone, &remote.block_id)?;
     Ok(true)
   }
 
@@ -1288,12 +1757,7 @@ impl SqliteStore {
         remote.deleted_at_ms,
         &remote.deleted_by_device_id,
       ) > 0 {
-        self.queue_document_snapshot(&remote.document_id)?;
-        self.upsert_outbox(
-          SyncEntityType::BlockTombstone,
-          &remote.block_id,
-          SyncOutboxOp::DeleteSourceRecord,
-        )?;
+        self.enqueue_document_projection_operations(&remote.document_id)?;
         return Ok(false);
       }
     }
@@ -1324,6 +1788,8 @@ impl SqliteStore {
         params![remote.block_id],
       )?;
       self.ensure_document_has_block(&remote.document_id)?;
+      self.discard_pending_operations(SyncEntityType::Block, &remote.block_id)?;
+      self.discard_pending_operations(SyncEntityType::BlockTombstone, &remote.block_id)?;
       return Ok(true);
     }
 
@@ -1543,23 +2009,22 @@ mod tests {
     let tombstone = store
       .read_tombstone(SyncEntityType::DocumentTombstone, &document.id)
       .expect("tombstone should load");
-    let outbox = store.list_outbox().expect("outbox should load");
+    let operations = store.list_sync_operations().expect("operations should load");
 
     assert!(tombstone.is_some());
-    assert!(outbox.iter().any(|entry| {
+    assert!(operations.iter().any(|entry| {
       entry.entity_type == SyncEntityType::DocumentTombstone
         && entry.entity_id == document.id
-        && entry.op == SyncOutboxOp::Upsert
+        && entry.operation_type == SyncOperationType::DocumentDeleted
     }));
-    assert!(outbox.iter().any(|entry| {
-      entry.entity_type == SyncEntityType::Document
-        && entry.entity_id == document.id
-        && entry.op == SyncOutboxOp::DeleteSourceRecord
+    assert!(operations.iter().any(|entry| {
+      entry.entity_type == SyncEntityType::BlockTombstone
+        && entry.document_id.as_deref() == Some(document.id.as_str())
     }));
   }
 
   #[test]
-  fn sync_completion_fails_when_outbox_still_has_pending_entries() {
+  fn sync_completion_keeps_pending_state_when_operations_remain() {
     let mut store = test_store();
     let document = store
       .create_document(Some("pending 문서".to_string()))
@@ -1574,18 +2039,15 @@ mod tests {
       },
     );
 
-    assert!(result.is_err());
+    assert!(result.is_ok());
 
     let status = store.get_icloud_sync_status().expect("sync status should load");
-    assert_eq!(status.state, ICloudSyncState::Error);
-    assert_eq!(status.last_error_code.as_deref(), Some("pending_changes_remaining"));
-    assert!(status
-      .last_error_message
-      .as_deref()
-      .is_some_and(|message| message.contains("대기 중 변경")));
+    assert_eq!(status.state, ICloudSyncState::Pending);
+    assert_eq!(status.last_error_code, None);
+    assert_eq!(status.pending_operation_count, 2);
 
-    let outbox = store.list_outbox().expect("outbox should load");
-    assert!(outbox.iter().any(|entry| entry.entity_id == document.id));
+    let operations = store.list_sync_operations().expect("operations should load");
+    assert!(operations.iter().any(|entry| entry.entity_id == document.id));
   }
 
   #[test]
@@ -1679,8 +2141,8 @@ mod tests {
 
     store
       .connection
-      .execute("DELETE FROM sync_outbox", [])
-      .expect("outbox should clear");
+      .execute("DELETE FROM sync_operations", [])
+      .expect("operations should clear");
 
     let state = store.read_cloudkit_state().expect("state should load");
     store
@@ -1696,9 +2158,9 @@ mod tests {
       )
       .expect("backfill should queue local documents");
 
-    let outbox = store.list_outbox().expect("outbox should load");
-    assert!(outbox.iter().any(|entry| entry.entity_id == first.id));
-    assert!(outbox.iter().any(|entry| entry.entity_id == second.id));
+    let operations = store.list_sync_operations().expect("operations should load");
+    assert!(operations.iter().any(|entry| entry.entity_id == first.id));
+    assert!(operations.iter().any(|entry| entry.entity_id == second.id));
   }
 
   #[test]
@@ -1710,8 +2172,8 @@ mod tests {
 
     store
       .connection
-      .execute("DELETE FROM sync_outbox", [])
-      .expect("outbox should clear");
+      .execute("DELETE FROM sync_operations", [])
+      .expect("operations should clear");
 
     let state = store.read_cloudkit_state().expect("state should load");
     store
@@ -1734,7 +2196,7 @@ mod tests {
       )
       .expect("remote-first sync should skip backfill");
 
-    let outbox = store.list_outbox().expect("outbox should load");
-    assert!(!outbox.iter().any(|entry| entry.entity_id == local.id));
+    let operations = store.list_sync_operations().expect("operations should load");
+    assert!(!operations.iter().any(|entry| entry.entity_id == local.id));
   }
 }

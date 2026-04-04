@@ -31,6 +31,7 @@ pub(crate) fn build_bootstrap_payload(
       enabled: false,
       state: ICloudSyncState::Disabled,
       account_status: ICloudAccountStatus::Unknown,
+      pending_operation_count: 0,
       last_sync_started_at_ms: None,
       last_sync_succeeded_at_ms: None,
       last_error_code: None,

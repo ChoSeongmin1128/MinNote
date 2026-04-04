@@ -66,6 +66,26 @@ impl SqliteStore {
           sync_enabled INTEGER NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS sync_operations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          operation_type TEXT NOT NULL,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          document_id TEXT NULL,
+          payload_json TEXT NOT NULL,
+          logical_clock INTEGER NOT NULL,
+          created_at_ms INTEGER NOT NULL,
+          attempt_count INTEGER NOT NULL DEFAULT 0,
+          last_error_code TEXT NULL,
+          status TEXT NOT NULL DEFAULT 'pending'
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_sync_operations_status_created
+          ON sync_operations(status, created_at_ms, id);
+
+        CREATE INDEX IF NOT EXISTS idx_sync_operations_entity
+          ON sync_operations(entity_type, entity_id, status);
+
         CREATE TABLE IF NOT EXISTS device_state (
           id INTEGER PRIMARY KEY CHECK (id = 1),
           device_id TEXT NOT NULL
@@ -99,6 +119,8 @@ impl SqliteStore {
     self.ensure_app_state_value("global_toggle_shortcut", DEFAULT_GLOBAL_TOGGLE_SHORTCUT)?;
     self.ensure_cloudkit_state_row()?;
     self.ensure_device_state_row()?;
+    self.ensure_sync_operations_defaults()?;
+    self.migrate_legacy_sync_outbox_to_operations()?;
     self.cleanup_removed_sync_state()?;
 
     Ok(())

@@ -91,6 +91,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     enabled: false,
     state: 'disabled',
     accountStatus: 'unknown',
+    pendingOperationCount: 0,
     lastSyncStartedAtMs: null,
     lastSyncSucceededAtMs: null,
     lastErrorCode: null,

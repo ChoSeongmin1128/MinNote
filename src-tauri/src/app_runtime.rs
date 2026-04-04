@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::domain::models::AppSettings;
 use crate::error::AppError;
 use crate::error::StartupError;
-use crate::infrastructure::cloudkit_bridge::CloudKitBridge;
+use crate::infrastructure::sync_engine::SyncEngine;
 use crate::ports::repositories::AppStateRepository;
 use crate::state::{AppState, SyncRuntimePhase};
 use crate::window_controls::{
@@ -182,28 +182,45 @@ fn run_icloud_startup_smoke(app_handle: &tauri::AppHandle) {
 
   let started_at = now_ms();
   let result = (|| -> Result<serde_json::Value, String> {
-    let bridge = CloudKitBridge::new().map_err(|error| error.to_string())?;
-    let mut repository = state
-      .repository
-      .lock()
-      .map_err(|_| AppError::StateLock.to_string())?;
-
-    let previous = repository
-      .get_icloud_sync_status()
-      .map_err(|error| error.to_string())?;
-    if !previous.enabled {
+    let previous = {
+      let repository = state
+        .repository
+        .lock()
+        .map_err(|_| AppError::StateLock.to_string())?;
       repository
-        .set_icloud_sync_enabled(true)
-        .map_err(|error| error.to_string())?;
+        .get_icloud_sync_status()
+        .map_err(|error| error.to_string())?
+    };
+
+    {
+      let mut repository = state
+        .repository
+        .lock()
+        .map_err(|_| AppError::StateLock.to_string())?;
+      if !previous.enabled {
+        repository
+          .set_icloud_sync_enabled(true)
+          .map_err(|error| error.to_string())?;
+      }
     }
 
     state.set_sync_phase(SyncRuntimePhase::Syncing);
-    let sync_result = repository.run_icloud_sync(&bridge).map_err(|error| error.to_string());
-    let debug_info = repository
-      .get_icloud_sync_debug_info()
-      .map_err(|error| error.to_string())?;
+    let sync_result = SyncEngine::run(&state).map_err(|error| error.to_string());
+    let debug_info = {
+      let repository = state
+        .repository
+        .lock()
+        .map_err(|_| AppError::StateLock.to_string())?;
+      repository
+        .get_icloud_sync_debug_info()
+        .map_err(|error| error.to_string())?
+    };
 
     if !previous.enabled {
+      let mut repository = state
+        .repository
+        .lock()
+        .map_err(|_| AppError::StateLock.to_string())?;
       repository
         .set_icloud_sync_enabled(false)
         .map_err(|error| error.to_string())?;
@@ -219,12 +236,13 @@ fn run_icloud_startup_smoke(app_handle: &tauri::AppHandle) {
         "enabled": status.enabled,
         "state": status.state,
         "accountStatus": status.account_status,
+        "pendingOperationCount": status.pending_operation_count,
         "lastSyncSucceededAtMs": status.last_sync_succeeded_at_ms,
         "lastErrorCode": status.last_error_code,
         "lastErrorMessage": status.last_error_message,
       },
       "debug": {
-        "outboxCount": debug_info.0,
+        "pendingOperationCount": debug_info.0,
         "tombstoneCount": debug_info.1,
         "serverChangeTokenPresent": debug_info.2,
         "deviceId": debug_info.3,

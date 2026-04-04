@@ -71,7 +71,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setCodeFontFamily,
     setICloudSyncEnabled,
     setMenuBarIconEnabled,
+    resetICloudSyncCheckpoint,
     runICloudSync,
+    forceUploadAllDocuments,
+    forceRedownloadFromCloud,
     setThemeMode,
   } = usePreferencesController();
   const { deleteAllDocuments } = useWorkspaceController();
@@ -206,6 +209,18 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           }}
           onRefreshDebug={() => {
             void refreshIcloudDebugInfo();
+          }}
+          onResetCheckpoint={() => {
+            void resetICloudSyncCheckpoint();
+          }}
+          onForceUpload={() => {
+            void forceUploadAllDocuments();
+          }}
+          onForceRedownload={() => {
+            if (!window.confirm('로컬 문서를 비우고 Cloud 기준으로 다시 받습니다. 계속하시겠습니까?')) {
+              return;
+            }
+            void forceRedownloadFromCloud();
           }}
         />
 

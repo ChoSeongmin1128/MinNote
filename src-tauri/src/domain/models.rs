@@ -192,9 +192,11 @@ impl CodeFontFamily {
 #[serde(rename_all = "snake_case")]
 pub enum ICloudSyncState {
   Disabled,
+  Pending,
   Checking,
   Syncing,
   Idle,
+  Offline,
   Error,
 }
 
@@ -240,6 +242,7 @@ pub struct ICloudSyncStatus {
   pub enabled: bool,
   pub state: ICloudSyncState,
   pub account_status: ICloudAccountStatus,
+  pub pending_operation_count: usize,
   pub last_sync_started_at_ms: Option<i64>,
   pub last_sync_succeeded_at_ms: Option<i64>,
   pub last_error_code: Option<String>,

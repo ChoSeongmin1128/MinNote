@@ -91,12 +91,12 @@ impl BlockRepository for SqliteStore {
       "UPDATE blocks SET updated_by_device_id = ?1 WHERE id = ?2",
       params![device_id, new_block.id],
     )?;
-    ordered_ids.insert(target_index, new_block.id);
+    ordered_ids.insert(target_index, new_block.id.clone());
     Self::rewrite_positions(&transaction, document_id, &ordered_ids)?;
     transaction.commit()?;
 
     self.finish_document_mutation(document_id)?;
-    self.queue_document_snapshot(document_id)?;
+    self.record_block_created(&new_block.id, document_id)?;
     self.list_blocks(document_id)
   }
 
@@ -115,7 +115,7 @@ impl BlockRepository for SqliteStore {
       params![kind.as_str(), content, search_text, language, now, device_id, block_id],
     )?;
     self.finish_document_mutation(&document_id)?;
-    self.queue_document_snapshot(&document_id)?;
+    self.record_block_kind_changed(block_id, &document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -133,14 +133,14 @@ impl BlockRepository for SqliteStore {
 
     let mut ordered_ids = blocks.into_iter().map(|block| block.id).collect::<Vec<_>>();
     let block_id = ordered_ids.remove(current_index);
-    ordered_ids.insert(clamped_target, block_id);
+    ordered_ids.insert(clamped_target, block_id.clone());
 
     let transaction = self.connection.transaction()?;
     Self::rewrite_positions(&transaction, document_id, &ordered_ids)?;
     transaction.commit()?;
 
     self.finish_document_mutation(document_id)?;
-    self.queue_document_snapshot(document_id)?;
+    self.record_block_moved(&block_id, document_id, target_position)?;
     self.list_blocks(document_id)
   }
 
@@ -162,8 +162,7 @@ impl BlockRepository for SqliteStore {
     }
 
     self.finish_document_structure_mutation(&document_id)?;
-    self.queue_block_deletion(block_id, &document_id, deleted_at)?;
-    self.queue_document_snapshot(&document_id)?;
+    self.record_block_deletion(block_id, &document_id, deleted_at)?;
     Ok(document_id)
   }
 
@@ -178,7 +177,7 @@ impl BlockRepository for SqliteStore {
       params![normalized_content, search_text, now, device_id, block_id],
     )?;
     self.finish_document_mutation(&document_id)?;
-    self.queue_document_snapshot(&document_id)?;
+    self.record_block_content_updated(block_id, &document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -196,7 +195,7 @@ impl BlockRepository for SqliteStore {
       params![content, content, language, now, device_id, block_id],
     )?;
     self.finish_document_mutation(&document_id)?;
-    self.queue_document_snapshot(&document_id)?;
+    self.record_block_content_updated(block_id, &document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -209,7 +208,7 @@ impl BlockRepository for SqliteStore {
       params![content, content, now, device_id, block_id],
     )?;
     self.finish_document_mutation(&document_id)?;
-    self.queue_document_snapshot(&document_id)?;
+    self.record_block_content_updated(block_id, &document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -261,7 +260,10 @@ impl BlockRepository for SqliteStore {
     transaction.commit()?;
 
     self.finish_document_mutation(document_id)?;
-    self.queue_document_snapshot(document_id)?;
+    self.record_document_touch(document_id)?;
+    for block in self.list_blocks(document_id)? {
+      self.record_block_created(&block.id, document_id)?;
+    }
     self.list_blocks(document_id)
   }
 }

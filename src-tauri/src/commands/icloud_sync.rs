@@ -3,8 +3,7 @@ use tauri::State;
 use crate::application::dto::ICloudSyncDebugInfoDto;
 use crate::domain::models::{ICloudSyncState, ICloudSyncStatus};
 use crate::error::AppError;
-use crate::infrastructure::cloudkit_bridge::CloudKitBridge;
-use crate::infrastructure::sqlite::sync::SyncRunPreparation;
+use crate::infrastructure::sync_engine::SyncEngine;
 use crate::state::{AppState, SyncRuntimePhase};
 
 fn decorate_status(state: &AppState, mut status: ICloudSyncStatus) -> ICloudSyncStatus {
@@ -58,10 +57,10 @@ pub fn get_icloud_sync_debug_info(state: State<'_, AppState>) -> Result<ICloudSy
     .repository
     .lock()
     .map_err(|_| AppError::StateLock.to_string())?;
-  let (outbox_count, tombstone_count, server_change_token_present, device_id) = repository
+  let (pending_operation_count, tombstone_count, server_change_token_present, device_id) = repository
     .get_icloud_sync_debug_info()
     .map_err(|error| error.to_string())?;
-  let bridge = CloudKitBridge::new();
+  let bridge = crate::infrastructure::cloudkit_bridge::CloudKitBridge::new();
   let (bridge_available, bridge_error) = match bridge {
     Ok(_) => (true, None),
     Err(error) => (false, Some(error.to_string())),
@@ -77,7 +76,7 @@ pub fn get_icloud_sync_debug_info(state: State<'_, AppState>) -> Result<ICloudSy
     bridge_error,
     zone_name: "MinNoteZone".to_string(),
     server_change_token_present,
-    outbox_count,
+    pending_operation_count,
     tombstone_count,
     device_id_suffix: suffix,
   })
@@ -90,92 +89,7 @@ pub fn run_icloud_sync(state: State<'_, AppState>) -> Result<ICloudSyncStatus, S
   }
 
   let result = (|| -> Result<ICloudSyncStatus, String> {
-    let preparation = {
-      let mut repository = state
-        .repository
-        .lock()
-        .map_err(|_| AppError::StateLock.to_string())?;
-      repository.begin_icloud_sync_run().map_err(|error| error.to_string())?
-    };
-
-    let SyncRunPreparation::Ready {
-      server_change_token,
-      has_server_change_token,
-    } = preparation
-    else {
-      let SyncRunPreparation::Disabled(status) = preparation else {
-        unreachable!();
-      };
-      return Ok(decorate_status(&state, status));
-    };
-
-    let bridge = match CloudKitBridge::new() {
-      Ok(bridge) => bridge,
-      Err(error) => return persist_sync_error_status(&state, error),
-    };
-
-    state.set_sync_phase(SyncRuntimePhase::Checking);
-    let account_status = match bridge.get_account_status() {
-      Ok(account_status) => account_status,
-      Err(error) => return persist_sync_error_status(&state, error),
-    };
-
-    {
-      let mut repository = state
-        .repository
-        .lock()
-        .map_err(|_| AppError::StateLock.to_string())?;
-      if account_status != crate::domain::models::ICloudAccountStatus::Available {
-        let status = repository
-          .handle_unavailable_account_status(account_status)
-          .map_err(|error| error.to_string())?;
-        return Ok(decorate_status(&state, status));
-      }
-      repository
-        .set_cloudkit_account_status(account_status.clone())
-        .map_err(|error| error.to_string())?;
-    }
-
-    if let Err(error) = bridge.ensure_zone("MinNoteZone") {
-      return persist_sync_error_status(&state, error);
-    }
-
-    let changes = match bridge.fetch_changes(&crate::infrastructure::cloudkit_bridge::FetchChangesRequest {
-      zone_name: "MinNoteZone".to_string(),
-      server_change_token,
-    }) {
-      Ok(changes) => changes,
-      Err(error) => return persist_sync_error_status(&state, error),
-    };
-
-    state.set_sync_phase(SyncRuntimePhase::Syncing);
-    let built = {
-      let mut repository = state
-        .repository
-        .lock()
-        .map_err(|_| AppError::StateLock.to_string())?;
-      repository
-        .apply_remote_changes_and_build_operations(has_server_change_token, &changes)
-        .map_err(|error| error.to_string())?
-    };
-
-    let response = if built.has_operations() {
-      match bridge.apply_operations(built.request()) {
-        Ok(response) => Some(response),
-        Err(error) => return persist_sync_error_status(&state, error),
-      }
-    } else {
-      None
-    };
-
-    let completion = {
-      let mut repository = state
-        .repository
-        .lock()
-        .map_err(|_| AppError::StateLock.to_string())?;
-      repository.complete_icloud_sync_run(account_status, &changes, &built, response.as_ref())
-    };
-    match completion {
+    match SyncEngine::run(&state) {
       Ok(status) => Ok(decorate_status(&state, status)),
       Err(error) => persist_sync_error_status(&state, error),
     }
@@ -183,4 +97,40 @@ pub fn run_icloud_sync(state: State<'_, AppState>) -> Result<ICloudSyncStatus, S
 
   state.set_sync_phase(SyncRuntimePhase::Idle);
   result
+}
+
+#[tauri::command]
+pub fn reset_icloud_sync_checkpoint(state: State<'_, AppState>) -> Result<ICloudSyncStatus, String> {
+  let mut repository = state
+    .repository
+    .lock()
+    .map_err(|_| AppError::StateLock.to_string())?;
+  let status = repository
+    .reset_icloud_sync_checkpoint()
+    .map_err(|error| error.to_string())?;
+  Ok(decorate_status(&state, status))
+}
+
+#[tauri::command]
+pub fn force_upload_all_documents(state: State<'_, AppState>) -> Result<ICloudSyncStatus, String> {
+  let mut repository = state
+    .repository
+    .lock()
+    .map_err(|_| AppError::StateLock.to_string())?;
+  let status = repository
+    .force_upload_all_documents()
+    .map_err(|error| error.to_string())?;
+  Ok(decorate_status(&state, status))
+}
+
+#[tauri::command]
+pub fn force_redownload_from_cloud(state: State<'_, AppState>) -> Result<ICloudSyncStatus, String> {
+  let mut repository = state
+    .repository
+    .lock()
+    .map_err(|_| AppError::StateLock.to_string())?;
+  let status = repository
+    .force_redownload_from_cloud()
+    .map_err(|error| error.to_string())?;
+  Ok(decorate_status(&state, status))
 }
