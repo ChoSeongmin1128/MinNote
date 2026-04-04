@@ -65,4 +65,10 @@ export const preferencesGateway: PreferencesGateway = {
   setWindowPreferenceError(value) {
     useWorkspaceStore.getState().setWindowPreferenceError(value);
   },
+  getICloudSyncStatus() {
+    return useWorkspaceStore.getState().icloudSyncStatus;
+  },
+  setICloudSyncStatus(value) {
+    useWorkspaceStore.getState().setICloudSyncStatus(value);
+  },
 };

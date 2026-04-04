@@ -9,6 +9,7 @@ import { DocumentCanvas } from './components/DocumentCanvas';
 import { SettingsModal } from './components/SettingsModal';
 import { WindowMenu } from './components/WindowMenu';
 import { useAppUpdater } from './hooks/useAppUpdater';
+import { useICloudSync } from './hooks/useICloudSync';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
 import { applyEditorTypographyCssVars } from './lib/editorTypography';
@@ -59,6 +60,7 @@ function App() {
 
   useAppShortcuts();
   useAppUpdater(!isBootstrapping);
+  useICloudSync(!isBootstrapping);
 
   useEffect(() => {
     void bootstrapApp();

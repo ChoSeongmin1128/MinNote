@@ -4,6 +4,7 @@ import type {
   BodyFontFamily,
   CodeFontFamily,
   DocumentSurfaceTonePreset,
+  ICloudSyncStatus,
   ThemeMode,
 } from '../../lib/types';
 import type { DocumentSummaryVm, DocumentVm } from './document';
@@ -12,6 +13,7 @@ export interface WorkspaceBootstrapState {
   documents: DocumentSummaryVm[];
   trashDocuments: DocumentSummaryVm[];
   currentDocument: DocumentVm | null;
+  icloudSyncStatus: ICloudSyncStatus;
   themeMode: ThemeMode;
   defaultBlockTintPreset: BlockTintPreset;
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;

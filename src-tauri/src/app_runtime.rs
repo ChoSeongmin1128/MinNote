@@ -1,10 +1,14 @@
 use std::fs;
 use std::path::Path;
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::domain::models::AppSettings;
+use crate::error::AppError;
 use crate::error::StartupError;
+use crate::infrastructure::cloudkit_bridge::CloudKitBridge;
 use crate::ports::repositories::AppStateRepository;
-use crate::state::AppState;
+use crate::state::{AppState, SyncRuntimePhase};
 use crate::window_controls::{
   apply_window_preferences_with_settings,
   menu_bar_icon,
@@ -19,6 +23,12 @@ use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 pub(crate) const TRAY_ID: &str = "minnote-tray";
 const APP_SHUTDOWN_REQUESTED_EVENT: &str = "app-shutdown-requested";
+const OPEN_SETTINGS_ON_START_ENV: &str = "MINNOTE_OPEN_SETTINGS_ON_START";
+const RUN_ICLOUD_SYNC_ON_START_ENV: &str = "MINNOTE_RUN_ICLOUD_SYNC_ON_START";
+const SMOKE_RESULT_PATH_ENV: &str = "MINNOTE_SMOKE_STATUS_PATH";
+const OPEN_SETTINGS_ON_START_ARG: &str = "--smoke-open-settings";
+const RUN_ICLOUD_SYNC_ON_START_ARG: &str = "--smoke-run-icloud-sync";
+const SMOKE_RESULT_PATH_ARG: &str = "--smoke-result-path";
 
 pub(crate) fn emit_shutdown_request(app_handle: &tauri::AppHandle) {
   let _ = app_handle.emit(APP_SHUTDOWN_REQUESTED_EVENT, ());
@@ -106,6 +116,160 @@ pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon>
   builder.build(app)
 }
 
+fn env_flag(name: &str) -> bool {
+  matches!(
+    std::env::var(name).ok().as_deref(),
+    Some("1") | Some("true") | Some("TRUE") | Some("yes") | Some("YES")
+  )
+}
+
+fn has_arg(flag: &str) -> bool {
+  std::env::args().any(|arg| arg == flag)
+}
+
+fn arg_value(flag: &str) -> Option<String> {
+  let mut args = std::env::args();
+  while let Some(arg) = args.next() {
+    if arg == flag {
+      return args.next();
+    }
+  }
+  None
+}
+
+fn smoke_result_path() -> std::path::PathBuf {
+  if let Some(value) = arg_value(SMOKE_RESULT_PATH_ARG) {
+    return std::path::PathBuf::from(value);
+  }
+  std::env::var_os(SMOKE_RESULT_PATH_ENV)
+    .map(std::path::PathBuf::from)
+    .unwrap_or_else(|| std::env::temp_dir().join("minnote-icloud-smoke.json"))
+}
+
+fn write_smoke_result(value: serde_json::Value) {
+  let path = smoke_result_path();
+  if let Some(parent) = path.parent() {
+    let _ = fs::create_dir_all(parent);
+  }
+  let _ = fs::write(path, serde_json::to_vec_pretty(&value).unwrap_or_default());
+}
+
+fn now_ms() -> u64 {
+  SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .unwrap_or_default()
+    .as_millis() as u64
+}
+
+fn run_icloud_startup_smoke(app_handle: &tauri::AppHandle) {
+  let Some(state) = app_handle.try_state::<AppState>() else {
+    write_smoke_result(serde_json::json!({
+      "ok": false,
+      "phase": "init",
+      "error": "app_state_unavailable",
+    }));
+    return;
+  };
+
+  if !state.try_begin_sync() {
+    write_smoke_result(serde_json::json!({
+      "ok": false,
+      "phase": "init",
+      "error": "sync_already_running",
+    }));
+    return;
+  }
+
+  let started_at = now_ms();
+  let result = (|| -> Result<serde_json::Value, String> {
+    let bridge = CloudKitBridge::new().map_err(|error| error.to_string())?;
+    let mut repository = state
+      .repository
+      .lock()
+      .map_err(|_| AppError::StateLock.to_string())?;
+
+    let previous = repository
+      .get_icloud_sync_status()
+      .map_err(|error| error.to_string())?;
+    if !previous.enabled {
+      repository
+        .set_icloud_sync_enabled(true)
+        .map_err(|error| error.to_string())?;
+    }
+
+    state.set_sync_phase(SyncRuntimePhase::Syncing);
+    let sync_result = repository.run_icloud_sync(&bridge).map_err(|error| error.to_string());
+    let debug_info = repository
+      .get_icloud_sync_debug_info()
+      .map_err(|error| error.to_string())?;
+
+    if !previous.enabled {
+      repository
+        .set_icloud_sync_enabled(false)
+        .map_err(|error| error.to_string())?;
+    }
+
+    let status = sync_result?;
+    Ok(serde_json::json!({
+      "ok": true,
+      "phase": "completed",
+      "startedAt": started_at,
+      "completedAt": now_ms(),
+      "status": {
+        "enabled": status.enabled,
+        "state": status.state,
+        "accountStatus": status.account_status,
+        "lastSyncSucceededAtMs": status.last_sync_succeeded_at_ms,
+        "lastErrorCode": status.last_error_code,
+        "lastErrorMessage": status.last_error_message,
+      },
+      "debug": {
+        "outboxCount": debug_info.0,
+        "tombstoneCount": debug_info.1,
+        "serverChangeTokenPresent": debug_info.2,
+        "deviceId": debug_info.3,
+      }
+    }))
+  })();
+
+  state.set_sync_phase(SyncRuntimePhase::Idle);
+
+  match result {
+    Ok(value) => write_smoke_result(value),
+    Err(error) => write_smoke_result(serde_json::json!({
+      "ok": false,
+      "phase": "completed",
+      "startedAt": started_at,
+      "completedAt": now_ms(),
+      "error": error,
+    })),
+  }
+}
+
+fn setup_startup_smoke(app: &tauri::App) {
+  let should_open_settings = env_flag(OPEN_SETTINGS_ON_START_ENV) || has_arg(OPEN_SETTINGS_ON_START_ARG);
+  let should_run_sync = env_flag(RUN_ICLOUD_SYNC_ON_START_ENV) || has_arg(RUN_ICLOUD_SYNC_ON_START_ARG);
+  if !should_open_settings && !should_run_sync {
+    return;
+  }
+
+  let app_handle = app.handle().clone();
+  thread::spawn(move || {
+    thread::sleep(Duration::from_secs(2));
+
+    if should_open_settings {
+      if let Some(window) = app_handle.get_webview_window("main") {
+        let _ = show_main_window(&app_handle);
+        let _ = window.emit("tray-open-settings", ());
+      }
+    }
+
+    if should_run_sync {
+      run_icloud_startup_smoke(&app_handle);
+    }
+  });
+}
+
 fn initialize_app_state(app_dir: &Path) -> Result<AppState, StartupError> {
   fs::create_dir_all(app_dir).map_err(StartupError::PrepareAppDataDir)?;
   let database_path = app_dir.join("minnote.sqlite3");
@@ -190,6 +354,8 @@ pub(crate) fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
 
   #[cfg(target_os = "macos")]
   setup_activation_listener(app.handle().clone());
+
+  setup_startup_smoke(app);
 
   if cfg!(debug_assertions) {
     app.handle().plugin(

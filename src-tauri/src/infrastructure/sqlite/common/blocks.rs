@@ -1,7 +1,7 @@
 use super::*;
 
 pub(crate) const BLOCK_COLUMNS: &str =
-  "id, document_id, kind, position, content, search_text, language, created_at, updated_at";
+  "id, document_id, kind, position, content, search_text, language, created_at, updated_at, updated_by_device_id";
 
 pub(crate) fn map_block(row: &rusqlite::Row<'_>) -> rusqlite::Result<Block> {
   Ok(Block {
@@ -15,6 +15,7 @@ pub(crate) fn map_block(row: &rusqlite::Row<'_>) -> rusqlite::Result<Block> {
     language: row.get(6)?,
     created_at: row.get(7)?,
     updated_at: row.get(8)?,
+    updated_by_device_id: row.get(9)?,
   })
 }
 
@@ -53,11 +54,12 @@ impl SqliteStore {
       language,
       created_at,
       updated_at,
+      updated_by_device_id: None,
     };
 
     connection.execute(
-      "INSERT INTO blocks (id, document_id, kind, position, content, search_text, language, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+      "INSERT INTO blocks (id, document_id, kind, position, content, search_text, language, created_at, updated_at, updated_by_device_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
       params![
         block.id,
         block.document_id,
@@ -67,7 +69,8 @@ impl SqliteStore {
         block.search_text,
         block.language,
         block.created_at,
-        block.updated_at
+        block.updated_at,
+        block.updated_by_device_id
       ],
     )?;
 

@@ -1,7 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::application::dto::{BlockDto, BootstrapPayload, DocumentDto, DocumentSummaryDto};
-use crate::domain::models::{AppSettings, Document, DocumentSummary};
+use crate::domain::models::{AppSettings, Document, DocumentSummary, ICloudAccountStatus, ICloudSyncState, ICloudSyncStatus};
 use crate::error::AppError;
 use crate::ports::repositories::AppRepository;
 
@@ -27,6 +27,15 @@ pub(crate) fn build_bootstrap_payload(
     documents: documents.into_iter().map(DocumentSummaryDto::from).collect(),
     trash_documents: trash_documents.into_iter().map(DocumentSummaryDto::from).collect(),
     current_document,
+    icloud_sync_status: ICloudSyncStatus {
+      enabled: false,
+      state: ICloudSyncState::Disabled,
+      account_status: ICloudAccountStatus::Unknown,
+      last_sync_started_at_ms: None,
+      last_sync_succeeded_at_ms: None,
+      last_error_code: None,
+      last_error_message: None,
+    },
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
     default_document_surface_tone_preset: settings.default_document_surface_tone_preset,

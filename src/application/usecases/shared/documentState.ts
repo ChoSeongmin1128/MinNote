@@ -56,6 +56,7 @@ export function applyBootstrapPayloadState(
   preferences.setGlobalShortcutError(payload.globalShortcutError);
   preferences.setMenuBarIconError(payload.menuBarIconError);
   preferences.setWindowPreferenceError(payload.windowPreferenceError);
+  preferences.setICloudSyncStatus(payload.icloudSyncStatus);
 
   const nextDocument = payload.currentDocument;
   if (currentDocumentStrategy === 'always') {

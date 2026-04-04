@@ -4,6 +4,7 @@ import type {
   BodyFontFamily,
   CodeFontFamily,
   DocumentSurfaceTonePreset,
+  ICloudSyncStatus,
   ThemeMode,
 } from '../../lib/types';
 
@@ -29,4 +30,6 @@ export interface PreferencesGateway {
   setMenuBarIconError(value: string | null): void;
   getWindowPreferenceError(): string | null;
   setWindowPreferenceError(value: string | null): void;
+  getICloudSyncStatus(): ICloudSyncStatus;
+  setICloudSyncStatus(value: ICloudSyncStatus): void;
 }

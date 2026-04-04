@@ -16,7 +16,27 @@ pub struct WindowControlState {
 pub struct AppState {
   pub repository: Mutex<SqliteStore>,
   pub window_controls: Mutex<WindowControlState>,
+  pub sync_runtime: Mutex<SyncRuntimeState>,
   pub shutdown_confirmed: Mutex<bool>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncRuntimePhase {
+  Idle,
+  Checking,
+  Syncing,
+}
+
+pub struct SyncRuntimeState {
+  pub phase: SyncRuntimePhase,
+}
+
+impl Default for SyncRuntimeState {
+  fn default() -> Self {
+    Self {
+      phase: SyncRuntimePhase::Idle,
+    }
+  }
 }
 
 impl AppState {
@@ -35,6 +55,7 @@ impl AppState {
     Ok(Self {
       repository: Mutex::new(repository),
       window_controls: Mutex::new(WindowControlState::default()),
+      sync_runtime: Mutex::new(SyncRuntimeState::default()),
       shutdown_confirmed: Mutex::new(false),
     })
   }
@@ -92,6 +113,38 @@ impl AppState {
   pub fn set_window_preference_error(&self, error: Option<String>) {
     if let Ok(mut state) = self.window_controls.lock() {
       state.window_preference_error = error;
+    }
+  }
+
+  pub fn try_begin_sync(&self) -> bool {
+    match self.sync_runtime.lock() {
+      Ok(mut state) => {
+        if state.phase != SyncRuntimePhase::Idle {
+          return false;
+        }
+        state.phase = SyncRuntimePhase::Checking;
+        true
+      }
+      Err(error) => {
+        log::warn!("동기화 런타임 상태를 잠그지 못했습니다: {error}");
+        false
+      }
+    }
+  }
+
+  pub fn set_sync_phase(&self, phase: SyncRuntimePhase) {
+    if let Ok(mut state) = self.sync_runtime.lock() {
+      state.phase = phase;
+    }
+  }
+
+  pub fn sync_phase(&self) -> SyncRuntimePhase {
+    match self.sync_runtime.lock() {
+      Ok(state) => state.phase,
+      Err(error) => {
+        log::warn!("동기화 런타임 상태를 읽지 못했습니다: {error}");
+        SyncRuntimePhase::Idle
+      }
     }
   }
 

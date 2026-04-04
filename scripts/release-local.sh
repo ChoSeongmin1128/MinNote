@@ -66,6 +66,57 @@ for var_name in "${required_vars[@]}"; do
   fi
 done
 
+resolve_signing_identity_ref() {
+  local requested_identity="$1"
+  local matches
+  matches="$(security find-identity -v -p codesigning | grep "\"$requested_identity\"" || true)"
+
+  if [ -z "$matches" ]; then
+    echo "$requested_identity"
+    return
+  fi
+
+  echo "$matches" | awk 'NR == 1 { print $2 }'
+}
+
+APPLE_SIGNING_IDENTITY_REF="$(resolve_signing_identity_ref "$APPLE_SIGNING_IDENTITY")"
+
+resolve_provisioning_profile_path() {
+  if [ -n "${APPLE_PROVISIONING_PROFILE_PATH:-}" ] && [ -f "${APPLE_PROVISIONING_PROFILE_PATH}" ]; then
+    echo "$APPLE_PROVISIONING_PROFILE_PATH"
+    return
+  fi
+
+  for candidate in \
+    "$ROOT_DIR/.local-release/MinNote_Developer_ID_CloudKit.provisionprofile" \
+    "$ROOT_DIR/.local-release/minnote-cloudkit.provisionprofile"
+  do
+    if [ -f "$candidate" ]; then
+      echo "$candidate"
+      return
+    fi
+  done
+}
+
+APPLE_PROVISIONING_PROFILE_RESOLVED="$(resolve_provisioning_profile_path || true)"
+
+sign_helper_app() {
+  local app_path="$1"
+  local helper_app_path="$app_path/Contents/Resources/minnote-cloudkit-bridge.app"
+  local helper_exec_path="$helper_app_path/Contents/MacOS/minnote-cloudkit-bridge"
+
+  if [ ! -f "$helper_exec_path" ]; then
+    return
+  fi
+
+  if [ -n "$APPLE_PROVISIONING_PROFILE_RESOLVED" ]; then
+    cp "$APPLE_PROVISIONING_PROFILE_RESOLVED" "$helper_app_path/Contents/embedded.provisionprofile"
+  fi
+
+  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$helper_exec_path"
+  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$helper_app_path"
+}
+
 cd "$ROOT_DIR"
 
 echo "[1/7] 검증"
@@ -86,6 +137,12 @@ for TARGET in "${TARGETS[@]}"; do
   APP_PATH="$ROOT_DIR/src-tauri/target/$TARGET/release/bundle/macos/MinNote.app"
   DIST_DIR="$RELEASE_DIR/dist/$ARCH_LABEL"
 
+  if [ -n "$APPLE_PROVISIONING_PROFILE_RESOLVED" ]; then
+    cp "$APPLE_PROVISIONING_PROFILE_RESOLVED" "$APP_PATH/Contents/embedded.provisionprofile"
+  fi
+  sign_helper_app "$APP_PATH"
+  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$APP_PATH/Contents/MacOS/minnote"
+  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$APP_PATH"
   codesign --verify --deep --strict --verbose=2 "$APP_PATH"
   xcrun stapler validate "$APP_PATH"
   spctl -a -vv -t exec "$APP_PATH"
@@ -105,7 +162,7 @@ for TARGET in "${TARGETS[@]}"; do
   DIST_DIR="$RELEASE_DIR/dist/$ARCH_LABEL"
   DMG_PATH="$(./scripts/create-dmg.sh "$DIST_DIR/MinNote.app" "$RELEASE_DIR" "$VERSION" "$ARCH_LABEL")"
 
-  codesign --force --sign "$APPLE_SIGNING_IDENTITY" "$DMG_PATH"
+  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" "$DMG_PATH"
   xcrun notarytool submit "$DMG_PATH" \
     --apple-id "$APPLE_ID" \
     --password "$APPLE_PASSWORD" \

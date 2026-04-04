@@ -9,9 +9,10 @@ impl SqliteStore {
     let now = Self::now();
     match target {
       DocumentTimestampTarget::UpdatedAt => {
+        let device_id = self.current_device_id()?;
         self.connection.execute(
-          "UPDATE documents SET updated_at = ?1 WHERE id = ?2",
-          params![now, document_id],
+          "UPDATE documents SET updated_at = ?1, updated_by_device_id = ?2 WHERE id = ?3",
+          params![now, device_id, document_id],
         )?;
       }
       DocumentTimestampTarget::LastOpenedAt => {

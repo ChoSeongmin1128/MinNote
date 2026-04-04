@@ -87,6 +87,7 @@ export function mapBootstrapPayloadToState(payload: BootstrapPayload): Workspace
     documents: payload.documents.map(mapDocumentSummaryDtoToVm),
     trashDocuments: payload.trashDocuments.map(mapDocumentSummaryDtoToVm),
     currentDocument: payload.currentDocument ? mapDocumentDtoToVm(payload.currentDocument) : null,
+    icloudSyncStatus: payload.icloudSyncStatus,
     themeMode: payload.themeMode,
     defaultBlockTintPreset: payload.defaultBlockTintPreset,
     defaultDocumentSurfaceTonePreset: payload.defaultDocumentSurfaceTonePreset,

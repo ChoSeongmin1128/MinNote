@@ -69,6 +69,7 @@ impl BlockRepository for SqliteStore {
     after_block_id: Option<&str>,
     kind: BlockKind,
   ) -> Result<Vec<Block>, AppError> {
+    let device_id = self.current_device_id()?;
     let transaction = self.connection.transaction()?;
     let mut ordered_ids = transaction
       .prepare("SELECT id FROM blocks WHERE document_id = ?1 ORDER BY position ASC")?
@@ -86,17 +87,23 @@ impl BlockRepository for SqliteStore {
 
     let temp_position = -(ordered_ids.len() as i64 + 1);
     let new_block = Self::insert_empty_block(&transaction, document_id, temp_position, kind)?;
+    transaction.execute(
+      "UPDATE blocks SET updated_by_device_id = ?1 WHERE id = ?2",
+      params![device_id, new_block.id],
+    )?;
     ordered_ids.insert(target_index, new_block.id);
     Self::rewrite_positions(&transaction, document_id, &ordered_ids)?;
     transaction.commit()?;
 
     self.finish_document_mutation(document_id)?;
+    self.queue_document_snapshot(document_id)?;
     self.list_blocks(document_id)
   }
 
   fn change_block_kind(&mut self, block_id: &str, kind: BlockKind) -> Result<Block, AppError> {
     let document_id = self.block_document_id(block_id)?;
     let now = Self::now();
+    let device_id = self.current_device_id()?;
     let (content, search_text, language) = match kind {
       BlockKind::Markdown => (String::new(), String::new(), None),
       BlockKind::Code => (String::new(), String::new(), Some("plaintext".to_string())),
@@ -104,10 +111,11 @@ impl BlockRepository for SqliteStore {
     };
 
     self.connection.execute(
-      "UPDATE blocks SET kind = ?1, content = ?2, search_text = ?3, language = ?4, updated_at = ?5 WHERE id = ?6",
-      params![kind.as_str(), content, search_text, language, now, block_id],
+      "UPDATE blocks SET kind = ?1, content = ?2, search_text = ?3, language = ?4, updated_at = ?5, updated_by_device_id = ?6 WHERE id = ?7",
+      params![kind.as_str(), content, search_text, language, now, device_id, block_id],
     )?;
     self.finish_document_mutation(&document_id)?;
+    self.queue_document_snapshot(&document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -132,11 +140,13 @@ impl BlockRepository for SqliteStore {
     transaction.commit()?;
 
     self.finish_document_mutation(document_id)?;
+    self.queue_document_snapshot(document_id)?;
     self.list_blocks(document_id)
   }
 
   fn delete_block(&mut self, block_id: &str) -> Result<String, AppError> {
     let document_id = self.block_document_id(block_id)?;
+    let deleted_at = Self::now();
     self.connection.execute("DELETE FROM blocks WHERE id = ?1", params![block_id])?;
 
     let remaining = self
@@ -152,6 +162,8 @@ impl BlockRepository for SqliteStore {
     }
 
     self.finish_document_structure_mutation(&document_id)?;
+    self.queue_block_deletion(block_id, &document_id, deleted_at)?;
+    self.queue_document_snapshot(&document_id)?;
     Ok(document_id)
   }
 
@@ -159,12 +171,14 @@ impl BlockRepository for SqliteStore {
     let document_id = self.block_document_id(block_id)?;
     let (normalized_content, search_text, _) = Self::normalize_markdown_storage(&content);
     let now = Self::now();
+    let device_id = self.current_device_id()?;
 
     self.connection.execute(
-      "UPDATE blocks SET content = ?1, search_text = ?2, updated_at = ?3 WHERE id = ?4",
-      params![normalized_content, search_text, now, block_id],
+      "UPDATE blocks SET content = ?1, search_text = ?2, updated_at = ?3, updated_by_device_id = ?4 WHERE id = ?5",
+      params![normalized_content, search_text, now, device_id, block_id],
     )?;
     self.finish_document_mutation(&document_id)?;
+    self.queue_document_snapshot(&document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -176,22 +190,26 @@ impl BlockRepository for SqliteStore {
   ) -> Result<Block, AppError> {
     let document_id = self.block_document_id(block_id)?;
     let now = Self::now();
+    let device_id = self.current_device_id()?;
     self.connection.execute(
-      "UPDATE blocks SET content = ?1, search_text = ?2, language = ?3, updated_at = ?4 WHERE id = ?5",
-      params![content, content, language, now, block_id],
+      "UPDATE blocks SET content = ?1, search_text = ?2, language = ?3, updated_at = ?4, updated_by_device_id = ?5 WHERE id = ?6",
+      params![content, content, language, now, device_id, block_id],
     )?;
     self.finish_document_mutation(&document_id)?;
+    self.queue_document_snapshot(&document_id)?;
     self.fetch_block(block_id)
   }
 
   fn update_text_block(&mut self, block_id: &str, content: String) -> Result<Block, AppError> {
     let document_id = self.block_document_id(block_id)?;
     let now = Self::now();
+    let device_id = self.current_device_id()?;
     self.connection.execute(
-      "UPDATE blocks SET content = ?1, search_text = ?2, language = NULL, updated_at = ?3 WHERE id = ?4",
-      params![content, content, now, block_id],
+      "UPDATE blocks SET content = ?1, search_text = ?2, language = NULL, updated_at = ?3, updated_by_device_id = ?4 WHERE id = ?5",
+      params![content, content, now, device_id, block_id],
     )?;
     self.finish_document_mutation(&document_id)?;
+    self.queue_document_snapshot(&document_id)?;
     self.fetch_block(block_id)
   }
 
@@ -201,6 +219,7 @@ impl BlockRepository for SqliteStore {
     blocks: &[crate::ports::models::RestoreBlockInput],
   ) -> Result<Vec<Block>, AppError> {
     let now = Self::now();
+    let device_id = self.current_device_id()?;
     let transaction = self.connection.transaction()?;
 
     transaction.execute("DELETE FROM blocks WHERE document_id = ?1", params![document_id])?;
@@ -221,8 +240,8 @@ impl BlockRepository for SqliteStore {
         };
 
         transaction.execute(
-          "INSERT INTO blocks (id, document_id, kind, position, content, search_text, language, created_at, updated_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+          "INSERT INTO blocks (id, document_id, kind, position, content, search_text, language, created_at, updated_at, updated_by_device_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
           params![
             block.id,
             document_id,
@@ -232,7 +251,8 @@ impl BlockRepository for SqliteStore {
             search_text,
             block.language,
             now,
-            now
+            now,
+            device_id
           ],
         )?;
       }
@@ -241,6 +261,7 @@ impl BlockRepository for SqliteStore {
     transaction.commit()?;
 
     self.finish_document_mutation(document_id)?;
+    self.queue_document_snapshot(document_id)?;
     self.list_blocks(document_id)
   }
 }

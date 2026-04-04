@@ -10,6 +10,8 @@ import type {
   DocumentSurfaceTonePreset,
   DocumentDto,
   DocumentSummaryDto,
+  ICloudSyncDebugInfoDto,
+  ICloudSyncStatus,
   SearchResultDto,
   ThemeMode,
   WindowControlRuntimeStateDto,
@@ -147,6 +149,18 @@ export const desktopApi = {
   },
   confirmAppShutdown() {
     return call<void>('confirm_app_shutdown');
+  },
+  getICloudSyncStatus() {
+    return call<ICloudSyncStatus>('get_icloud_sync_status');
+  },
+  getICloudSyncDebugInfo() {
+    return call<ICloudSyncDebugInfoDto>('get_icloud_sync_debug_info');
+  },
+  setICloudSyncEnabled(enabled: boolean) {
+    return call<ICloudSyncStatus>('set_icloud_sync_enabled', { enabled });
+  },
+  runICloudSync() {
+    return call<ICloudSyncStatus>('run_icloud_sync');
   },
   setMenuBarIconEnabled(enabled: boolean) {
     return call<boolean>('set_menu_bar_icon_enabled', { enabled });

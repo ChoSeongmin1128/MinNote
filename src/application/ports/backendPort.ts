@@ -4,6 +4,8 @@ import type {
   BodyFontFamily,
   CodeFontFamily,
   DocumentSurfaceTonePreset,
+  ICloudSyncDebugInfoDto,
+  ICloudSyncStatus,
   ThemeMode,
 } from '../../lib/types';
 import type { BlockVm, DocumentVm, RestoreBlockInput, SearchResultVm } from '../models/document';
@@ -44,6 +46,10 @@ export interface BackendPort {
   emptyTrash(): Promise<void>;
   restoreDocumentFromTrash(documentId: string): Promise<WorkspaceBootstrapState>;
   confirmAppShutdown(): Promise<void>;
+  getICloudSyncStatus(): Promise<ICloudSyncStatus>;
+  getICloudSyncDebugInfo(): Promise<ICloudSyncDebugInfoDto>;
+  setICloudSyncEnabled(enabled: boolean): Promise<ICloudSyncStatus>;
+  runICloudSync(): Promise<ICloudSyncStatus>;
   setMenuBarIconEnabled(enabled: boolean): Promise<boolean>;
   setDefaultBlockKind(kind: BlockKind): Promise<BlockKind>;
   setAlwaysOnTopEnabled(enabled: boolean): Promise<boolean>;

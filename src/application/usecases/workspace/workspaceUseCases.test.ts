@@ -8,6 +8,15 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     documents: [],
     trashDocuments: [],
     currentDocument: null,
+    icloudSyncStatus: {
+      enabled: false,
+      state: 'disabled',
+      accountStatus: 'unknown',
+      lastSyncStartedAtMs: null,
+      lastSyncSucceededAtMs: null,
+      lastErrorCode: null,
+      lastErrorMessage: null,
+    },
     themeMode: 'dark',
     defaultBlockTintPreset: 'ocean-sand',
     defaultDocumentSurfaceTonePreset: 'default',
@@ -91,6 +100,16 @@ function createPreferencesGateway() {
     setMenuBarIconError: vi.fn(),
     getWindowPreferenceError: vi.fn(() => null),
     setWindowPreferenceError: vi.fn(),
+    getICloudSyncStatus: vi.fn(() => ({
+      enabled: false,
+      state: 'disabled',
+      accountStatus: 'unknown',
+      lastSyncStartedAtMs: null,
+      lastSyncSucceededAtMs: null,
+      lastErrorCode: null,
+      lastErrorMessage: null,
+    })),
+    setICloudSyncStatus: vi.fn(),
   };
 }
 

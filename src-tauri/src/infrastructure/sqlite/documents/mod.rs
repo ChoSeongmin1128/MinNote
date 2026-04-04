@@ -60,6 +60,7 @@ impl DocumentRepository for SqliteStore {
 
   fn create_document(&mut self, title: Option<String>) -> Result<Document, AppError> {
     let now = Self::now();
+    let device_id = self.current_device_id()?;
     let unique_title = self.unique_document_title(title, None)?;
     let document = Document {
       id: Self::new_id(),
@@ -68,12 +69,13 @@ impl DocumentRepository for SqliteStore {
       document_surface_tone_override: None,
       created_at: now,
       updated_at: now,
+      updated_by_device_id: Some(device_id),
       last_opened_at: now,
       deleted_at: None,
     };
 
     self.connection.execute(
-      "INSERT INTO documents (id, title, block_tint_override, document_surface_tone_override, created_at, updated_at, last_opened_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+      "INSERT INTO documents (id, title, block_tint_override, document_surface_tone_override, created_at, updated_at, updated_by_device_id, last_opened_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
       params![
         document.id,
         document.title,
@@ -81,12 +83,15 @@ impl DocumentRepository for SqliteStore {
         Option::<String>::None,
         document.created_at,
         document.updated_at,
+        document.updated_by_device_id,
         document.last_opened_at
       ],
     )?;
 
     self.create_empty_block(&document.id, 0, BlockKind::Markdown)?;
-    self.finish_document_structure_mutation(&document.id)
+    let document = self.finish_document_structure_mutation(&document.id)?;
+    self.queue_document_snapshot(&document.id)?;
+    Ok(document)
   }
 
   fn rename_document(&mut self, document_id: &str, title: Option<String>) -> Result<Document, AppError> {
@@ -95,7 +100,9 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET title = ?1 WHERE id = ?2",
       params![normalized, document_id],
     )?;
-    self.finish_document_mutation(document_id)
+    let document = self.finish_document_mutation(document_id)?;
+    self.queue_document_snapshot(document_id)?;
+    Ok(document)
   }
 
   fn delete_document(&mut self, document_id: &str) -> Result<(), AppError> {
@@ -104,6 +111,7 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
       params![now, document_id],
     )?;
+    self.queue_document_deletion(document_id, now)?;
     Ok(())
   }
 
@@ -113,9 +121,11 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET deleted_at = NULL, updated_at = ?1 WHERE id = ?2",
       params![now, document_id],
     )?;
-    self
+    let document = self
       .get_document(document_id)?
-      .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))
+      .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))?;
+    self.queue_document_snapshot(document_id)?;
+    Ok(document)
   }
 
   fn purge_expired_trash(&mut self, cutoff_ms: i64) -> Result<(), AppError> {
@@ -170,11 +180,22 @@ impl DocumentRepository for SqliteStore {
        WHERE deleted_at IS NOT NULL",
       [],
     )?;
+    self.purge_expired_tombstones(Self::now())?;
 
     Ok(())
   }
 
   fn delete_all_documents(&mut self) -> Result<(), AppError> {
+    let document_ids = self
+      .connection
+      .prepare("SELECT id FROM documents")?
+      .query_map([], |row| row.get::<_, String>(0))?
+      .collect::<Result<Vec<_>, _>>()?;
+    let now = Self::now();
+
+    for document_id in &document_ids {
+      self.queue_document_deletion(document_id, now)?;
+    }
     self.connection.execute(&format!("DELETE FROM {SEARCH_INDEX_TABLE}"), [])?;
     self.connection.execute("DELETE FROM documents", [])?;
     Ok(())
@@ -190,7 +211,9 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET block_tint_override = ?1 WHERE id = ?2",
       params![value, document_id],
     )?;
-    self.finish_document_mutation(document_id)
+    let document = self.finish_document_mutation(document_id)?;
+    self.queue_document_snapshot(document_id)?;
+    Ok(document)
   }
 
   fn set_document_surface_tone_override(
@@ -203,7 +226,9 @@ impl DocumentRepository for SqliteStore {
       "UPDATE documents SET document_surface_tone_override = ?1 WHERE id = ?2",
       params![value, document_id],
     )?;
-    self.finish_document_mutation(document_id)
+    let document = self.finish_document_mutation(document_id)?;
+    self.queue_document_snapshot(document_id)?;
+    Ok(document)
   }
 
   fn mark_document_opened(&mut self, document_id: &str) -> Result<Document, AppError> {

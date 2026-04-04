@@ -2,10 +2,19 @@ use tauri::State;
 
 use crate::application::dto::{BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
 use crate::application::services;
+use crate::domain::models::{ICloudSyncState, ICloudSyncStatus};
 use crate::error::AppError;
-use crate::state::AppState;
+use crate::state::{AppState, SyncRuntimePhase};
 
 use super::helpers::with_repository;
+
+fn decorate_icloud_sync_status(state: &AppState, status: &mut ICloudSyncStatus) {
+  status.state = match state.sync_phase() {
+    SyncRuntimePhase::Idle => status.state.clone(),
+    SyncRuntimePhase::Checking => ICloudSyncState::Checking,
+    SyncRuntimePhase::Syncing => ICloudSyncState::Syncing,
+  };
+}
 
 #[tauri::command]
 pub fn bootstrap_app(state: State<'_, AppState>) -> Result<BootstrapPayload, String> {
@@ -17,6 +26,8 @@ pub fn bootstrap_app(state: State<'_, AppState>) -> Result<BootstrapPayload, Str
   payload.global_shortcut_error = state.global_shortcut_error();
   payload.menu_bar_icon_error = state.menu_bar_icon_error();
   payload.window_preference_error = state.window_preference_error();
+  payload.icloud_sync_status = repository.get_icloud_sync_status().map_err(|error| error.to_string())?;
+  decorate_icloud_sync_status(&state, &mut payload.icloud_sync_status);
   Ok(payload)
 }
 
@@ -46,12 +57,26 @@ pub fn rename_document(
 
 #[tauri::command]
 pub fn delete_document(state: State<'_, AppState>, document_id: String) -> Result<BootstrapPayload, String> {
-  with_repository(state, |repository| services::delete_document(repository, &document_id))
+  let mut repository = state
+    .repository
+    .lock()
+    .map_err(|_| AppError::StateLock.to_string())?;
+  let mut payload = services::delete_document(&mut *repository, &document_id).map_err(|error| error.to_string())?;
+  payload.icloud_sync_status = repository.get_icloud_sync_status().map_err(|error| error.to_string())?;
+  decorate_icloud_sync_status(&state, &mut payload.icloud_sync_status);
+  Ok(payload)
 }
 
 #[tauri::command]
 pub fn delete_all_documents(state: State<'_, AppState>) -> Result<BootstrapPayload, String> {
-  with_repository(state, services::delete_all_documents)
+  let mut repository = state
+    .repository
+    .lock()
+    .map_err(|_| AppError::StateLock.to_string())?;
+  let mut payload = services::delete_all_documents(&mut *repository).map_err(|error| error.to_string())?;
+  payload.icloud_sync_status = repository.get_icloud_sync_status().map_err(|error| error.to_string())?;
+  decorate_icloud_sync_status(&state, &mut payload.icloud_sync_status);
+  Ok(payload)
 }
 
 #[tauri::command]
@@ -74,7 +99,13 @@ pub fn restore_document_from_trash(
   state: State<'_, AppState>,
   document_id: String,
 ) -> Result<BootstrapPayload, String> {
-  with_repository(state, |repository| {
-    services::restore_document_from_trash(repository, &document_id)
-  })
+  let mut repository = state
+    .repository
+    .lock()
+    .map_err(|_| AppError::StateLock.to_string())?;
+  let mut payload = services::restore_document_from_trash(&mut *repository, &document_id)
+    .map_err(|error| error.to_string())?;
+  payload.icloud_sync_status = repository.get_icloud_sync_status().map_err(|error| error.to_string())?;
+  decorate_icloud_sync_status(&state, &mut payload.icloud_sync_status);
+  Ok(payload)
 }

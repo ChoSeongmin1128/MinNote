@@ -38,6 +38,9 @@
     "createUpdaterArtifacts": true,
     "targets": "all",
     "macOS": {
+      "files": {
+        "Resources/minnote-cloudkit-bridge.app": "binaries/minnote-cloudkit-bridge.app"
+      },
       "dmg": {
         "windowSize": {
           "width": 720,

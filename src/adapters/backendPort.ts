@@ -100,6 +100,18 @@ export const backendPort: BackendPort = {
   confirmAppShutdown() {
     return desktopApi.confirmAppShutdown();
   },
+  getICloudSyncStatus() {
+    return desktopApi.getICloudSyncStatus();
+  },
+  getICloudSyncDebugInfo() {
+    return desktopApi.getICloudSyncDebugInfo();
+  },
+  setICloudSyncEnabled(enabled) {
+    return desktopApi.setICloudSyncEnabled(enabled);
+  },
+  runICloudSync() {
+    return desktopApi.runICloudSync();
+  },
   setMenuBarIconEnabled(enabled) {
     return desktopApi.setMenuBarIconEnabled(enabled);
   },

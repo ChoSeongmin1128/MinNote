@@ -187,6 +187,56 @@ export function createPreferencesUseCases({
     }
   }
 
+  async function setICloudSyncEnabled(enabled: boolean) {
+    const previous = preferences.getICloudSyncStatus();
+    preferences.setICloudSyncStatus({
+      ...previous,
+      enabled,
+      state: enabled ? 'checking' : 'disabled',
+      lastErrorCode: enabled ? previous.lastErrorCode : null,
+      lastErrorMessage: enabled ? previous.lastErrorMessage : null,
+    });
+
+    try {
+      const result = await backend.setICloudSyncEnabled(enabled);
+      workspace.clearError();
+      preferences.setICloudSyncStatus(result);
+      return result;
+    } catch (error) {
+      preferences.setICloudSyncStatus(previous);
+      const message = normalizeErrorMessage(error, 'iCloud 동기화 설정을 변경하지 못했습니다.');
+      workspace.setError(message);
+      throw new Error(message);
+    }
+  }
+
+  async function runICloudSync() {
+    const previous = preferences.getICloudSyncStatus();
+    preferences.setICloudSyncStatus({
+      ...previous,
+      state: previous.enabled ? 'syncing' : previous.state,
+      lastErrorCode: null,
+      lastErrorMessage: null,
+    });
+
+    try {
+      const result = await backend.runICloudSync();
+      workspace.clearError();
+      preferences.setICloudSyncStatus(result);
+      return result;
+    } catch (error) {
+      const message = normalizeErrorMessage(error, 'iCloud 동기화를 실행하지 못했습니다.');
+      preferences.setICloudSyncStatus({
+        ...previous,
+        state: 'error',
+        lastErrorCode: 'sync_failed',
+        lastErrorMessage: message,
+      });
+      workspace.setError(message);
+      throw new Error(message);
+    }
+  }
+
   return {
     setThemeMode,
     setDefaultBlockTintPreset,
@@ -201,5 +251,7 @@ export function createPreferencesUseCases({
     previewWindowOpacityPercent,
     setWindowOpacityPercent,
     setGlobalToggleShortcut,
+    setICloudSyncEnabled,
+    runICloudSync,
   };
 }

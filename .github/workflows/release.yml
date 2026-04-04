@@ -41,11 +41,18 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
+          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           unset TAURI_SIGNING_PRIVATE_KEY_PATH
           ENTITLEMENTS_PATH="src-tauri/Entitlements.plist"
+          if [ -z "${APPLE_PROVISIONING_PROFILE_BASE64:-}" ]; then
+            echo "APPLE_PROVISIONING_PROFILE_BASE64 secret is required for CloudKit-enabled release builds."
+            exit 1
+          fi
+          PROFILE_PATH="$RUNNER_TEMP/minnote-cloudkit.provisionprofile"
+          printf '%s' "$APPLE_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
 
           for TARGET in aarch64-apple-darwin x86_64-apple-darwin
           do
@@ -66,6 +73,14 @@ jobs:
             fi
 
             xattr -crs "$APP_PATH"
+            cp "$PROFILE_PATH" "$APP_PATH/Contents/embedded.provisionprofile"
+            HELPER_APP_PATH="$APP_PATH/Contents/Resources/minnote-cloudkit-bridge.app"
+            HELPER_EXEC_PATH="$HELPER_APP_PATH/Contents/MacOS/minnote-cloudkit-bridge"
+            if [ -f "$HELPER_EXEC_PATH" ]; then
+              cp "$PROFILE_PATH" "$HELPER_APP_PATH/Contents/embedded.provisionprofile"
+              codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$HELPER_EXEC_PATH"
+              codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$HELPER_APP_PATH"
+            fi
             codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
             codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH"
 

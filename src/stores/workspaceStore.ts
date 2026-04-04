@@ -6,6 +6,7 @@ import type {
   BodyFontFamily,
   CodeFontFamily,
   DocumentSurfaceTonePreset,
+  ICloudSyncStatus,
   ThemeMode,
 } from '../lib/types';
 import type { DocumentSummaryVm, SearchResultVm } from '../application/models/document';
@@ -32,6 +33,7 @@ interface WorkspaceState {
   globalShortcutError: string | null;
   menuBarIconError: string | null;
   windowPreferenceError: string | null;
+  icloudSyncStatus: ICloudSyncStatus;
   setDocuments: (documents: DocumentSummaryVm[]) => void;
   setTrashDocuments: (documents: DocumentSummaryVm[]) => void;
   upsertDocumentSummary: (document: DocumentSummaryVm) => void;
@@ -55,6 +57,7 @@ interface WorkspaceState {
   setGlobalShortcutError: (value: string | null) => void;
   setMenuBarIconError: (value: string | null) => void;
   setWindowPreferenceError: (value: string | null) => void;
+  setICloudSyncStatus: (value: ICloudSyncStatus) => void;
 }
 
 function sortDocuments(documents: DocumentSummaryVm[]) {
@@ -84,6 +87,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   globalShortcutError: null,
   menuBarIconError: null,
   windowPreferenceError: null,
+  icloudSyncStatus: {
+    enabled: false,
+    state: 'disabled',
+    accountStatus: 'unknown',
+    lastSyncStartedAtMs: null,
+    lastSyncSucceededAtMs: null,
+    lastErrorCode: null,
+    lastErrorMessage: null,
+  },
   setDocuments: (documents) => set({ documents: sortDocuments(documents) }),
   setTrashDocuments: (trashDocuments) => set({ trashDocuments }),
   upsertDocumentSummary: (document) =>
@@ -117,6 +129,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   setGlobalShortcutError: (globalShortcutError) => set({ globalShortcutError }),
   setMenuBarIconError: (menuBarIconError) => set({ menuBarIconError }),
   setWindowPreferenceError: (windowPreferenceError) => set({ windowPreferenceError }),
+  setICloudSyncStatus: (icloudSyncStatus) => set({ icloudSyncStatus }),
 }), {
     name: 'workspace-state',
     storage: createJSONStorage(() => localStorage),

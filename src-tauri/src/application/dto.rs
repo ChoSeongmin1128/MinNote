@@ -1,5 +1,17 @@
 use serde::{Deserialize, Serialize};
-use crate::domain::models::{Block, BlockKind, BlockTintPreset, BodyFontFamily, CodeFontFamily, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode};
+use crate::domain::models::{
+  Block,
+  BlockKind,
+  BlockTintPreset,
+  BodyFontFamily,
+  CodeFontFamily,
+  Document,
+  DocumentSummary,
+  DocumentSurfaceTonePreset,
+  ICloudSyncStatus,
+  SearchResult,
+  ThemeMode,
+};
 use crate::error::AppError;
 
 #[derive(Debug, Serialize)]
@@ -56,6 +68,7 @@ pub struct BootstrapPayload {
   pub documents: Vec<DocumentSummaryDto>,
   pub trash_documents: Vec<DocumentSummaryDto>,
   pub current_document: Option<DocumentDto>,
+  pub icloud_sync_status: ICloudSyncStatus,
   pub theme_mode: ThemeMode,
   pub default_block_tint_preset: BlockTintPreset,
   pub default_document_surface_tone_preset: DocumentSurfaceTonePreset,
@@ -79,6 +92,18 @@ pub struct WindowControlRuntimeStateDto {
   pub global_shortcut_error: Option<String>,
   pub menu_bar_icon_error: Option<String>,
   pub window_preference_error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ICloudSyncDebugInfoDto {
+  pub bridge_available: bool,
+  pub bridge_error: Option<String>,
+  pub zone_name: String,
+  pub server_change_token_present: bool,
+  pub outbox_count: usize,
+  pub tombstone_count: usize,
+  pub device_id_suffix: String,
 }
 
 #[derive(Debug, Deserialize)]

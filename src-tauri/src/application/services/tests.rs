@@ -36,6 +36,7 @@ impl MockRepository {
       document_surface_tone_override: Some(DocumentSurfaceTonePreset::Paper),
       created_at: 1,
       updated_at: 2,
+      updated_by_device_id: Some("device-a".to_string()),
       last_opened_at: 3,
       deleted_at: None,
     };
@@ -49,6 +50,7 @@ impl MockRepository {
       language: None,
       created_at: 1,
       updated_at: 2,
+      updated_by_device_id: Some("device-a".to_string()),
     };
     let summary = DocumentSummary {
       id: document.id.clone(),

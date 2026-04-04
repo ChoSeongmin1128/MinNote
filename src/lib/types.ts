@@ -17,6 +17,14 @@ export type DocumentSurfaceTonePreset =
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type BodyFontFamily = 'system-sans' | 'system-serif' | 'system-rounded';
 export type CodeFontFamily = 'system-mono' | 'sf-mono' | 'menlo' | 'monaco';
+export type ICloudSyncState = 'disabled' | 'checking' | 'syncing' | 'idle' | 'error';
+export type ICloudAccountStatus =
+  | 'unknown'
+  | 'available'
+  | 'no_account'
+  | 'restricted'
+  | 'temporarily_unavailable'
+  | 'could_not_determine';
 
 export type JsonValue =
   | string
@@ -56,6 +64,7 @@ export interface BootstrapPayload {
   documents: DocumentSummaryDto[];
   trashDocuments: DocumentSummaryDto[];
   currentDocument: DocumentDto | null;
+  icloudSyncStatus: ICloudSyncStatus;
   themeMode: ThemeMode;
   defaultBlockTintPreset: BlockTintPreset;
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
@@ -77,6 +86,26 @@ export interface WindowControlRuntimeStateDto {
   globalShortcutError: string | null;
   menuBarIconError: string | null;
   windowPreferenceError: string | null;
+}
+
+export interface ICloudSyncStatus {
+  enabled: boolean;
+  state: ICloudSyncState;
+  accountStatus: ICloudAccountStatus;
+  lastSyncStartedAtMs: number | null;
+  lastSyncSucceededAtMs: number | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+}
+
+export interface ICloudSyncDebugInfoDto {
+  bridgeAvailable: boolean;
+  bridgeError: string | null;
+  zoneName: string;
+  serverChangeTokenPresent: boolean;
+  outboxCount: number;
+  tombstoneCount: number;
+  deviceIdSuffix: string;
 }
 
 export interface SearchResultDto extends DocumentSummaryDto {

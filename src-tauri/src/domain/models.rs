@@ -188,6 +188,64 @@ impl CodeFontFamily {
   }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ICloudSyncState {
+  Disabled,
+  Checking,
+  Syncing,
+  Idle,
+  Error,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ICloudAccountStatus {
+  Unknown,
+  Available,
+  NoAccount,
+  Restricted,
+  TemporarilyUnavailable,
+  CouldNotDetermine,
+}
+
+impl ICloudAccountStatus {
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      Self::Unknown => "unknown",
+      Self::Available => "available",
+      Self::NoAccount => "no_account",
+      Self::Restricted => "restricted",
+      Self::TemporarilyUnavailable => "temporarily_unavailable",
+      Self::CouldNotDetermine => "could_not_determine",
+    }
+  }
+
+  pub fn try_from_str(value: &str) -> Result<Self, AppError> {
+    match value {
+      "unknown" => Ok(Self::Unknown),
+      "available" => Ok(Self::Available),
+      "no_account" => Ok(Self::NoAccount),
+      "restricted" => Ok(Self::Restricted),
+      "temporarily_unavailable" => Ok(Self::TemporarilyUnavailable),
+      "could_not_determine" => Ok(Self::CouldNotDetermine),
+      _ => Err(AppError::validation(format!("알 수 없는 iCloud 계정 상태입니다: {value}"))),
+    }
+  }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ICloudSyncStatus {
+  pub enabled: bool,
+  pub state: ICloudSyncState,
+  pub account_status: ICloudAccountStatus,
+  pub last_sync_started_at_ms: Option<i64>,
+  pub last_sync_succeeded_at_ms: Option<i64>,
+  pub last_error_code: Option<String>,
+  pub last_error_message: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Document {
   pub id: String,
@@ -196,6 +254,7 @@ pub struct Document {
   pub document_surface_tone_override: Option<DocumentSurfaceTonePreset>,
   pub created_at: i64,
   pub updated_at: i64,
+  pub updated_by_device_id: Option<String>,
   pub last_opened_at: i64,
   pub deleted_at: Option<i64>,
 }
@@ -211,6 +270,7 @@ pub struct Block {
   pub language: Option<String>,
   pub created_at: i64,
   pub updated_at: i64,
+  pub updated_by_device_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
