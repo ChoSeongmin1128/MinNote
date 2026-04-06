@@ -97,7 +97,7 @@ export function createBlockEditingActions({
     const optimisticDocument = reorderDocumentBlocks(currentDocument, blockId, targetPosition);
     workspace.clearError();
     session.markLocalMutation(optimisticDocument.updatedAt);
-    setDocumentWithFocus(session, workspace, optimisticDocument, blockId, 'start');
+    setDocumentWithFocus(session, workspace, optimisticDocument, blockId, 'start', { persisted: false });
     session.setIsFlushing(true);
 
     try {

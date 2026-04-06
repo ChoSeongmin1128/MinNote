@@ -59,6 +59,32 @@ editorPersistence.setErrorHandler((error, context) => {
   workspaceGateway.setError(normalizeErrorMessage(error, fallback));
 });
 
+editorPersistence.setLifecycleHandler((context) => {
+  const currentDocument = sessionGateway.getCurrentDocument();
+  if (!currentDocument || currentDocument.id !== context.documentId) {
+    return;
+  }
+
+  if (context.status === 'started') {
+    sessionGateway.startSaving();
+    return;
+  }
+
+  if (context.status === 'succeeded') {
+    sessionGateway.finishSaving();
+    sessionGateway.setSaveError(null);
+    sessionGateway.setLastSavedAt(context.savedAt ?? Date.now());
+    return;
+  }
+
+  sessionGateway.finishSaving();
+  const fallback =
+    context.phase === 'autosave'
+      ? '변경 내용을 자동 저장하지 못했습니다.'
+      : '변경 내용을 저장하지 못했습니다.';
+  sessionGateway.setSaveError(normalizeErrorMessage(context.error, fallback));
+});
+
 export const appControllers = {
   documents: documentUseCases,
   blocks: blockUseCases,

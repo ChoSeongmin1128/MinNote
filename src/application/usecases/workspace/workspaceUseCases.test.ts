@@ -59,6 +59,10 @@ function createSessionGateway(currentDocument: DocumentVm | null = null) {
     requestBlockFocus: vi.fn(),
     clearActiveEditorRef: vi.fn(),
     setIsFlushing: vi.fn(),
+    startSaving: vi.fn(),
+    finishSaving: vi.fn(),
+    setLastSavedAt: vi.fn(),
+    setSaveError: vi.fn(),
     markLocalMutation: vi.fn(),
   };
 }

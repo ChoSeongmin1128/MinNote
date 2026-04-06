@@ -2,8 +2,10 @@ import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { AlertCircle, LoaderCircle, PanelLeft } from 'lucide-react';
 import { useDocumentController, useWorkspaceController } from './app/controllers';
+import { deriveEditorStatusPresentation } from './application/models/editorStatus';
 import { AppUpdateButton } from './components/AppUpdateButton';
 import { DocumentMenu } from './components/DocumentMenu';
+import { EditorStatus } from './components/EditorStatus';
 import { Sidebar } from './components/Sidebar';
 import { DocumentCanvas } from './components/DocumentCanvas';
 import { SettingsModal } from './components/SettingsModal';
@@ -19,32 +21,19 @@ import { useDocumentSessionStore } from './stores/documentSessionStore';
 import { useUiStore } from './stores/uiStore';
 import { useUpdaterStore } from './stores/updaterStore';
 
-function formatLastSavedAt(value: number) {
-  const date = new Date(value);
-  const parts = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ];
-  const time = [
-    String(date.getHours()).padStart(2, '0'),
-    String(date.getMinutes()).padStart(2, '0'),
-    String(date.getSeconds()).padStart(2, '0'),
-  ];
-
-  return `${parts.join('.')}. ${time.join(':')}`;
-}
-
 function App() {
   const { flushCurrentDocument } = useDocumentController();
   const { bootstrapApp, confirmAppShutdown, refreshWorkspaceDocumentsAfterSync } = useWorkspaceController();
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const isFlushing = useDocumentSessionStore((state) => state.isFlushing);
+  const saveError = useDocumentSessionStore((state) => state.saveError);
   const lastSavedAt = useDocumentSessionStore((state) => state.lastSavedAt);
+  const lastLocalMutationAt = useDocumentSessionStore((state) => state.lastLocalMutationAt);
   const isBootstrapping = useWorkspaceStore((state) => state.isBootstrapping);
   const appUpdateStatus = useUpdaterStore((state) => state.appUpdateStatus);
   const error = useWorkspaceStore((state) => state.error);
   const syncNotice = useWorkspaceStore((state) => state.syncNotice);
+  const icloudSyncStatus = useWorkspaceStore((state) => state.icloudSyncStatus);
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const bodyFontFamily = useWorkspaceStore((state) => state.bodyFontFamily);
   const bodyFontSizePx = useWorkspaceStore((state) => state.bodyFontSizePx);
@@ -140,6 +129,17 @@ function App() {
 
   const appSurfaceTone =
     currentDocument?.documentSurfaceToneOverride ?? defaultDocumentSurfaceTonePreset;
+  const editorStatus = currentDocument
+    ? deriveEditorStatusPresentation(
+        {
+          isFlushing,
+          lastSavedAt,
+          lastLocalMutationAt,
+          saveError,
+        },
+        icloudSyncStatus,
+      )
+    : null;
 
   return (
     <div className="app-shell" data-surface-tone={appSurfaceTone}>
@@ -161,12 +161,7 @@ function App() {
             </button>
           ) : null}
           <div className="workspace-heading">
-            {currentDocument ? (
-              <span className="workspace-status">
-                {isFlushing ? '저장 중…' : lastSavedAt ? `마지막 저장 ${formatLastSavedAt(lastSavedAt)}` : ''}
-                {syncNotice ? ` · ${syncNotice}` : ''}
-              </span>
-            ) : null}
+            {editorStatus ? <EditorStatus presentation={editorStatus} notice={syncNotice} /> : null}
           </div>
           <div className="workspace-actions">
             <AppUpdateButton status={appUpdateStatus} />

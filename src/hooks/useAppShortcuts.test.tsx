@@ -91,7 +91,10 @@ function resetStore() {
     blockSelected: false,
     allBlocksSelected: false,
     isFlushing: false,
+    saveInFlightCount: 0,
+    saveError: null,
     lastSavedAt: null,
+    lastLocalMutationAt: null,
     focusRequest: null,
     activeEditorRef: null,
   });
@@ -127,6 +130,8 @@ describe('useAppShortcuts', () => {
       selectedBlockIds: ['block-a', 'block-b'],
       blockSelected: true,
       allBlocksSelected: false,
+      saveInFlightCount: 0,
+      saveError: null,
     });
   });
 

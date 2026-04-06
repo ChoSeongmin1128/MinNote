@@ -1,6 +1,7 @@
 import type { BackendPort } from '../application/ports/backendPort';
 import type {
   EditorPersistenceErrorContext,
+  EditorPersistenceLifecycleContext,
   EditorPersistencePort,
   PendingBlockSave,
 } from '../application/ports/editorPersistencePort';
@@ -12,6 +13,7 @@ export function createEditorPersistenceAdapter(backend: BackendPort): EditorPers
   const pendingByDocument = new Map<string, Map<string, PendingBlockSave>>();
   const timersByBlock = new Map<string, number>();
   let handleError: ((error: unknown, context: EditorPersistenceErrorContext) => void) | null = null;
+  let handleLifecycle: ((context: EditorPersistenceLifecycleContext) => void) | null = null;
 
   function getTimerKey(documentId: string, blockId: string) {
     return `${documentId}:${blockId}`;
@@ -73,13 +75,30 @@ export function createEditorPersistenceAdapter(backend: BackendPort): EditorPers
 
       const timer = window.setTimeout(async () => {
         timersByBlock.delete(timerKey);
+        handleLifecycle?.({
+          documentId,
+          phase: 'autosave',
+          status: 'started',
+        });
         try {
           await persistBlockSave(documentId, blockId);
+          handleLifecycle?.({
+            documentId,
+            phase: 'autosave',
+            status: 'succeeded',
+            savedAt: Date.now(),
+          });
         } catch (error) {
           handleError?.(error, {
             documentId,
             blockId,
             phase: 'autosave',
+          });
+          handleLifecycle?.({
+            documentId,
+            phase: 'autosave',
+            status: 'failed',
+            error,
           });
         }
       }, SAVE_DEBOUNCE_MS);
@@ -107,7 +126,30 @@ export function createEditorPersistenceAdapter(backend: BackendPort): EditorPers
         return null;
       }
 
-      return backend.flushDocument(documentId);
+      handleLifecycle?.({
+        documentId,
+        phase: 'flush',
+        status: 'started',
+      });
+
+      try {
+        const updatedAt = await backend.flushDocument(documentId);
+        handleLifecycle?.({
+          documentId,
+          phase: 'flush',
+          status: 'succeeded',
+          savedAt: updatedAt ?? Date.now(),
+        });
+        return updatedAt;
+      } catch (error) {
+        handleLifecycle?.({
+          documentId,
+          phase: 'flush',
+          status: 'failed',
+          error,
+        });
+        throw error;
+      }
     },
     clearDocument(documentId) {
       clearDocumentTimers(documentId);
@@ -141,6 +183,9 @@ export function createEditorPersistenceAdapter(backend: BackendPort): EditorPers
     },
     setErrorHandler(handler) {
       handleError = handler;
+    },
+    setLifecycleHandler(handler) {
+      handleLifecycle = handler;
     },
   };
 }

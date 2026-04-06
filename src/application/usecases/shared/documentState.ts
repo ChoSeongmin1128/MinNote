@@ -16,9 +16,15 @@ export function updateDocumentState(
   session: SessionGateway,
   workspace: WorkspaceGateway,
   document: DocumentVm,
+  options: { persisted?: boolean } = {},
 ) {
+  const { persisted = true } = options;
   workspace.setSyncNotice(null);
   session.setCurrentDocumentState(document);
+  if (persisted) {
+    session.setLastSavedAt(document.updatedAt);
+    session.setSaveError(null);
+  }
   workspace.upsertDocumentSummary(summarizeDocument(document));
 }
 
@@ -28,9 +34,15 @@ export function setDocumentWithFocus(
   document: DocumentVm,
   focusBlockId: string | null,
   caret: BlockCaretPlacement = 'start',
+  options: { persisted?: boolean } = {},
 ) {
+  const { persisted = true } = options;
   workspace.setSyncNotice(null);
   session.setDocumentWithFocus(document, focusBlockId, caret);
+  if (persisted) {
+    session.setLastSavedAt(document.updatedAt);
+    session.setSaveError(null);
+  }
   workspace.upsertDocumentSummary(summarizeDocument(document));
 }
 

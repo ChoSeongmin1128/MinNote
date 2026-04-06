@@ -55,8 +55,12 @@ function resetStore() {
     blockSelected: false,
     allBlocksSelected: false,
     isFlushing: false,
+    saveInFlightCount: 0,
+    saveError: null,
     lastSavedAt: null,
+    lastLocalMutationAt: null,
     focusRequest: null,
+    activeEditorRef: null,
   });
 }
 

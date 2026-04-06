@@ -19,5 +19,9 @@ export interface SessionGateway {
   requestBlockFocus(blockId: string, caret: BlockCaretPlacement): void;
   clearActiveEditorRef(): void;
   setIsFlushing(value: boolean): void;
+  startSaving(): void;
+  finishSaving(): void;
+  setLastSavedAt(value: number | null): void;
+  setSaveError(value: string | null): void;
   markLocalMutation(value?: number): void;
 }

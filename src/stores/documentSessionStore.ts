@@ -17,6 +17,8 @@ interface DocumentSessionState {
   blockSelected: boolean;
   allBlocksSelected: boolean;
   isFlushing: boolean;
+  saveInFlightCount: number;
+  saveError: string | null;
   lastSavedAt: number | null;
   lastLocalMutationAt: number | null;
   lastCodeLanguage: CodeLanguageId;
@@ -28,7 +30,10 @@ interface DocumentSessionState {
   setBlockSelected: (value: boolean) => void;
   setAllBlocksSelected: (value: boolean) => void;
   setIsFlushing: (value: boolean) => void;
+  startSaving: () => void;
+  finishSaving: () => void;
   setLastSavedAt: (value: number | null) => void;
+  setSaveError: (value: string | null) => void;
   markLocalMutation: (value?: number) => void;
   setLastCodeLanguage: (language: CodeLanguageId) => void;
   requestBlockFocus: (blockId: string, caret: BlockCaretPlacement) => void;
@@ -64,6 +69,8 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
   blockSelected: false,
   allBlocksSelected: false,
   isFlushing: false,
+  saveInFlightCount: 0,
+  saveError: null,
   lastSavedAt: null,
   lastLocalMutationAt: null,
   lastCodeLanguage: 'javascript',
@@ -79,6 +86,9 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
       focusRequest: currentDocument?.blocks[0]
         ? createFocusRequest(currentDocument.blocks[0].id, 'start')
         : null,
+      isFlushing: false,
+      saveInFlightCount: 0,
+      saveError: null,
       lastSavedAt: currentDocument?.updatedAt ?? null,
       lastLocalMutationAt: null,
     }),
@@ -104,9 +114,27 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
       selectedBlockIds: allBlocksSelected ? [] : get().selectedBlockIds,
       blockSelected: allBlocksSelected ? false : get().blockSelected,
     }),
-  setIsFlushing: (isFlushing) => set({ isFlushing }),
+  setIsFlushing: (isFlushing) =>
+    set((state) => ({
+      isFlushing,
+      saveInFlightCount: isFlushing ? Math.max(state.saveInFlightCount, 1) : 0,
+    })),
+  startSaving: () =>
+    set((state) => ({
+      saveInFlightCount: state.saveInFlightCount + 1,
+      isFlushing: true,
+    })),
+  finishSaving: () =>
+    set((state) => {
+      const saveInFlightCount = Math.max(0, state.saveInFlightCount - 1);
+      return {
+        saveInFlightCount,
+        isFlushing: saveInFlightCount > 0,
+      };
+    }),
   setLastSavedAt: (lastSavedAt) => set({ lastSavedAt }),
-  markLocalMutation: (lastLocalMutationAt = Date.now()) => set({ lastLocalMutationAt }),
+  setSaveError: (saveError) => set({ saveError }),
+  markLocalMutation: (lastLocalMutationAt = Date.now()) => set({ lastLocalMutationAt, saveError: null }),
   setLastCodeLanguage: (lastCodeLanguage) => set({ lastCodeLanguage }),
   requestBlockFocus: (blockId, caret) =>
     set({

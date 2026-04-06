@@ -6,7 +6,7 @@ import type { SessionGateway } from '../../ports/sessionGateway';
 import type { UiGateway } from '../../ports/uiGateway';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
 import type { WorkspaceDocumentsChangedEvent } from '../../../lib/types';
-import { applyBootstrapPayloadState } from '../shared/documentState';
+import { applyBootstrapPayloadState, updateDocumentState } from '../shared/documentState';
 import { normalizeBootstrapErrorMessage, normalizeErrorMessage } from '../shared/errors';
 
 interface WorkspaceUseCaseDeps {
@@ -76,17 +76,7 @@ export function createWorkspaceUseCases({
       const currentStillActive = documents.some((document) => document.id === currentDocument.id);
       if (currentStillActive) {
         const nextDocument = await backend.openDocument(currentDocument.id);
-        session.setCurrentDocumentState(nextDocument);
-        workspace.upsertDocumentSummary({
-          id: nextDocument.id,
-          title: nextDocument.title,
-          blockTintOverride: nextDocument.blockTintOverride,
-          documentSurfaceToneOverride: nextDocument.documentSurfaceToneOverride,
-          preview: nextDocument.preview,
-          updatedAt: nextDocument.updatedAt,
-          lastOpenedAt: nextDocument.lastOpenedAt,
-          blockCount: nextDocument.blockCount,
-        });
+        updateDocumentState(session, workspace, nextDocument);
         workspace.setSyncNotice(null);
         return;
       }

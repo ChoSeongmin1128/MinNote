@@ -40,11 +40,14 @@ export const sessionGateway: SessionGateway = {
         selectedBlockId: null,
         selectedBlockIds: [],
         blockSelected: false,
-        allBlocksSelected: false,
-        focusRequest: null,
-        lastSavedAt: null,
-        lastLocalMutationAt: null,
-      });
+      allBlocksSelected: false,
+      focusRequest: null,
+      isFlushing: false,
+      saveInFlightCount: 0,
+      saveError: null,
+      lastSavedAt: null,
+      lastLocalMutationAt: null,
+    });
       return;
     }
 
@@ -59,7 +62,6 @@ export const sessionGateway: SessionGateway = {
 
     useDocumentSessionStore.setState({
       currentDocument: document,
-      lastSavedAt: document.updatedAt,
       selectedBlockId: normalizedSelectedBlockId,
       selectedBlockIds: normalizedSelectedBlockIds,
       blockSelected: normalizedSelectedBlockId !== null ? state.blockSelected : false,
@@ -78,7 +80,6 @@ export const sessionGateway: SessionGateway = {
       blockSelected: false,
       allBlocksSelected: false,
       focusRequest: targetBlock ? createFocusRequest(targetBlock.id, caret) : null,
-      lastSavedAt: document.updatedAt,
     });
   },
   clearBlockSelection(clearActiveEditorRef = false) {
@@ -98,6 +99,18 @@ export const sessionGateway: SessionGateway = {
   },
   setIsFlushing(value) {
     useDocumentSessionStore.getState().setIsFlushing(value);
+  },
+  startSaving() {
+    useDocumentSessionStore.getState().startSaving();
+  },
+  finishSaving() {
+    useDocumentSessionStore.getState().finishSaving();
+  },
+  setLastSavedAt(value) {
+    useDocumentSessionStore.getState().setLastSavedAt(value);
+  },
+  setSaveError(value) {
+    useDocumentSessionStore.getState().setSaveError(value);
   },
   markLocalMutation(value) {
     useDocumentSessionStore.getState().markLocalMutation(value);

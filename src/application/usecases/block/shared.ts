@@ -32,7 +32,7 @@ export function applyUpdatedBlock(
     blocks: currentDocument.blocks
       .map((entry) => (entry.id === block.id ? block : entry))
       .sort((left, right) => left.position - right.position),
-  });
+  }, { persisted: false });
 }
 
 export function queueAndApplyBlockUpdate(

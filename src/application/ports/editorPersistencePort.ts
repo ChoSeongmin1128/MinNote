@@ -9,6 +9,14 @@ export interface EditorPersistenceErrorContext {
   phase: 'autosave' | 'flush';
 }
 
+export interface EditorPersistenceLifecycleContext {
+  documentId: string;
+  phase: 'autosave' | 'flush';
+  status: 'started' | 'succeeded' | 'failed';
+  savedAt?: number;
+  error?: unknown;
+}
+
 export interface EditorPersistencePort {
   queueBlockSave(documentId: string, blockId: string, save: PendingBlockSave): void;
   flushDocument(documentId: string): Promise<number | null>;
@@ -16,4 +24,5 @@ export interface EditorPersistencePort {
   clearAll(): void;
   clearBlock(documentId: string, blockId: string): void;
   setErrorHandler(handler: ((error: unknown, context: EditorPersistenceErrorContext) => void) | null): void;
+  setLifecycleHandler(handler: ((context: EditorPersistenceLifecycleContext) => void) | null): void;
 }
