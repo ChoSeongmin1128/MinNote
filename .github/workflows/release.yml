@@ -48,6 +48,11 @@ jobs:
           unset TAURI_SIGNING_PRIVATE_KEY_PATH
           APP_ENTITLEMENTS_PATH="src-tauri/Entitlements.plist"
           HELPER_ENTITLEMENTS_PATH="src-tauri/Entitlements.Helper.plist"
+          APPLE_SIGNING_IDENTITY_REF="$(security find-identity -v -p codesigning | grep "\"$APPLE_SIGNING_IDENTITY\"" | awk 'NR == 1 { print $2 }')"
+          if [ -z "$APPLE_SIGNING_IDENTITY_REF" ]; then
+            echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"
+            exit 1
+          fi
           if [ -z "${APPLE_PROVISIONING_PROFILE_BASE64:-}" ]; then
             echo "APPLE_PROVISIONING_PROFILE_BASE64 secret is required for CloudKit-enabled release builds."
             exit 1
@@ -79,11 +84,11 @@ jobs:
             HELPER_EXEC_PATH="$HELPER_APP_PATH/Contents/MacOS/minnote-cloudkit-bridge"
             if [ -f "$HELPER_EXEC_PATH" ]; then
               cp "$PROFILE_PATH" "$HELPER_APP_PATH/Contents/embedded.provisionprofile"
-              codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH" "$HELPER_EXEC_PATH"
-              codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH" "$HELPER_APP_PATH"
+              codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH" "$HELPER_EXEC_PATH"
+              codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH" "$HELPER_APP_PATH"
             fi
-            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
-            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH"
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH"
 
             rm -f "$APP_ZIP_PATH"
             ditto -c -k --keepParent --sequesterRsrc "$APP_PATH" "$APP_ZIP_PATH"
@@ -236,12 +241,17 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
         run: |
+          APPLE_SIGNING_IDENTITY_REF="$(security find-identity -v -p codesigning | grep "\"$APPLE_SIGNING_IDENTITY\"" | awk 'NR == 1 { print $2 }')"
+          if [ -z "$APPLE_SIGNING_IDENTITY_REF" ]; then
+            echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"
+            exit 1
+          fi
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           for ARCH in aarch64 x86_64
           do
             DMG_PATH="$(./scripts/create-dmg.sh "dist/$ARCH/MinNote.app" dist "$VERSION" "$ARCH")"
-            codesign --force --sign "$APPLE_SIGNING_IDENTITY" "$DMG_PATH"
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" "$DMG_PATH"
             xcrun notarytool submit "$DMG_PATH" \
               --apple-id "$APPLE_ID" \
               --password "$APPLE_PASSWORD" \
