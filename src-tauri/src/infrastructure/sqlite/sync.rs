@@ -306,6 +306,22 @@ struct ApplyResponseStats {
     failed_count: usize,
 }
 
+fn document_record_name_for(document: &BridgeDocumentRecord) -> String {
+    SyncEntityType::Document.record_name(&document.document_id)
+}
+
+fn block_record_name_for(block: &BridgeBlockRecord) -> String {
+    SyncEntityType::Block.record_name(&block.block_id)
+}
+
+fn document_tombstone_record_name_for(tombstone: &BridgeDocumentTombstoneRecord) -> String {
+    SyncEntityType::DocumentTombstone.record_name(&tombstone.document_id)
+}
+
+fn block_tombstone_record_name_for(tombstone: &BridgeBlockTombstoneRecord) -> String {
+    SyncEntityType::BlockTombstone.record_name(&tombstone.block_id)
+}
+
 impl SqliteStore {
     pub(crate) fn begin_icloud_sync_run(&mut self) -> Result<SyncRunPreparation, AppError> {
         self.cleanup_orphaned_sync_operations()?;
@@ -1702,6 +1718,7 @@ impl SqliteStore {
         mark_processing: bool,
     ) -> Result<BuiltApplyOperations, AppError> {
         let plan = self.coalesce_sync_operations(operations)?;
+        let deleted_block_ids = plan.block_deletes.keys().cloned().collect::<HashSet<_>>();
         let mut save_documents = Vec::new();
         let mut save_blocks = Vec::new();
         let mut save_document_tombstones = Vec::new();
@@ -1795,14 +1812,11 @@ impl SqliteStore {
                         .or_insert(document.updated_at);
                 }
             }
-            operation_contexts.insert(
-                operation.id,
-                BuiltOperationContext {
-                    document_id: Some(document_id.clone()),
-                    clears_document_sync_state: false,
-                },
-            );
+            let mut projected_any_block = false;
             for block in blocks {
+                if deleted_block_ids.contains(&block.id) {
+                    continue;
+                }
                 if projected_block_ids.insert(block.id.clone()) {
                     let block_record_name = SyncEntityType::Block.record_name(&block.id);
                     let block_tombstone_record_name =
@@ -1819,7 +1833,17 @@ impl SqliteStore {
                         &block_tombstone_record_name,
                         operation.id,
                     );
+                    projected_any_block = true;
                 }
+            }
+            if projected_any_block {
+                operation_contexts.insert(
+                    operation.id,
+                    BuiltOperationContext {
+                        document_id: Some(document_id.clone()),
+                        clears_document_sync_state: false,
+                    },
+                );
             }
         }
 
@@ -1933,6 +1957,22 @@ impl SqliteStore {
             }
         }
 
+        self.remove_conflicting_save_records(
+            &mut save_documents,
+            &mut save_blocks,
+            &mut record_names_by_operation_id,
+            &mut operation_contexts,
+            &delete_record_names,
+        );
+
+        Self::validate_apply_request_has_no_record_conflicts(
+            &save_documents,
+            &save_blocks,
+            &save_document_tombstones,
+            &save_block_tombstones,
+            &delete_record_names,
+        )?;
+
         if mark_processing {
             let processing_ids = record_names_by_operation_id
                 .keys()
@@ -1967,6 +2007,94 @@ impl SqliteStore {
             document_projection_versions,
             coalesced_intent_count,
         })
+    }
+
+    fn remove_conflicting_save_records(
+        &self,
+        save_documents: &mut Vec<BridgeDocumentRecord>,
+        save_blocks: &mut Vec<BridgeBlockRecord>,
+        record_names_by_operation_id: &mut HashMap<i64, HashSet<String>>,
+        operation_contexts: &mut HashMap<i64, BuiltOperationContext>,
+        delete_record_names: &[String],
+    ) {
+        let delete_record_names = delete_record_names
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
+
+        save_documents.retain(|document| {
+            let record_name = document_record_name_for(document);
+            let keep = !delete_record_names.contains(&record_name);
+            if !keep {
+                Self::remove_record_operation_mapping(
+                    record_names_by_operation_id,
+                    operation_contexts,
+                    &record_name,
+                );
+            }
+            keep
+        });
+
+        save_blocks.retain(|block| {
+            let record_name = block_record_name_for(block);
+            let keep = !delete_record_names.contains(&record_name);
+            if !keep {
+                Self::remove_record_operation_mapping(
+                    record_names_by_operation_id,
+                    operation_contexts,
+                    &record_name,
+                );
+            }
+            keep
+        });
+    }
+
+    fn validate_apply_request_has_no_record_conflicts(
+        save_documents: &[BridgeDocumentRecord],
+        save_blocks: &[BridgeBlockRecord],
+        save_document_tombstones: &[BridgeDocumentTombstoneRecord],
+        save_block_tombstones: &[BridgeBlockTombstoneRecord],
+        delete_record_names: &[String],
+    ) -> Result<(), AppError> {
+        let delete_record_names = delete_record_names.iter().collect::<HashSet<_>>();
+        let mut conflicting_record_names = Vec::new();
+
+        conflicting_record_names.extend(
+            save_documents
+                .iter()
+                .map(document_record_name_for)
+                .filter(|record_name| delete_record_names.contains(record_name)),
+        );
+        conflicting_record_names.extend(
+            save_blocks
+                .iter()
+                .map(block_record_name_for)
+                .filter(|record_name| delete_record_names.contains(record_name)),
+        );
+        conflicting_record_names.extend(
+            save_document_tombstones
+                .iter()
+                .map(document_tombstone_record_name_for)
+                .filter(|record_name| delete_record_names.contains(record_name)),
+        );
+        conflicting_record_names.extend(
+            save_block_tombstones
+                .iter()
+                .map(block_tombstone_record_name_for)
+                .filter(|record_name| delete_record_names.contains(record_name)),
+        );
+
+        conflicting_record_names.sort();
+        conflicting_record_names.dedup();
+
+        if conflicting_record_names.is_empty() {
+            return Ok(());
+        }
+
+        Err(AppError::validation(format!(
+            "동기화 요청에 save/delete 충돌 record가 남아 있습니다: {}",
+            conflicting_record_names.join(", ")
+        )))
     }
 
     fn process_apply_response(
@@ -2115,6 +2243,34 @@ impl SqliteStore {
             .entry(operation_id)
             .or_default()
             .insert(record_name.to_string());
+    }
+
+    fn remove_record_operation_mapping(
+        record_names_by_operation_id: &mut HashMap<i64, HashSet<String>>,
+        operation_contexts: &mut HashMap<i64, BuiltOperationContext>,
+        record_name: &str,
+    ) {
+        let affected_operation_ids = record_names_by_operation_id
+            .iter()
+            .filter_map(|(operation_id, record_names)| {
+                record_names.contains(record_name).then_some(*operation_id)
+            })
+            .collect::<Vec<_>>();
+
+        for operation_id in affected_operation_ids {
+            let should_remove_operation = match record_names_by_operation_id.get_mut(&operation_id) {
+                Some(record_names) => {
+                    record_names.remove(record_name);
+                    record_names.is_empty()
+                }
+                None => false,
+            };
+
+            if should_remove_operation {
+                record_names_by_operation_id.remove(&operation_id);
+                operation_contexts.remove(&operation_id);
+            }
+        }
     }
 
     fn document_record(&self, document: Document) -> Result<BridgeDocumentRecord, AppError> {
@@ -3273,6 +3429,56 @@ mod tests {
     }
 
     #[test]
+    fn block_delete_and_ordering_do_not_save_and_delete_same_block_record() {
+        let mut store = test_store();
+        let document = store
+            .create_document(Some("삭제 충돌".to_string()))
+            .expect("document should be created");
+        let blocks = store
+            .create_block_below(&document.id, None, BlockKind::Text)
+            .expect("second block should be created");
+
+        store
+            .connection
+            .execute("DELETE FROM sync_operations", [])
+            .expect("operations should clear");
+
+        let deleted_block_id = blocks[0].id.clone();
+        store
+            .delete_block(&deleted_block_id)
+            .expect("block delete should succeed");
+
+        let built = store
+            .build_coalesced_sync_plan()
+            .expect("coalesced plan should build");
+
+        let saved_block_record_names = built
+            .request
+            .save_blocks
+            .iter()
+            .map(block_record_name_for)
+            .collect::<HashSet<_>>();
+        let deleted_record_names = built
+            .request
+            .delete_record_names
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
+
+        assert!(
+            !saved_block_record_names.contains(&SyncEntityType::Block.record_name(&deleted_block_id)),
+            "삭제된 블록은 ordering projection에서 다시 저장되면 안 됩니다"
+        );
+        assert_eq!(
+            saved_block_record_names
+                .intersection(&deleted_record_names)
+                .count(),
+            0,
+            "같은 block record가 save/delete에 동시에 들어가면 안 됩니다"
+        );
+    }
+
+    #[test]
     fn document_delete_supersedes_block_intents_in_coalesced_plan() {
         let mut store = test_store();
         let document = store
@@ -3341,6 +3547,28 @@ mod tests {
 
         assert_eq!(built.request.save_blocks.len(), 2);
         assert_eq!(built.coalesced_intent_count(), 1);
+    }
+
+    #[test]
+    fn apply_request_validation_rejects_remaining_save_delete_conflicts() {
+        let result = SqliteStore::validate_apply_request_has_no_record_conflicts(
+            &[],
+            &[BridgeBlockRecord {
+                block_id: "block-1".to_string(),
+                document_id: "doc-1".to_string(),
+                kind: BlockKind::Markdown.as_str().to_string(),
+                content: String::new(),
+                language: None,
+                position: 0,
+                updated_at_ms: SqliteStore::now(),
+                updated_by_device_id: "device-1".to_string(),
+            }],
+            &[],
+            &[],
+            &[SyncEntityType::Block.record_name("block-1")],
+        );
+
+        assert!(result.is_err(), "save/delete conflict는 bridge 호출 전에 차단해야 합니다");
     }
 
     #[test]
