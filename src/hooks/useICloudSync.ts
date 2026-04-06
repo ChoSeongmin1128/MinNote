@@ -4,11 +4,11 @@ import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 
 const INITIAL_DELAY_MS = 2_000;
-const TEXT_CHANGE_DEBOUNCE_MS = 2_500;
-const STRUCTURAL_CHANGE_DEBOUNCE_MS = 750;
-const ACTIVE_PERIODIC_SYNC_MS = 60_000;
+const TEXT_CHANGE_DEBOUNCE_MS = 1_500;
+const STRUCTURAL_CHANGE_DEBOUNCE_MS = 250;
+const ACTIVE_PERIODIC_SYNC_MS = 30_000;
 const BACKGROUND_PERIODIC_SYNC_MS = 5 * 60_000;
-const FOREGROUND_MIN_INTERVAL_MS = 60_000;
+const FOREGROUND_MIN_INTERVAL_MS = 30_000;
 
 export function useICloudSync(isReady: boolean) {
   const { runICloudSync } = usePreferencesController();
@@ -44,7 +44,7 @@ export function useICloudSync(isReady: boolean) {
         return;
       }
       initialSyncQueuedRef.current = true;
-      void runICloudSync();
+      void runICloudSync('initial');
     }, INITIAL_DELAY_MS);
 
     return () => {
@@ -75,7 +75,7 @@ export function useICloudSync(isReady: boolean) {
 
     const timer = window.setTimeout(() => {
       lastQueuedStructuralTriggerRef.current = triggerKey;
-      void runICloudSync();
+      void runICloudSync('structural_mutation');
     }, STRUCTURAL_CHANGE_DEBOUNCE_MS);
 
     return () => {
@@ -118,7 +118,7 @@ export function useICloudSync(isReady: boolean) {
 
     const timer = window.setTimeout(() => {
       lastQueuedTextTriggerRef.current = triggerKey;
-      void runICloudSync();
+      void runICloudSync('text_mutation');
     }, TEXT_CHANGE_DEBOUNCE_MS);
 
     return () => {
@@ -161,7 +161,7 @@ export function useICloudSync(isReady: boolean) {
         return;
       }
 
-      void runICloudSync();
+      void runICloudSync('periodic');
     }, ACTIVE_PERIODIC_SYNC_MS);
 
     return () => {
@@ -200,7 +200,7 @@ export function useICloudSync(isReady: boolean) {
       }
 
       lastForegroundSyncAtRef.current = now;
-      void runICloudSync();
+      void runICloudSync('foreground');
     };
 
     const handleVisibilityChange = () => {
@@ -230,7 +230,7 @@ export function useICloudSync(isReady: boolean) {
     }
 
     const handleOnline = () => {
-      void runICloudSync();
+      void runICloudSync('online');
     };
 
     window.addEventListener('online', handleOnline);

@@ -46,7 +46,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           unset TAURI_SIGNING_PRIVATE_KEY_PATH
-          ENTITLEMENTS_PATH="src-tauri/Entitlements.plist"
+          APP_ENTITLEMENTS_PATH="src-tauri/Entitlements.plist"
+          HELPER_ENTITLEMENTS_PATH="src-tauri/Entitlements.Helper.plist"
           if [ -z "${APPLE_PROVISIONING_PROFILE_BASE64:-}" ]; then
             echo "APPLE_PROVISIONING_PROFILE_BASE64 secret is required for CloudKit-enabled release builds."
             exit 1
@@ -78,11 +79,11 @@ jobs:
             HELPER_EXEC_PATH="$HELPER_APP_PATH/Contents/MacOS/minnote-cloudkit-bridge"
             if [ -f "$HELPER_EXEC_PATH" ]; then
               cp "$PROFILE_PATH" "$HELPER_APP_PATH/Contents/embedded.provisionprofile"
-              codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$HELPER_EXEC_PATH"
-              codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$HELPER_APP_PATH"
+              codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH" "$HELPER_EXEC_PATH"
+              codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH" "$HELPER_APP_PATH"
             fi
-            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
-            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH"
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH"
 
             rm -f "$APP_ZIP_PATH"
             ditto -c -k --keepParent --sequesterRsrc "$APP_PATH" "$APP_ZIP_PATH"

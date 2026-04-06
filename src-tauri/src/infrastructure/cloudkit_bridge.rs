@@ -135,6 +135,21 @@ impl CloudKitBridge {
     Ok(())
   }
 
+  pub fn ensure_subscription(
+    &self,
+    zone_name: &str,
+    subscription_id: &str,
+  ) -> Result<(), AppError> {
+    self.invoke::<EnsureSubscriptionRequest, EmptyResponse>(
+      "ensureSubscription",
+      &EnsureSubscriptionRequest {
+        zone_name: zone_name.to_string(),
+        subscription_id: subscription_id.to_string(),
+      },
+    )?;
+    Ok(())
+  }
+
   pub fn fetch_changes(&self, request: &FetchChangesRequest) -> Result<FetchChangesResponse, AppError> {
     self.invoke("fetchChanges", request)
   }
@@ -188,6 +203,13 @@ impl CloudKitBridge {
 #[serde(rename_all = "camelCase")]
 struct EnsureZoneRequest {
   zone_name: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EnsureSubscriptionRequest {
+  zone_name: String,
+  subscription_id: String,
 }
 
 #[derive(Debug, Deserialize)]

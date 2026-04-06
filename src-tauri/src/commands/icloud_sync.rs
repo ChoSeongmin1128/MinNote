@@ -4,7 +4,7 @@ use crate::application::dto::ICloudSyncDebugInfoDto;
 use crate::domain::models::ICloudSyncStatus;
 use crate::error::AppError;
 use crate::infrastructure::sync_engine::{decorate_status, emit_sync_status, SyncEngine};
-use crate::state::{AppState, SyncRuntimePhase};
+use crate::state::{AppState, SyncRuntimePhase, SyncTriggerReason};
 
 #[tauri::command]
 pub fn get_icloud_sync_status(state: State<'_, AppState>) -> Result<ICloudSyncStatus, String> {
@@ -34,7 +34,7 @@ pub fn set_icloud_sync_enabled(
     drop(repository);
     if enabled {
         state.reset_sync_backoff();
-        state.schedule_sync(true);
+        state.schedule_sync(SyncTriggerReason::Initial, true);
     }
     let status = decorate_status(&state, status);
     emit_sync_status(&app_handle, &status);
@@ -97,6 +97,7 @@ pub fn get_icloud_sync_debug_info(
 pub fn run_icloud_sync(
     app_handle: AppHandle,
     state: State<'_, AppState>,
+    reason: Option<String>,
 ) -> Result<ICloudSyncStatus, String> {
     {
         let repository = state
@@ -114,7 +115,13 @@ pub fn run_icloud_sync(
     }
 
     state.reset_sync_backoff();
-    state.schedule_sync(true);
+    let trigger = reason
+        .as_deref()
+        .map(SyncTriggerReason::from_str)
+        .transpose()
+        .map_err(|error| error.to_string())?
+        .unwrap_or(SyncTriggerReason::Manual);
+    state.schedule_sync(trigger, true);
     let status = SyncEngine::current_status(&state).map_err(|error| error.to_string())?;
     emit_sync_status(&app_handle, &status);
     Ok(status)
@@ -134,7 +141,7 @@ pub fn reset_icloud_sync_checkpoint(
         .map_err(|error| error.to_string())?;
     drop(repository);
     state.reset_sync_backoff();
-    state.schedule_sync(true);
+    state.schedule_sync(SyncTriggerReason::Manual, true);
     let status = decorate_status(&state, status);
     emit_sync_status(&app_handle, &status);
     Ok(status)
@@ -154,7 +161,7 @@ pub fn force_upload_all_documents(
         .map_err(|error| error.to_string())?;
     drop(repository);
     state.reset_sync_backoff();
-    state.schedule_sync(true);
+    state.schedule_sync(SyncTriggerReason::Manual, true);
     let status = decorate_status(&state, status);
     emit_sync_status(&app_handle, &status);
     Ok(status)
@@ -174,7 +181,7 @@ pub fn force_redownload_from_cloud(
         .map_err(|error| error.to_string())?;
     drop(repository);
     state.reset_sync_backoff();
-    state.schedule_sync(true);
+    state.schedule_sync(SyncTriggerReason::Manual, true);
     let status = decorate_status(&state, status);
     emit_sync_status(&app_handle, &status);
     Ok(status)

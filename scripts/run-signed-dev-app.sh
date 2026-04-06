@@ -5,6 +5,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env.release.local"
+APP_ENTITLEMENTS_PATH="$ROOT_DIR/src-tauri/Entitlements.plist"
+HELPER_ENTITLEMENTS_PATH="$ROOT_DIR/src-tauri/Entitlements.Helper.plist"
 
 usage() {
   cat <<'EOF'
@@ -124,15 +126,17 @@ sign_helper_app() {
     cp "$APPLE_PROVISIONING_PROFILE_RESOLVED" "$helper_app_path/Contents/embedded.provisionprofile"
   fi
 
-  codesign "${CODESIGN_ARGS[@]}" "$helper_exec_path"
-  codesign "${CODESIGN_ARGS[@]}" "$helper_app_path"
+  codesign "${HELPER_CODESIGN_ARGS[@]}" "$helper_exec_path"
+  codesign "${HELPER_CODESIGN_ARGS[@]}" "$helper_app_path"
 }
 
 cd "$ROOT_DIR"
 
-CODESIGN_ARGS=(--force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist")
+CODESIGN_ARGS=(--force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH")
+HELPER_CODESIGN_ARGS=(--force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH")
 if [ "$BUILD_MODE" = "debug" ]; then
   CODESIGN_ARGS+=(--timestamp=none)
+  HELPER_CODESIGN_ARGS+=(--timestamp=none)
 fi
 
 BUILD_ARGS=(--bundles app --no-sign)

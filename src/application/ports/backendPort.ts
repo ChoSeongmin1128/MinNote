@@ -57,7 +57,7 @@ export interface BackendPort {
   getICloudSyncStatus(): Promise<ICloudSyncStatus>;
   getICloudSyncDebugInfo(): Promise<ICloudSyncDebugInfoDto>;
   setICloudSyncEnabled(enabled: boolean): Promise<ICloudSyncStatus>;
-  runICloudSync(): Promise<ICloudSyncStatus>;
+  runICloudSync(reason?: string): Promise<ICloudSyncStatus>;
   resetICloudSyncCheckpoint(): Promise<ICloudSyncStatus>;
   forceUploadAllDocuments(): Promise<ICloudSyncStatus>;
   forceRedownloadFromCloud(): Promise<ICloudSyncStatus>;

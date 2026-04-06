@@ -6,6 +6,7 @@ use crate::application::dto::WorkspaceDocumentsChangedEventDto;
 use crate::domain::models::{ICloudAccountStatus, ICloudSyncState, ICloudSyncStatus};
 use crate::error::AppError;
 use crate::infrastructure::cloudkit_bridge::{CloudKitBridge, FetchChangesRequest};
+use crate::infrastructure::sqlite::{ICLOUD_ZONE_NAME, ICLOUD_ZONE_SUBSCRIPTION_ID};
 use crate::infrastructure::sqlite::sync::{is_retryable_sync_error, RemoteApplySummary, SyncRunPreparation};
 use crate::state::{AppState, SyncRuntimePhase};
 
@@ -121,6 +122,7 @@ impl SyncEngine {
     }
 
     bridge.ensure_zone("MinNoteZone")?;
+    ensure_cloudkit_subscription(state, &bridge);
 
     let changes = bridge.fetch_changes(&FetchChangesRequest {
       zone_name: "MinNoteZone".to_string(),
@@ -161,6 +163,42 @@ impl SyncEngine {
     if let Ok(status) = Self::current_status(state) {
       emit_sync_status(app_handle, &status);
     }
+  }
+}
+
+fn ensure_cloudkit_subscription(state: &AppState, bridge: &CloudKitBridge) {
+  let needs_ensure = match state.repository.lock() {
+    Ok(repository) => match repository.cloudkit_subscription_needs_ensure() {
+      Ok(needs_ensure) => needs_ensure,
+      Err(error) => {
+        log::warn!("CloudKit subscription 확인 상태를 읽지 못했습니다: {error}");
+        return;
+      }
+    },
+    Err(error) => {
+      log::warn!("CloudKit subscription 확인을 위해 저장소를 잠그지 못했습니다: {error}");
+      return;
+    }
+  };
+
+  if !needs_ensure {
+    return;
+  }
+
+  let installed = match bridge.ensure_subscription(ICLOUD_ZONE_NAME, ICLOUD_ZONE_SUBSCRIPTION_ID) {
+    Ok(()) => true,
+    Err(error) => {
+      log::warn!("CloudKit subscription 보장을 실패했습니다. polling fallback을 유지합니다: {error}");
+      false
+    }
+  };
+
+  if let Ok(repository) = state.repository.lock() {
+    if let Err(error) = repository.mark_cloudkit_subscription_check(installed) {
+      log::warn!("CloudKit subscription 상태를 기록하지 못했습니다: {error}");
+    }
+  } else {
+    log::warn!("CloudKit subscription 상태 기록을 위해 저장소를 잠그지 못했습니다");
   }
 }
 

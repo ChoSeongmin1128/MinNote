@@ -19,6 +19,8 @@ use crate::infrastructure::cloudkit_bridge::{
 use super::*;
 
 const TOMBSTONE_RETENTION_MS: i64 = 30 * 86_400_000;
+const SUBSCRIPTION_VERIFY_INTERVAL_MS: i64 = 24 * 60 * 60 * 1000;
+const SUBSCRIPTION_RETRY_INTERVAL_MS: i64 = 15 * 60 * 1000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SyncEntityType {
@@ -206,6 +208,8 @@ struct StoredCloudKitState {
     last_error_message: Option<String>,
     account_status: ICloudAccountStatus,
     sync_enabled: bool,
+    subscription_installed: bool,
+    subscription_last_verified_at_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone)]
@@ -457,8 +461,10 @@ impl SqliteStore {
          last_error_code,
          last_error_message,
          account_status,
-         sync_enabled
-       ) VALUES (?1, ?2, NULL, NULL, NULL, NULL, NULL, ?3, 0)
+         sync_enabled,
+         subscription_installed,
+         subscription_last_verified_at_ms
+       ) VALUES (?1, ?2, NULL, NULL, NULL, NULL, NULL, ?3, 0, 0, NULL)
        ON CONFLICT(scope) DO NOTHING",
             params![
                 ICLOUD_SCOPE_PRIVATE,
@@ -1453,7 +1459,7 @@ impl SqliteStore {
 
     fn read_cloudkit_state(&self) -> Result<StoredCloudKitState, AppError> {
         self.connection.query_row(
-      "SELECT server_change_token, last_sync_started_at_ms, last_sync_succeeded_at_ms, last_error_code, last_error_message, account_status, sync_enabled
+      "SELECT server_change_token, last_sync_started_at_ms, last_sync_succeeded_at_ms, last_error_code, last_error_message, account_status, sync_enabled, subscription_installed, subscription_last_verified_at_ms
        FROM cloudkit_state
        WHERE scope = ?1",
       params![ICLOUD_SCOPE_PRIVATE],
@@ -1468,6 +1474,8 @@ impl SqliteStore {
           account_status: ICloudAccountStatus::try_from_str(&account_status_raw)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
           sync_enabled: row.get::<_, i64>(6)? != 0,
+          subscription_installed: row.get::<_, i64>(7)? != 0,
+          subscription_last_verified_at_ms: row.get(8)?,
         })
       },
     ).map_err(AppError::from)
@@ -1480,6 +1488,38 @@ impl SqliteStore {
         self.connection.execute(
             "UPDATE cloudkit_state SET account_status = ?1 WHERE scope = ?2",
             params![account_status.as_str(), ICLOUD_SCOPE_PRIVATE],
+        )?;
+        Ok(())
+    }
+
+    pub(crate) fn cloudkit_subscription_needs_ensure(&self) -> Result<bool, AppError> {
+        let stored = self.read_cloudkit_state()?;
+        if !stored.sync_enabled {
+            return Ok(false);
+        }
+
+        let now = Self::now();
+        let interval_ms = if stored.subscription_installed {
+            SUBSCRIPTION_VERIFY_INTERVAL_MS
+        } else {
+            SUBSCRIPTION_RETRY_INTERVAL_MS
+        };
+
+        Ok(stored.subscription_last_verified_at_ms.map_or(true, |verified_at| {
+            now.saturating_sub(verified_at) >= interval_ms
+        }))
+    }
+
+    pub(crate) fn mark_cloudkit_subscription_check(
+        &self,
+        installed: bool,
+    ) -> Result<(), AppError> {
+        self.connection.execute(
+            "UPDATE cloudkit_state
+       SET subscription_installed = ?1,
+           subscription_last_verified_at_ms = ?2
+       WHERE scope = ?3",
+            params![if installed { 1 } else { 0 }, Self::now(), ICLOUD_SCOPE_PRIVATE],
         )?;
         Ok(())
     }

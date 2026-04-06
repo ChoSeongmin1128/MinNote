@@ -31,8 +31,9 @@ const DEFAULT_MENU_BAR_ICON_ENABLED: &str = "false";
 const DEFAULT_ALWAYS_ON_TOP_ENABLED: &str = "false";
 const DEFAULT_WINDOW_OPACITY_PERCENT: &str = "100";
 const DEFAULT_GLOBAL_TOGGLE_SHORTCUT: &str = "Option+M";
-const ICLOUD_SCOPE_PRIVATE: &str = "private";
-const ICLOUD_ZONE_NAME: &str = "MinNoteZone";
+pub(crate) const ICLOUD_SCOPE_PRIVATE: &str = "private";
+pub(crate) const ICLOUD_ZONE_NAME: &str = "MinNoteZone";
+pub(crate) const ICLOUD_ZONE_SUBSCRIPTION_ID: &str = "minnote-zone-subscription";
 
 pub struct SqliteStore {
   pub(crate) connection: Connection,

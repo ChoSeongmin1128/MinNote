@@ -31,12 +31,44 @@ pub enum SyncRuntimePhase {
   BackoffWaiting,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncTriggerReason {
+  Initial,
+  TextMutation,
+  StructuralMutation,
+  Foreground,
+  Online,
+  Periodic,
+  Manual,
+  RemoteNotification,
+}
+
+impl SyncTriggerReason {
+  pub fn from_str(value: &str) -> Result<Self, AppError> {
+    match value {
+      "initial" => Ok(Self::Initial),
+      "text_mutation" => Ok(Self::TextMutation),
+      "structural_mutation" => Ok(Self::StructuralMutation),
+      "foreground" => Ok(Self::Foreground),
+      "online" => Ok(Self::Online),
+      "periodic" => Ok(Self::Periodic),
+      "manual" => Ok(Self::Manual),
+      "remote_notification" => Ok(Self::RemoteNotification),
+      _ => Err(AppError::validation(format!(
+        "알 수 없는 동기화 트리거입니다: {value}"
+      ))),
+    }
+  }
+}
+
 pub struct SyncRuntimeState {
   pub phase: SyncRuntimePhase,
   pub scheduled: bool,
   pub force_run: bool,
   pub backoff_attempt: usize,
   pub next_retry_at_ms: Option<u64>,
+  pub queued_trigger: Option<SyncTriggerReason>,
+  pub active_trigger: Option<SyncTriggerReason>,
 }
 
 impl Default for SyncRuntimeState {
@@ -47,6 +79,8 @@ impl Default for SyncRuntimeState {
       force_run: false,
       backoff_attempt: 0,
       next_retry_at_ms: None,
+      queued_trigger: None,
+      active_trigger: None,
     }
   }
 }
@@ -145,6 +179,7 @@ impl AppState {
         state.scheduled = false;
         state.force_run = false;
         state.next_retry_at_ms = None;
+        state.active_trigger = Some(SyncTriggerReason::Manual);
         state.phase = SyncRuntimePhase::Checking;
         true
       }
@@ -172,9 +207,10 @@ impl AppState {
     }
   }
 
-  pub fn schedule_sync(&self, force: bool) {
+  pub fn schedule_sync(&self, trigger: SyncTriggerReason, force: bool) {
     if let Ok(mut state) = self.sync_runtime.lock() {
       state.scheduled = true;
+      state.queued_trigger = Some(trigger);
       if force {
         state.force_run = true;
         state.next_retry_at_ms = None;
@@ -230,6 +266,7 @@ impl AppState {
           state.scheduled = false;
           state.force_run = false;
           state.next_retry_at_ms = None;
+          state.active_trigger = state.queued_trigger.take();
           state.phase = SyncRuntimePhase::Checking;
           return;
         }
@@ -303,6 +340,7 @@ impl AppState {
 
   pub fn finish_sync_cycle(&self) {
     if let Ok(mut state) = self.sync_runtime.lock() {
+      state.active_trigger = None;
       if state.scheduled {
         state.phase = if state.next_retry_at_ms.is_some() && !state.force_run {
           SyncRuntimePhase::BackoffWaiting
@@ -320,6 +358,7 @@ impl AppState {
     if let Ok(mut state) = self.sync_runtime.lock() {
       state.backoff_attempt = 0;
       state.next_retry_at_ms = None;
+      state.active_trigger = None;
       if state.scheduled {
         state.phase = SyncRuntimePhase::Scheduled;
       } else {

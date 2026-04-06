@@ -210,7 +210,7 @@ export function createPreferencesUseCases({
     }
   }
 
-  async function runICloudSync() {
+  async function runICloudSync(reason?: string) {
     const previous = preferences.getICloudSyncStatus();
     preferences.setICloudSyncStatus({
       ...previous,
@@ -220,7 +220,7 @@ export function createPreferencesUseCases({
     });
 
     try {
-      const result = await backend.runICloudSync();
+      const result = await backend.runICloudSync(reason);
       workspace.clearError();
       preferences.setICloudSyncStatus(result);
       return result;

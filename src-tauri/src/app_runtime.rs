@@ -6,6 +6,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::domain::models::AppSettings;
 use crate::error::AppError;
 use crate::error::StartupError;
+#[cfg(target_os = "macos")]
+use crate::infrastructure::macos_remote_notifications::setup_remote_notifications;
 use crate::infrastructure::sync_engine::SyncEngine;
 use crate::ports::repositories::AppStateRepository;
 use crate::state::{AppState, SyncRuntimePhase};
@@ -377,6 +379,9 @@ pub(crate) fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
 
     #[cfg(target_os = "macos")]
     setup_activation_listener(app.handle().clone());
+
+    #[cfg(target_os = "macos")]
+    setup_remote_notifications(app.handle().clone());
 
     setup_startup_smoke(app);
 

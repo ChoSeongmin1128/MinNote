@@ -5,6 +5,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env.release.local"
+APP_ENTITLEMENTS_PATH="$ROOT_DIR/src-tauri/Entitlements.plist"
+HELPER_ENTITLEMENTS_PATH="$ROOT_DIR/src-tauri/Entitlements.Helper.plist"
 
 if [ "$#" -ne 1 ]; then
   echo "usage: $0 <version>"
@@ -113,8 +115,8 @@ sign_helper_app() {
     cp "$APPLE_PROVISIONING_PROFILE_RESOLVED" "$helper_app_path/Contents/embedded.provisionprofile"
   fi
 
-  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$helper_exec_path"
-  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$helper_app_path"
+  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH" "$helper_exec_path"
+  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH" "$helper_app_path"
 }
 
 cd "$ROOT_DIR"
@@ -141,8 +143,8 @@ for TARGET in "${TARGETS[@]}"; do
     cp "$APPLE_PROVISIONING_PROFILE_RESOLVED" "$APP_PATH/Contents/embedded.provisionprofile"
   fi
   sign_helper_app "$APP_PATH"
-  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$APP_PATH/Contents/MacOS/minnote"
-  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$ROOT_DIR/src-tauri/Entitlements.plist" "$APP_PATH"
+  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
+  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH"
   codesign --verify --deep --strict --verbose=2 "$APP_PATH"
   xcrun stapler validate "$APP_PATH"
   spctl -a -vv -t exec "$APP_PATH"

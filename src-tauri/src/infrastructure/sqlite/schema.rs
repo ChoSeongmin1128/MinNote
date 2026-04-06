@@ -63,7 +63,9 @@ impl SqliteStore {
           last_error_code TEXT NULL,
           last_error_message TEXT NULL,
           account_status TEXT NOT NULL,
-          sync_enabled INTEGER NOT NULL
+          sync_enabled INTEGER NOT NULL,
+          subscription_installed INTEGER NOT NULL DEFAULT 0,
+          subscription_last_verified_at_ms INTEGER NULL
         );
 
         CREATE TABLE IF NOT EXISTS sync_operations (
@@ -111,6 +113,8 @@ impl SqliteStore {
     self.ensure_document_column("deleted_at", "INTEGER NULL")?;
     self.ensure_document_column("updated_by_device_id", "TEXT NULL")?;
     self.ensure_block_column("updated_by_device_id", "TEXT NULL")?;
+    self.ensure_cloudkit_state_column("subscription_installed", "INTEGER NOT NULL DEFAULT 0")?;
+    self.ensure_cloudkit_state_column("subscription_last_verified_at_ms", "INTEGER NULL")?;
     self.ensure_app_state_value("theme_mode", DEFAULT_THEME_MODE)?;
     self.ensure_app_state_value("default_block_tint_preset", DEFAULT_BLOCK_TINT_PRESET)?;
     self.ensure_app_state_value("default_document_surface_tone_preset", DEFAULT_DOCUMENT_SURFACE_TONE_PRESET)?;
@@ -163,6 +167,23 @@ impl SqliteStore {
 
     self.connection.execute(
       &format!("ALTER TABLE blocks ADD COLUMN {column_name} {column_definition}"),
+      [],
+    )?;
+    Ok(())
+  }
+
+  fn ensure_cloudkit_state_column(&self, column_name: &str, column_definition: &str) -> Result<(), AppError> {
+    let mut statement = self.connection.prepare("PRAGMA table_info(cloudkit_state)")?;
+    let columns = statement
+      .query_map([], |row| row.get::<_, String>(1))?
+      .collect::<Result<Vec<_>, _>>()?;
+
+    if columns.iter().any(|column| column == column_name) {
+      return Ok(());
+    }
+
+    self.connection.execute(
+      &format!("ALTER TABLE cloudkit_state ADD COLUMN {column_name} {column_definition}"),
       [],
     )?;
     Ok(())

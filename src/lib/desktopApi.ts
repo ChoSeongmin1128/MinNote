@@ -162,8 +162,8 @@ export const desktopApi = {
   setICloudSyncEnabled(enabled: boolean) {
     return call<ICloudSyncStatus>('set_icloud_sync_enabled', { enabled });
   },
-  runICloudSync() {
-    return call<ICloudSyncStatus>('run_icloud_sync');
+  runICloudSync(reason?: string) {
+    return call<ICloudSyncStatus>('run_icloud_sync', { reason });
   },
   resetICloudSyncCheckpoint() {
     return call<ICloudSyncStatus>('reset_icloud_sync_checkpoint');

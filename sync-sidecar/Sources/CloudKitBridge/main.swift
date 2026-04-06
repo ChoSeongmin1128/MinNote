@@ -20,6 +20,13 @@ struct Main {
         let request: EnsureZoneRequest = try readPayload()
         try await ensureZone(zoneName: request.zoneName)
         try writeResponse(EmptyResponse())
+      case "ensureSubscription":
+        let request: EnsureSubscriptionRequest = try readPayload()
+        try await ensureSubscription(
+          zoneName: request.zoneName,
+          subscriptionId: request.subscriptionId
+        )
+        try writeResponse(EmptyResponse())
       case "fetchChanges":
         let request: FetchChangesRequest = try readPayload()
         let response = try await fetchChanges(request: request)
@@ -44,6 +51,11 @@ private struct EmptyResponse: Codable {}
 
 private struct EnsureZoneRequest: Codable {
   let zoneName: String
+}
+
+private struct EnsureSubscriptionRequest: Codable {
+  let zoneName: String
+  let subscriptionId: String
 }
 
 private struct AccountStatusResponse: Codable {
@@ -199,6 +211,29 @@ private func ensureZone(zoneName: String) async throws {
       }
     }
     privateDatabase().add(operation)
+  }
+}
+
+private func ensureSubscription(zoneName: String, subscriptionId: String) async throws {
+  let zone = zoneID(named: zoneName)
+  let subscription = CKRecordZoneSubscription(
+    zoneID: zone,
+    subscriptionID: subscriptionId
+  )
+  let notificationInfo = CKSubscription.NotificationInfo()
+  notificationInfo.shouldSendContentAvailable = true
+  subscription.notificationInfo = notificationInfo
+
+  _ = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CKSubscription, Error>) in
+    privateDatabase().save(subscription) { savedSubscription, error in
+      if let error {
+        continuation.resume(throwing: error)
+      } else if let savedSubscription {
+        continuation.resume(returning: savedSubscription)
+      } else {
+        continuation.resume(throwing: BridgeError.invalidCommand("ensureSubscription"))
+      }
+    }
   }
 }
 

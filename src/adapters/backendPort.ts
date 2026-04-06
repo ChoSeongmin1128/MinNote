@@ -116,8 +116,8 @@ export const backendPort: BackendPort = {
   setICloudSyncEnabled(enabled) {
     return desktopApi.setICloudSyncEnabled(enabled);
   },
-  runICloudSync() {
-    return desktopApi.runICloudSync();
+  runICloudSync(reason) {
+    return desktopApi.runICloudSync(reason);
   },
   resetICloudSyncCheckpoint() {
     return desktopApi.resetICloudSyncCheckpoint();
