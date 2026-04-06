@@ -24,4 +24,6 @@ export interface SessionGateway {
   setLastSavedAt(value: number | null): void;
   setSaveError(value: string | null): void;
   markLocalMutation(value?: number): void;
+  markTextMutation(value?: number): void;
+  markStructuralMutation(value?: number): void;
 }

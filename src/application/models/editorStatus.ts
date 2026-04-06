@@ -17,6 +17,23 @@ export interface EditorStatusPresentation {
   cloudTooltip: string;
 }
 
+function hasLocalUnsyncedChanges({
+  isFlushing,
+  lastSavedAt,
+  lastLocalMutationAt,
+  saveError,
+}: EditorSaveStatusInput) {
+  if (saveError) {
+    return true;
+  }
+
+  if (isFlushing) {
+    return true;
+  }
+
+  return lastLocalMutationAt != null && (lastSavedAt ?? 0) < lastLocalMutationAt;
+}
+
 export function deriveEditorSaveStatus({
   isFlushing,
   lastSavedAt,
@@ -39,6 +56,7 @@ export function deriveEditorSaveStatus({
 }
 
 export function deriveCloudSyncIndicatorStatus(
+  saveInput: EditorSaveStatusInput,
   status: ICloudSyncStatus,
 ): CloudSyncIndicatorStatus {
   if (!status.enabled) {
@@ -47,6 +65,10 @@ export function deriveCloudSyncIndicatorStatus(
 
   if (status.state === 'offline' || status.state === 'error' || status.lastErrorCode) {
     return 'warning';
+  }
+
+  if (hasLocalUnsyncedChanges(saveInput)) {
+    return 'pending';
   }
 
   if (status.state === 'checking' || status.state === 'syncing') {
@@ -75,6 +97,7 @@ function getSaveLabel(saveStatus: EditorSaveStatus) {
 }
 
 function getCloudTooltip(
+  saveInput: EditorSaveStatusInput,
   cloudStatus: CloudSyncIndicatorStatus,
   syncStatus: ICloudSyncStatus,
 ) {
@@ -91,6 +114,18 @@ function getCloudTooltip(
         ? 'iCloud 연결 상태를 확인하고 있습니다.'
         : 'iCloud와 동기화 중입니다.';
     case 'pending':
+      if (saveInput.saveError) {
+        return '로컬 저장이 끝나지 않아 iCloud에 반영하지 못했습니다.';
+      }
+      if (saveInput.isFlushing) {
+        return '이 Mac에 저장한 뒤 iCloud에 반영합니다.';
+      }
+      if (
+        saveInput.lastLocalMutationAt != null &&
+        (saveInput.lastSavedAt ?? 0) < saveInput.lastLocalMutationAt
+      ) {
+        return '로컬 변경을 저장한 뒤 iCloud에 반영합니다.';
+      }
       return syncStatus.pendingOperationCount > 0
         ? `다른 기기와 동기화할 변경 ${syncStatus.pendingOperationCount}건이 있습니다.`
         : '다른 기기와 동기화할 변경이 있습니다.';
@@ -105,12 +140,12 @@ export function deriveEditorStatusPresentation(
   syncStatus: ICloudSyncStatus,
 ): EditorStatusPresentation {
   const saveStatus = deriveEditorSaveStatus(saveInput);
-  const cloudStatus = deriveCloudSyncIndicatorStatus(syncStatus);
+  const cloudStatus = deriveCloudSyncIndicatorStatus(saveInput, syncStatus);
 
   return {
     saveLabel: getSaveLabel(saveStatus),
     saveStatus,
     cloudStatus,
-    cloudTooltip: getCloudTooltip(cloudStatus, syncStatus),
+    cloudTooltip: getCloudTooltip(saveInput, cloudStatus, syncStatus),
   };
 }

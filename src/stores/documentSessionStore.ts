@@ -21,6 +21,8 @@ interface DocumentSessionState {
   saveError: string | null;
   lastSavedAt: number | null;
   lastLocalMutationAt: number | null;
+  lastTextMutationAt: number | null;
+  lastStructuralMutationAt: number | null;
   lastCodeLanguage: CodeLanguageId;
   focusRequest: BlockFocusRequest | null;
   activeEditorRef: { current: BlockEditorHandle | null } | null;
@@ -35,6 +37,8 @@ interface DocumentSessionState {
   setLastSavedAt: (value: number | null) => void;
   setSaveError: (value: string | null) => void;
   markLocalMutation: (value?: number) => void;
+  markTextMutation: (value?: number) => void;
+  markStructuralMutation: (value?: number) => void;
   setLastCodeLanguage: (language: CodeLanguageId) => void;
   requestBlockFocus: (blockId: string, caret: BlockCaretPlacement) => void;
   setFocusRequest: (focusRequest: BlockFocusRequest | null) => void;
@@ -73,6 +77,8 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
   saveError: null,
   lastSavedAt: null,
   lastLocalMutationAt: null,
+  lastTextMutationAt: null,
+  lastStructuralMutationAt: null,
   lastCodeLanguage: 'javascript',
   focusRequest: null,
   activeEditorRef: null,
@@ -91,6 +97,8 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
       saveError: null,
       lastSavedAt: currentDocument?.updatedAt ?? null,
       lastLocalMutationAt: null,
+      lastTextMutationAt: null,
+      lastStructuralMutationAt: null,
     }),
   setSelectedBlockId: (selectedBlockId) => set({ selectedBlockId, selectedBlockIds: [], blockSelected: false, allBlocksSelected: false }),
   setSelectedBlockIds: (blockIds) => {
@@ -135,6 +143,18 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
   setLastSavedAt: (lastSavedAt) => set({ lastSavedAt }),
   setSaveError: (saveError) => set({ saveError }),
   markLocalMutation: (lastLocalMutationAt = Date.now()) => set({ lastLocalMutationAt, saveError: null }),
+  markTextMutation: (lastTextMutationAt = Date.now()) =>
+    set({
+      lastLocalMutationAt: lastTextMutationAt,
+      lastTextMutationAt,
+      saveError: null,
+    }),
+  markStructuralMutation: (lastStructuralMutationAt = Date.now()) =>
+    set({
+      lastLocalMutationAt: lastStructuralMutationAt,
+      lastStructuralMutationAt,
+      saveError: null,
+    }),
   setLastCodeLanguage: (lastCodeLanguage) => set({ lastCodeLanguage }),
   requestBlockFocus: (blockId, caret) =>
     set({

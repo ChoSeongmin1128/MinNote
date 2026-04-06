@@ -61,7 +61,7 @@ export function createDocumentUseCases({
       history.clear();
       workspace.upsertDocumentSummary(summarizeDocument(document));
       session.setCurrentDocument(document);
-      session.markLocalMutation(document.updatedAt);
+      session.markStructuralMutation(document.updatedAt);
       ui.setSettingsOpen(false);
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 만들지 못했습니다.'));
@@ -99,7 +99,7 @@ export function createDocumentUseCases({
 
       const document = await backend.renameDocument(currentDocument.id, title.trim() ? title : null);
       workspace.clearError();
-      session.markLocalMutation(document.updatedAt);
+      session.markStructuralMutation(document.updatedAt);
       updateDocumentState(session, workspace, document);
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서 제목을 저장하지 못했습니다.'));
@@ -117,7 +117,7 @@ export function createDocumentUseCases({
       const payload = await backend.deleteDocument(documentId);
       workspace.clearError();
       applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
-      session.markLocalMutation();
+      session.markStructuralMutation();
       ui.setSettingsOpen(false);
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 삭제하지 못했습니다.'));
@@ -139,7 +139,7 @@ export function createDocumentUseCases({
       const payload = await backend.restoreDocumentFromTrash(documentId);
       workspace.clearError();
       applyBootstrapPayloadState(preferences, workspace, session, payload, 'if-missing');
-      session.markLocalMutation();
+      session.markStructuralMutation();
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 복원하지 못했습니다.'));
     }
@@ -154,7 +154,7 @@ export function createDocumentUseCases({
 
       const nextDocument = await backend.setDocumentBlockTintOverride(currentDocument.id, preset);
       workspace.clearError();
-      session.markLocalMutation(nextDocument.updatedAt);
+      session.markStructuralMutation(nextDocument.updatedAt);
       updateDocumentState(session, workspace, nextDocument);
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서 색상쌍을 변경하지 못했습니다.'));
@@ -172,7 +172,7 @@ export function createDocumentUseCases({
 
       const nextDocument = await backend.setDocumentSurfaceToneOverride(currentDocument.id, preset);
       workspace.clearError();
-      session.markLocalMutation(nextDocument.updatedAt);
+      session.markStructuralMutation(nextDocument.updatedAt);
       updateDocumentState(session, workspace, nextDocument);
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서 배경 톤을 변경하지 못했습니다.'));

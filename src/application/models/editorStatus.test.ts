@@ -60,13 +60,61 @@ describe('editor status presentation', () => {
   });
 
   it('derives cloud sync indicator states', () => {
-    expect(deriveCloudSyncIndicatorStatus(createSyncStatus({ enabled: false }))).toBe('off');
-    expect(deriveCloudSyncIndicatorStatus(createSyncStatus({ state: 'offline' }))).toBe('warning');
-    expect(deriveCloudSyncIndicatorStatus(createSyncStatus({ state: 'syncing' }))).toBe('syncing');
+    const cleanSaveInput = {
+      isFlushing: false,
+      lastSavedAt: 20,
+      lastLocalMutationAt: 20,
+      saveError: null,
+    };
+
+    expect(deriveCloudSyncIndicatorStatus(cleanSaveInput, createSyncStatus({ enabled: false }))).toBe('off');
+    expect(deriveCloudSyncIndicatorStatus(cleanSaveInput, createSyncStatus({ state: 'offline' }))).toBe('warning');
+    expect(deriveCloudSyncIndicatorStatus(cleanSaveInput, createSyncStatus({ state: 'syncing' }))).toBe('syncing');
     expect(
-      deriveCloudSyncIndicatorStatus(createSyncStatus({ state: 'idle', pendingOperationCount: 2 })),
+      deriveCloudSyncIndicatorStatus(
+        cleanSaveInput,
+        createSyncStatus({ state: 'idle', pendingOperationCount: 2 }),
+      ),
     ).toBe('pending');
-    expect(deriveCloudSyncIndicatorStatus(createSyncStatus())).toBe('synced');
+    expect(deriveCloudSyncIndicatorStatus(cleanSaveInput, createSyncStatus())).toBe('synced');
+  });
+
+  it('treats local unsaved changes as cloud pending before backend status catches up', () => {
+    expect(
+      deriveCloudSyncIndicatorStatus(
+        {
+          isFlushing: true,
+          lastSavedAt: 20,
+          lastLocalMutationAt: 20,
+          saveError: null,
+        },
+        createSyncStatus(),
+      ),
+    ).toBe('pending');
+
+    expect(
+      deriveCloudSyncIndicatorStatus(
+        {
+          isFlushing: false,
+          lastSavedAt: 20,
+          lastLocalMutationAt: 21,
+          saveError: null,
+        },
+        createSyncStatus(),
+      ),
+    ).toBe('pending');
+
+    expect(
+      deriveCloudSyncIndicatorStatus(
+        {
+          isFlushing: false,
+          lastSavedAt: 20,
+          lastLocalMutationAt: 21,
+          saveError: '저장 실패',
+        },
+        createSyncStatus(),
+      ),
+    ).toBe('pending');
   });
 
   it('builds a combined presentation for the header', () => {

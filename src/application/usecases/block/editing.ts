@@ -79,7 +79,7 @@ export function createBlockEditingActions({
         }) ?? nextDocument.blocks.at(-1) ?? null;
 
       workspace.clearError();
-      session.markLocalMutation(nextDocument.updatedAt);
+      session.markStructuralMutation(nextDocument.updatedAt);
       setDocumentWithFocus(session, workspace, nextDocument, nextBlock?.id ?? null, 'start');
     }, (message) => workspace.setError(message), '블록을 만들지 못했습니다.');
   }
@@ -99,7 +99,7 @@ export function createBlockEditingActions({
       const replaced = replaceBlockInDocument(currentDocument, nextBlock);
       editorPersistence.clearBlock(currentDocument.id, blockId);
       workspace.clearError();
-      session.markLocalMutation(nextBlock.updatedAt);
+      session.markStructuralMutation(nextBlock.updatedAt);
       updateDocumentState(session, workspace, replaced);
     }, (message) => workspace.setError(message), '블록 형식을 바꾸지 못했습니다.');
   }
@@ -117,14 +117,14 @@ export function createBlockEditingActions({
     const previousDocument = currentDocument;
     const optimisticDocument = reorderDocumentBlocks(currentDocument, blockId, targetPosition);
     workspace.clearError();
-    session.markLocalMutation(optimisticDocument.updatedAt);
+    session.markStructuralMutation(optimisticDocument.updatedAt);
     setDocumentWithFocus(session, workspace, optimisticDocument, blockId, 'start', { persisted: false });
     session.setIsFlushing(true);
 
     try {
       await editorPersistence.flushDocument(previousDocument.id);
       const nextDocument = await backend.moveBlock(previousDocument.id, blockId, targetPosition);
-      session.markLocalMutation(nextDocument.updatedAt);
+      session.markStructuralMutation(nextDocument.updatedAt);
       updateDocumentState(session, workspace, nextDocument);
       session.requestBlockFocus(blockId, 'start');
     } catch (error) {
@@ -175,7 +175,7 @@ export function createBlockEditingActions({
         throw error;
       }
       workspace.clearError();
-      session.markLocalMutation(nextDocument.updatedAt);
+      session.markStructuralMutation(nextDocument.updatedAt);
       updateDocumentState(session, workspace, nextDocument);
 
       if (focusTarget) {

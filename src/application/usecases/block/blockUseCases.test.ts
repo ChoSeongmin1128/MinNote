@@ -80,6 +80,8 @@ describe('block usecases', () => {
       setLastSavedAt: vi.fn(),
       setSaveError: vi.fn(),
       markLocalMutation: vi.fn(),
+      markTextMutation: vi.fn(),
+      markStructuralMutation: vi.fn(),
     };
     const workspace = {
       upsertDocumentSummary: vi.fn(),
@@ -142,6 +144,8 @@ describe('block usecases', () => {
       setLastSavedAt: vi.fn(),
       setSaveError: vi.fn(),
       markLocalMutation: vi.fn(),
+      markTextMutation: vi.fn(),
+      markStructuralMutation: vi.fn(),
     };
     const workspace = {
       upsertDocumentSummary: vi.fn(),

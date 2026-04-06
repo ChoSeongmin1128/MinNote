@@ -5,7 +5,7 @@ use crate::application::services;
 use crate::domain::models::BlockKind;
 use crate::state::AppState;
 
-use super::helpers::{schedule_sync_after_mutation, with_repository};
+use super::helpers::{emit_sync_status_after_mutation, schedule_sync_after_mutation, with_repository};
 
 #[tauri::command]
 pub fn create_block_below(
@@ -64,32 +64,43 @@ pub fn delete_block(
 
 #[tauri::command]
 pub fn update_markdown_block(
+  app_handle: AppHandle,
   state: State<'_, AppState>,
   block_id: String,
   content: String,
 ) -> Result<BlockDto, String> {
-  with_repository(state, |repository| services::update_markdown_block(repository, &block_id, content))
+  let result =
+    with_repository(state.clone(), |repository| services::update_markdown_block(repository, &block_id, content))?;
+  emit_sync_status_after_mutation(&state, &app_handle);
+  Ok(result)
 }
 
 #[tauri::command]
 pub fn update_code_block(
+  app_handle: AppHandle,
   state: State<'_, AppState>,
   block_id: String,
   content: String,
   language: Option<String>,
 ) -> Result<BlockDto, String> {
-  with_repository(state, |repository| {
+  let result = with_repository(state.clone(), |repository| {
     services::update_code_block(repository, &block_id, content, language)
-  })
+  })?;
+  emit_sync_status_after_mutation(&state, &app_handle);
+  Ok(result)
 }
 
 #[tauri::command]
 pub fn update_text_block(
+  app_handle: AppHandle,
   state: State<'_, AppState>,
   block_id: String,
   content: String,
 ) -> Result<BlockDto, String> {
-  with_repository(state, |repository| services::update_text_block(repository, &block_id, content))
+  let result =
+    with_repository(state.clone(), |repository| services::update_text_block(repository, &block_id, content))?;
+  emit_sync_status_after_mutation(&state, &app_handle);
+  Ok(result)
 }
 
 #[tauri::command]

@@ -43,7 +43,7 @@ export function queueAndApplyBlockUpdate(
   nextBlock: BlockVm,
   payload: PendingBlockSave,
 ) {
-  session.markLocalMutation(nextBlock.updatedAt);
+  session.markTextMutation(nextBlock.updatedAt);
   queueBlockSave(nextBlock.documentId, blockId, payload);
   applyUpdatedBlock(session, workspace, nextBlock);
 }

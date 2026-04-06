@@ -35,7 +35,7 @@ export function createBlockHistoryActions({
         toRestoreBlocks(previousDocument.blocks),
       );
       workspace.clearError();
-      session.markLocalMutation(restored.updatedAt);
+      session.markStructuralMutation(restored.updatedAt);
       updateDocumentState(session, workspace, restored);
       session.clearBlockSelection(true);
       const focusId = restored.blocks[0]?.id ?? null;
@@ -60,7 +60,7 @@ export function createBlockHistoryActions({
         toRestoreBlocks(nextDocument.blocks),
       );
       workspace.clearError();
-      session.markLocalMutation(restored.updatedAt);
+      session.markStructuralMutation(restored.updatedAt);
       updateDocumentState(session, workspace, restored);
       session.clearBlockSelection(true);
       const focusId = restored.blocks[0]?.id ?? null;

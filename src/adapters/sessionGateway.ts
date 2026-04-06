@@ -47,6 +47,8 @@ export const sessionGateway: SessionGateway = {
       saveError: null,
       lastSavedAt: null,
       lastLocalMutationAt: null,
+      lastTextMutationAt: null,
+      lastStructuralMutationAt: null,
     });
       return;
     }
@@ -114,5 +116,11 @@ export const sessionGateway: SessionGateway = {
   },
   markLocalMutation(value) {
     useDocumentSessionStore.getState().markLocalMutation(value);
+  },
+  markTextMutation(value) {
+    useDocumentSessionStore.getState().markTextMutation(value);
+  },
+  markStructuralMutation(value) {
+    useDocumentSessionStore.getState().markStructuralMutation(value);
   },
 };

@@ -4,24 +4,29 @@ import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 
 const INITIAL_DELAY_MS = 2_000;
-const LOCAL_CHANGE_DEBOUNCE_MS = 8_000;
-const PERIODIC_SYNC_MS = 5 * 60_000;
+const TEXT_CHANGE_DEBOUNCE_MS = 2_500;
+const STRUCTURAL_CHANGE_DEBOUNCE_MS = 750;
+const ACTIVE_PERIODIC_SYNC_MS = 60_000;
+const BACKGROUND_PERIODIC_SYNC_MS = 5 * 60_000;
 const FOREGROUND_MIN_INTERVAL_MS = 60_000;
 
 export function useICloudSync(isReady: boolean) {
   const { runICloudSync } = usePreferencesController();
   const icloudSyncStatus = useWorkspaceStore((state) => state.icloudSyncStatus);
-  const lastLocalMutationAt = useDocumentSessionStore((state) => state.lastLocalMutationAt);
+  const lastTextMutationAt = useDocumentSessionStore((state) => state.lastTextMutationAt);
+  const lastStructuralMutationAt = useDocumentSessionStore((state) => state.lastStructuralMutationAt);
   const lastForegroundSyncAtRef = useRef<number>(0);
   const initialSyncQueuedRef = useRef(false);
-  const lastQueuedLocalTriggerRef = useRef<string | null>(null);
+  const lastQueuedTextTriggerRef = useRef<string | null>(null);
+  const lastQueuedStructuralTriggerRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (icloudSyncStatus.enabled) {
       return;
     }
     initialSyncQueuedRef.current = false;
-    lastQueuedLocalTriggerRef.current = null;
+    lastQueuedTextTriggerRef.current = null;
+    lastQueuedStructuralTriggerRef.current = null;
   }, [icloudSyncStatus.enabled]);
 
   useEffect(() => {
@@ -48,14 +53,14 @@ export function useICloudSync(isReady: boolean) {
   }, [icloudSyncStatus.enabled, isReady, runICloudSync]);
 
   useEffect(() => {
-    const mutationIsUnsynced =
-      lastLocalMutationAt != null &&
-      (icloudSyncStatus.lastSyncSucceededAtMs ?? 0) < lastLocalMutationAt;
+    const structuralMutationIsUnsynced =
+      lastStructuralMutationAt != null &&
+      (icloudSyncStatus.lastSyncSucceededAtMs ?? 0) < lastStructuralMutationAt;
 
     if (
       !isReady ||
       !icloudSyncStatus.enabled ||
-      (!mutationIsUnsynced && icloudSyncStatus.pendingOperationCount === 0) ||
+      !structuralMutationIsUnsynced ||
       icloudSyncStatus.state === 'checking' ||
       icloudSyncStatus.state === 'syncing' ||
       icloudSyncStatus.state === 'offline'
@@ -63,15 +68,15 @@ export function useICloudSync(isReady: boolean) {
       return;
     }
 
-    const triggerKey = `${lastLocalMutationAt ?? 0}:${icloudSyncStatus.pendingOperationCount}`;
-    if (lastQueuedLocalTriggerRef.current === triggerKey) {
+    const triggerKey = `${lastStructuralMutationAt ?? 0}:${icloudSyncStatus.pendingOperationCount}`;
+    if (lastQueuedStructuralTriggerRef.current === triggerKey) {
       return;
     }
 
     const timer = window.setTimeout(() => {
-      lastQueuedLocalTriggerRef.current = triggerKey;
+      lastQueuedStructuralTriggerRef.current = triggerKey;
       void runICloudSync();
-    }, LOCAL_CHANGE_DEBOUNCE_MS);
+    }, STRUCTURAL_CHANGE_DEBOUNCE_MS);
 
     return () => {
       window.clearTimeout(timer);
@@ -82,7 +87,51 @@ export function useICloudSync(isReady: boolean) {
     icloudSyncStatus.pendingOperationCount,
     icloudSyncStatus.state,
     isReady,
-    lastLocalMutationAt,
+    lastStructuralMutationAt,
+    runICloudSync,
+  ]);
+
+  useEffect(() => {
+    const textMutationIsUnsynced =
+      lastTextMutationAt != null &&
+      (icloudSyncStatus.lastSyncSucceededAtMs ?? 0) < lastTextMutationAt;
+    const structuralMutationIsUnsynced =
+      lastStructuralMutationAt != null &&
+      (icloudSyncStatus.lastSyncSucceededAtMs ?? 0) < lastStructuralMutationAt;
+
+    if (
+      !isReady ||
+      !icloudSyncStatus.enabled ||
+      !textMutationIsUnsynced ||
+      structuralMutationIsUnsynced ||
+      icloudSyncStatus.state === 'checking' ||
+      icloudSyncStatus.state === 'syncing' ||
+      icloudSyncStatus.state === 'offline'
+    ) {
+      return;
+    }
+
+    const triggerKey = `${lastTextMutationAt ?? 0}:${icloudSyncStatus.pendingOperationCount}`;
+    if (lastQueuedTextTriggerRef.current === triggerKey) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      lastQueuedTextTriggerRef.current = triggerKey;
+      void runICloudSync();
+    }, TEXT_CHANGE_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    icloudSyncStatus.enabled,
+    icloudSyncStatus.lastSyncSucceededAtMs,
+    icloudSyncStatus.pendingOperationCount,
+    icloudSyncStatus.state,
+    isReady,
+    lastStructuralMutationAt,
+    lastTextMutationAt,
     runICloudSync,
   ]);
 
@@ -95,13 +144,37 @@ export function useICloudSync(isReady: boolean) {
       if (icloudSyncStatus.state === 'checking' || icloudSyncStatus.state === 'syncing') {
         return;
       }
+
+      if (icloudSyncStatus.state === 'offline') {
+        return;
+      }
+
+      const now = Date.now();
+      const lastSyncAt = icloudSyncStatus.lastSyncSucceededAtMs ?? 0;
+      const hasPendingChanges = icloudSyncStatus.pendingOperationCount > 0;
+      const minInterval =
+        document.visibilityState === 'visible'
+          ? ACTIVE_PERIODIC_SYNC_MS
+          : BACKGROUND_PERIODIC_SYNC_MS;
+
+      if (!hasPendingChanges && now - lastSyncAt < minInterval) {
+        return;
+      }
+
       void runICloudSync();
-    }, PERIODIC_SYNC_MS);
+    }, ACTIVE_PERIODIC_SYNC_MS);
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [icloudSyncStatus.enabled, icloudSyncStatus.state, isReady, runICloudSync]);
+  }, [
+    icloudSyncStatus.enabled,
+    icloudSyncStatus.lastSyncSucceededAtMs,
+    icloudSyncStatus.pendingOperationCount,
+    icloudSyncStatus.state,
+    isReady,
+    runICloudSync,
+  ]);
 
   useEffect(() => {
     if (!isReady || !icloudSyncStatus.enabled) {

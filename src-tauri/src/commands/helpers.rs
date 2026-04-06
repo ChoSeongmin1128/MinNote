@@ -113,3 +113,10 @@ pub(super) fn schedule_sync_after_mutation(
   state.schedule_sync(false);
   SyncEngine::emit_current_status(app_handle, state.inner());
 }
+
+pub(super) fn emit_sync_status_after_mutation(
+  state: &State<'_, AppState>,
+  app_handle: &AppHandle,
+) {
+  SyncEngine::emit_current_status(app_handle, state.inner());
+}
