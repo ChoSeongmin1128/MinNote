@@ -1013,7 +1013,7 @@ impl SqliteStore {
             .get_document(document_id)?
             .map(|document| document.updated_at)
             .unwrap_or_else(Self::now);
-        self.clear_document_tombstones(document_id)?;
+        self.clear_document_tombstone(document_id)?;
         self.enqueue_sync_operation(
             SyncOperationType::DocumentCreated,
             SyncEntityType::Document,
@@ -1115,7 +1115,7 @@ impl SqliteStore {
             );
         }
 
-        self.clear_document_tombstones(document_id)?;
+        self.clear_document_tombstone(document_id)?;
         self.record_document_touch(document_id)?;
         self.record_document_ordering_updated(document_id)?;
 
@@ -1345,6 +1345,14 @@ impl SqliteStore {
         Ok(())
     }
 
+    fn clear_document_tombstone(&self, document_id: &str) -> Result<(), AppError> {
+        self.connection.execute(
+            "DELETE FROM sync_tombstones WHERE entity_type = ?1 AND entity_id = ?2",
+            params![SyncEntityType::DocumentTombstone.as_str(), document_id],
+        )?;
+        Ok(())
+    }
+
     fn clear_block_tombstone(&self, block_id: &str) -> Result<(), AppError> {
         self.connection.execute(
             "DELETE FROM sync_tombstones WHERE entity_type = ?1 AND entity_id = ?2",
@@ -1362,6 +1370,18 @@ impl SqliteStore {
         payload_json: Value,
         logical_clock: i64,
     ) -> Result<(), AppError> {
+        if matches!(
+            operation_type,
+            SyncOperationType::BlockCreated
+                | SyncOperationType::BlockContentUpdated
+                | SyncOperationType::BlockKindChanged
+        ) && self
+            .read_tombstone(SyncEntityType::BlockTombstone, entity_id)?
+            .is_some()
+        {
+            return Ok(());
+        }
+
         self.supersede_existing_operations(operation_type, entity_type, entity_id)?;
         self.connection.execute(
             "INSERT INTO sync_operations (
@@ -1419,7 +1439,8 @@ impl SqliteStore {
          AND operation_type IN ('document_ordering_updated', 'block_moved')"
       }
       SyncOperationType::BlockDeleted => {
-        "entity_type = ?1 AND entity_id = ?2 AND status IN ('pending', 'processing', 'failed')"
+        "entity_id = ?2 AND status IN ('pending', 'processing', 'failed')
+         AND entity_type IN ('block', 'block_tombstone')"
       }
       SyncOperationType::BlockCreated
       | SyncOperationType::BlockContentUpdated
@@ -1759,7 +1780,13 @@ impl SqliteStore {
                 | SyncOperationType::BlockContentUpdated
                 | SyncOperationType::BlockKindChanged => {
                     let block_id = operation.entity_id.clone();
-                    plan.block_deletes.remove(&block_id);
+                    if plan.block_deletes.contains_key(&block_id)
+                        || self
+                            .read_tombstone(SyncEntityType::BlockTombstone, &block_id)?
+                            .is_some()
+                    {
+                        continue;
+                    }
                     plan.block_upserts.insert(block_id, operation);
                 }
             }
@@ -2632,20 +2659,12 @@ impl SqliteStore {
         let tombstone = self.read_tombstone(SyncEntityType::BlockTombstone, &remote.block_id)?;
 
         if let Some(tombstone) = tombstone {
-            if compare_logical_clock(
-                remote.updated_at_ms,
-                &remote.updated_by_device_id,
+            self.record_block_deletion(
+                &remote.block_id,
+                &remote.document_id,
                 tombstone.deleted_at_ms,
-                &tombstone.deleted_by_device_id,
-            ) <= 0
-            {
-                self.record_block_deletion(
-                    &remote.block_id,
-                    &remote.document_id,
-                    tombstone.deleted_at_ms,
-                )?;
-                return Ok(false);
-            }
+            )?;
+            return Ok(false);
         }
 
         if let Some(local) = &local {
@@ -3623,6 +3642,137 @@ mod tests {
                 .count(),
             0,
             "같은 block record가 save/delete에 동시에 들어가면 안 됩니다"
+        );
+    }
+
+    #[test]
+    fn block_delete_supersedes_stale_block_upsert_operations() {
+        let mut store = test_store();
+        let document = store
+            .create_document(Some("삭제 우선".to_string()))
+            .expect("document should be created");
+        let block_id = store
+            .list_blocks(&document.id)
+            .expect("blocks should load")
+            .first()
+            .expect("initial block should exist")
+            .id
+            .clone();
+
+        store
+            .connection
+            .execute("DELETE FROM sync_operations", [])
+            .expect("operations should clear");
+
+        let deleted_at_ms = SqliteStore::now();
+        store
+            .record_block_deletion(&block_id, &document.id, deleted_at_ms)
+            .expect("block delete should enqueue");
+        store
+            .enqueue_sync_operation(
+                SyncOperationType::BlockContentUpdated,
+                SyncEntityType::Block,
+                &block_id,
+                Some(&document.id),
+                json!({}),
+                deleted_at_ms + 1,
+            )
+            .expect("stale block update should be ignored");
+
+        let built = store
+            .build_coalesced_sync_plan()
+            .expect("coalesced plan should build");
+
+        assert!(
+            built
+                .request
+                .save_blocks
+                .iter()
+                .all(|block| block.block_id != block_id),
+            "삭제된 블록은 stale upsert가 남아 있어도 다시 저장되면 안 됩니다"
+        );
+        assert!(
+            built
+                .request
+                .delete_record_names
+                .contains(&SyncEntityType::Block.record_name(&block_id)),
+            "삭제된 블록은 source record delete가 유지되어야 합니다"
+        );
+    }
+
+    #[test]
+    fn remote_block_does_not_resurrect_when_local_block_tombstone_exists() {
+        let mut store = test_store();
+        let document = store
+            .create_document(Some("삭제 부활 방지".to_string()))
+            .expect("document should be created");
+        let block_id = store
+            .list_blocks(&document.id)
+            .expect("blocks should load")
+            .first()
+            .expect("initial block should exist")
+            .id
+            .clone();
+
+        let deleted_at_ms = SqliteStore::now();
+        store
+            .delete_block(&block_id)
+            .expect("block delete should succeed");
+
+        let mut next_temp_position = 1_000_000_000;
+        let applied = store
+            .apply_remote_block(
+                &BridgeBlockRecord {
+                    block_id: block_id.clone(),
+                    document_id: document.id.clone(),
+                    kind: BlockKind::Markdown.as_str().to_string(),
+                    content: "되살아나면 안 됨".to_string(),
+                    language: None,
+                    position: 0,
+                    updated_at_ms: deleted_at_ms + 10,
+                    updated_by_device_id: "remote-device".to_string(),
+                },
+                &mut next_temp_position,
+            )
+            .expect("remote block apply should succeed");
+
+        assert!(!applied, "로컬 tombstone이 있으면 remote block은 적용되면 안 됩니다");
+        assert!(
+            store.fetch_block(&block_id).is_err(),
+            "삭제된 블록은 remote upsert로 다시 생기면 안 됩니다"
+        );
+    }
+
+    #[test]
+    fn enqueue_document_projection_keeps_deleted_block_tombstones() {
+        let mut store = test_store();
+        let document = store
+            .create_document(Some("projection tombstone 유지".to_string()))
+            .expect("document should be created");
+        let blocks = store
+            .create_block_below(&document.id, None, BlockKind::Text)
+            .expect("second block should be created");
+        let deleted_block_id = blocks[0].id.clone();
+
+        store
+            .connection
+            .execute("DELETE FROM sync_operations", [])
+            .expect("operations should clear");
+
+        store
+            .delete_block(&deleted_block_id)
+            .expect("block delete should succeed");
+        store
+            .enqueue_document_projection_operations(&document.id)
+            .expect("document projection should enqueue");
+
+        let tombstone = store
+            .read_tombstone(SyncEntityType::BlockTombstone, &deleted_block_id)
+            .expect("tombstone should load");
+
+        assert!(
+            tombstone.is_some(),
+            "문서 전체 재투영이 삭제된 블록 tombstone을 지우면 안 됩니다"
         );
     }
 

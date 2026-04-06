@@ -13,12 +13,20 @@ const FOREGROUND_MIN_INTERVAL_MS = 30_000;
 export function useICloudSync(isReady: boolean) {
   const { runICloudSync } = usePreferencesController();
   const icloudSyncStatus = useWorkspaceStore((state) => state.icloudSyncStatus);
+  const isFlushing = useDocumentSessionStore((state) => state.isFlushing);
+  const lastSavedAt = useDocumentSessionStore((state) => state.lastSavedAt);
+  const lastLocalMutationAt = useDocumentSessionStore((state) => state.lastLocalMutationAt);
+  const saveError = useDocumentSessionStore((state) => state.saveError);
   const lastTextMutationAt = useDocumentSessionStore((state) => state.lastTextMutationAt);
   const lastStructuralMutationAt = useDocumentSessionStore((state) => state.lastStructuralMutationAt);
   const lastForegroundSyncAtRef = useRef<number>(0);
   const initialSyncQueuedRef = useRef(false);
   const lastQueuedTextTriggerRef = useRef<string | null>(null);
   const lastQueuedStructuralTriggerRef = useRef<string | null>(null);
+  const hasUnsavedLocalChanges =
+    saveError != null ||
+    isFlushing ||
+    (lastLocalMutationAt != null && (lastSavedAt ?? 0) < lastLocalMutationAt);
 
   useEffect(() => {
     if (icloudSyncStatus.enabled) {
@@ -61,6 +69,7 @@ export function useICloudSync(isReady: boolean) {
       !isReady ||
       !icloudSyncStatus.enabled ||
       !structuralMutationIsUnsynced ||
+      hasUnsavedLocalChanges ||
       icloudSyncStatus.state === 'checking' ||
       icloudSyncStatus.state === 'syncing' ||
       icloudSyncStatus.state === 'offline'
@@ -86,9 +95,14 @@ export function useICloudSync(isReady: boolean) {
     icloudSyncStatus.lastSyncSucceededAtMs,
     icloudSyncStatus.pendingOperationCount,
     icloudSyncStatus.state,
+    hasUnsavedLocalChanges,
+    isFlushing,
     isReady,
+    lastLocalMutationAt,
+    lastSavedAt,
     lastStructuralMutationAt,
     runICloudSync,
+    saveError,
   ]);
 
   useEffect(() => {
@@ -104,6 +118,7 @@ export function useICloudSync(isReady: boolean) {
       !icloudSyncStatus.enabled ||
       !textMutationIsUnsynced ||
       structuralMutationIsUnsynced ||
+      hasUnsavedLocalChanges ||
       icloudSyncStatus.state === 'checking' ||
       icloudSyncStatus.state === 'syncing' ||
       icloudSyncStatus.state === 'offline'
@@ -129,10 +144,15 @@ export function useICloudSync(isReady: boolean) {
     icloudSyncStatus.lastSyncSucceededAtMs,
     icloudSyncStatus.pendingOperationCount,
     icloudSyncStatus.state,
+    hasUnsavedLocalChanges,
+    isFlushing,
     isReady,
+    lastLocalMutationAt,
+    lastSavedAt,
     lastStructuralMutationAt,
     lastTextMutationAt,
     runICloudSync,
+    saveError,
   ]);
 
   useEffect(() => {
