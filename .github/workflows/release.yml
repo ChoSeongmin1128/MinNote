@@ -94,12 +94,14 @@ jobs:
         run: |
           APPLE_SIGNING_IDENTITY_REF="$(security find-identity -v -p codesigning | grep "\"$APPLE_SIGNING_IDENTITY\"" | awk 'NR == 1 { print $2 }')"
           [ -n "$APPLE_SIGNING_IDENTITY_REF" ] || { echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"; exit 1; }
-          echo "APPLE_SIGNING_IDENTITY_REF=$APPLE_SIGNING_IDENTITY_REF" >> "$GITHUB_ENV"
           PROFILE_PATH="$RUNNER_TEMP/minnote-cloudkit.provisionprofile"
           printf '%s' "$APPLE_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
-          echo "PROFILE_PATH=$PROFILE_PATH" >> "$GITHUB_ENV"
-          echo "TARGET=${{ matrix.target }}" >> "$GITHUB_ENV"
-          echo "ARCH_LABEL=${{ matrix.arch_label }}" >> "$GITHUB_ENV"
+          {
+            echo "APPLE_SIGNING_IDENTITY_REF=$APPLE_SIGNING_IDENTITY_REF"
+            echo "PROFILE_PATH=$PROFILE_PATH"
+            echo "TARGET=${{ matrix.target }}"
+            echo "ARCH_LABEL=${{ matrix.arch_label }}"
+          } >> "$GITHUB_ENV"
 
       - name: Build app bundle
         run: ./scripts/package-notarized-app.sh build "$TARGET"
