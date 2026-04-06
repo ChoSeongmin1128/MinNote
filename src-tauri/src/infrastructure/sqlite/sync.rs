@@ -208,6 +208,12 @@ struct StoredCloudKitState {
     sync_enabled: bool,
 }
 
+#[derive(Debug, Clone)]
+struct DocumentSyncStateRow {
+    last_projected_updated_at_ms: Option<i64>,
+    last_uploaded_success_at_ms: Option<i64>,
+}
+
 pub(crate) struct SyncDebugSnapshot {
     pub pending_operation_count: usize,
     pub processing_operation_count: usize,
@@ -221,8 +227,16 @@ pub(crate) struct SyncDebugSnapshot {
 pub(crate) struct BuiltApplyOperations {
     request: ApplyOperationsRequest,
     record_names_by_operation_id: HashMap<i64, HashSet<String>>,
+    operation_contexts: HashMap<i64, BuiltOperationContext>,
+    document_projection_versions: HashMap<String, i64>,
     #[allow(dead_code)]
     coalesced_intent_count: usize,
+}
+
+#[derive(Debug, Clone)]
+struct BuiltOperationContext {
+    document_id: Option<String>,
+    clears_document_sync_state: bool,
 }
 
 #[derive(Default)]
@@ -238,7 +252,6 @@ pub(crate) enum SyncRunPreparation {
     Disabled(ICloudSyncStatus),
     Ready {
         server_change_token: Option<String>,
-        has_server_change_token: bool,
     },
 }
 
@@ -285,7 +298,6 @@ impl SqliteStore {
         )?;
 
         Ok(SyncRunPreparation::Ready {
-            has_server_change_token: stored.server_change_token.is_some(),
             server_change_token: stored.server_change_token,
         })
     }
@@ -308,13 +320,10 @@ impl SqliteStore {
 
     pub(crate) fn apply_remote_changes_and_build_operations(
         &mut self,
-        has_server_change_token: bool,
         changes: &FetchChangesResponse,
     ) -> Result<BuiltApplyOperations, AppError> {
         self.apply_remote_changes(changes)?;
-        if !has_server_change_token && changes.is_empty() {
-            self.queue_all_active_documents_for_sync()?;
-        }
+        self.queue_unsynced_documents_for_upload()?;
         self.build_coalesced_sync_plan()
     }
 
@@ -687,7 +696,7 @@ impl SqliteStore {
             current_state.server_change_token.clone(),
         )?;
         self.apply_remote_changes(&changes)?;
-        self.seed_cloud_from_local_if_needed(&current_state, &changes)?;
+        self.queue_unsynced_documents_for_upload()?;
 
         let built = self.build_coalesced_sync_plan()?;
         let mut apply_stats = ApplyResponseStats::default();
@@ -737,18 +746,6 @@ impl SqliteStore {
             }
             Err(error) => Err(error),
         }
-    }
-
-    fn seed_cloud_from_local_if_needed(
-        &mut self,
-        current_state: &StoredCloudKitState,
-        changes: &FetchChangesResponse,
-    ) -> Result<(), AppError> {
-        if current_state.server_change_token.is_some() || !changes.is_empty() {
-            return Ok(());
-        }
-
-        self.queue_all_active_documents_for_sync()
     }
 
     pub(crate) fn purge_expired_tombstones(&mut self, now_ms: i64) -> Result<(), AppError> {
@@ -817,6 +814,116 @@ impl SqliteStore {
             self.enqueue_document_projection_operations(&document_id)?;
         }
 
+        Ok(())
+    }
+
+    fn queue_unsynced_documents_for_upload(&mut self) -> Result<(), AppError> {
+        let document_ids = self
+            .connection
+            .prepare(
+                "SELECT id
+         FROM documents
+         WHERE deleted_at IS NULL
+         ORDER BY updated_at DESC, id DESC",
+            )?
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        for document_id in document_ids {
+            if !self.document_needs_cloud_projection(&document_id)? {
+                continue;
+            }
+            self.enqueue_document_projection_operations(&document_id)?;
+        }
+
+        Ok(())
+    }
+
+    fn document_needs_cloud_projection(&self, document_id: &str) -> Result<bool, AppError> {
+        let Some(document) = self.get_document(document_id)? else {
+            return Ok(false);
+        };
+
+        if document.deleted_at.is_some() || self.document_has_active_sync_work(document_id)? {
+            return Ok(false);
+        }
+
+        let sync_state = self.read_document_sync_state(document_id)?;
+        let Some(sync_state) = sync_state else {
+            return Ok(true);
+        };
+
+        Ok(sync_state.last_uploaded_success_at_ms.is_none()
+            || sync_state.last_projected_updated_at_ms.unwrap_or_default() < document.updated_at)
+    }
+
+    fn document_has_active_sync_work(&self, document_id: &str) -> Result<bool, AppError> {
+        let has_work = self.connection.query_row(
+            "SELECT EXISTS(
+               SELECT 1
+               FROM sync_operations
+               WHERE status IN ('pending', 'processing', 'failed')
+                 AND (
+                   document_id = ?1
+                   OR (entity_type IN ('document', 'document_tombstone') AND entity_id = ?1)
+                 )
+             )",
+            params![document_id],
+            |row| row.get::<_, i64>(0),
+        )?;
+        Ok(has_work > 0)
+    }
+
+    fn read_document_sync_state(
+        &self,
+        document_id: &str,
+    ) -> Result<Option<DocumentSyncStateRow>, AppError> {
+        self.connection
+            .query_row(
+                "SELECT last_projected_updated_at_ms, last_uploaded_success_at_ms
+         FROM document_sync_state
+         WHERE document_id = ?1",
+                params![document_id],
+                |row| {
+                    Ok(DocumentSyncStateRow {
+                        last_projected_updated_at_ms: row.get(0)?,
+                        last_uploaded_success_at_ms: row.get(1)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(AppError::from)
+    }
+
+    fn upsert_document_sync_state(
+        &self,
+        document_id: &str,
+        last_projected_updated_at_ms: i64,
+        last_uploaded_success_at_ms: i64,
+    ) -> Result<(), AppError> {
+        self.connection.execute(
+            "INSERT INTO document_sync_state (
+         document_id,
+         last_projected_updated_at_ms,
+         last_uploaded_success_at_ms
+       ) VALUES (?1, ?2, ?3)
+       ON CONFLICT(document_id) DO UPDATE SET
+         last_projected_updated_at_ms = excluded.last_projected_updated_at_ms,
+         last_uploaded_success_at_ms = excluded.last_uploaded_success_at_ms",
+            params![
+                document_id,
+                last_projected_updated_at_ms,
+                last_uploaded_success_at_ms
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn clear_document_sync_state(&self, document_id: &str) -> Result<(), AppError> {
+        self.connection.execute(
+            "DELETE FROM document_sync_state WHERE document_id = ?1",
+            params![document_id],
+        )?;
         Ok(())
     }
 
@@ -953,6 +1060,7 @@ impl SqliteStore {
     ) -> Result<(), AppError> {
         let device_id = self.current_device_id()?;
         let blocks = self.list_blocks(document_id)?;
+        self.clear_document_sync_state(document_id)?;
 
         self.connection.execute(
             "UPDATE documents
@@ -1126,6 +1234,7 @@ impl SqliteStore {
     pub(crate) fn force_redownload_from_cloud(&mut self) -> Result<ICloudSyncStatus, AppError> {
         self.connection.execute("DELETE FROM sync_operations", [])?;
         self.connection.execute("DELETE FROM sync_tombstones", [])?;
+        self.connection.execute("DELETE FROM document_sync_state", [])?;
         self.connection
             .execute(&format!("DELETE FROM {SEARCH_INDEX_TABLE}"), [])?;
         self.connection.execute("DELETE FROM blocks", [])?;
@@ -1560,12 +1669,21 @@ impl SqliteStore {
         let mut save_block_tombstones = Vec::new();
         let mut delete_record_names = Vec::new();
         let mut record_names_by_operation_id: HashMap<i64, HashSet<String>> = HashMap::new();
+        let mut operation_contexts: HashMap<i64, BuiltOperationContext> = HashMap::new();
+        let mut document_projection_versions: HashMap<String, i64> = HashMap::new();
         let mut projected_block_ids = HashSet::new();
 
         for (document_id, operation) in &plan.document_deletes {
             let document_record_name = SyncEntityType::Document.record_name(document_id);
             let document_tombstone_record_name =
                 SyncEntityType::DocumentTombstone.record_name(document_id);
+            operation_contexts.insert(
+                operation.id,
+                BuiltOperationContext {
+                    document_id: Some(document_id.clone()),
+                    clears_document_sync_state: true,
+                },
+            );
             if let Some(tombstone) =
                 self.read_tombstone(SyncEntityType::DocumentTombstone, document_id)?
             {
@@ -1597,6 +1715,16 @@ impl SqliteStore {
                 SyncEntityType::DocumentTombstone.record_name(document_id);
             if let Some(document) = self.get_document(document_id)? {
                 if document.deleted_at.is_none() {
+                    document_projection_versions
+                        .entry(document_id.clone())
+                        .or_insert(document.updated_at);
+                    operation_contexts.insert(
+                        operation.id,
+                        BuiltOperationContext {
+                            document_id: Some(document_id.clone()),
+                            clears_document_sync_state: false,
+                        },
+                    );
                     save_documents.push(self.document_record(document)?);
                     delete_record_names.push(document_tombstone_record_name.clone());
                     Self::push_record_operation_mapping(
@@ -1621,6 +1749,20 @@ impl SqliteStore {
             if blocks.is_empty() {
                 continue;
             }
+            if let Some(document) = self.get_document(document_id)? {
+                if document.deleted_at.is_none() {
+                    document_projection_versions
+                        .entry(document_id.clone())
+                        .or_insert(document.updated_at);
+                }
+            }
+            operation_contexts.insert(
+                operation.id,
+                BuiltOperationContext {
+                    document_id: Some(document_id.clone()),
+                    clears_document_sync_state: false,
+                },
+            );
             for block in blocks {
                 if projected_block_ids.insert(block.id.clone()) {
                     let block_record_name = SyncEntityType::Block.record_name(&block.id);
@@ -1650,6 +1792,22 @@ impl SqliteStore {
             {
                 continue;
             }
+            if let Some(document_id) = &operation.document_id {
+                if let Some(document) = self.get_document(document_id)? {
+                    if document.deleted_at.is_none() {
+                        document_projection_versions
+                            .entry(document_id.clone())
+                            .or_insert(document.updated_at);
+                    }
+                }
+            }
+            operation_contexts.insert(
+                operation.id,
+                BuiltOperationContext {
+                    document_id: operation.document_id.clone(),
+                    clears_document_sync_state: false,
+                },
+            );
             let block_record_name = SyncEntityType::Block.record_name(block_id);
             let block_tombstone_record_name = SyncEntityType::BlockTombstone.record_name(block_id);
             if let Some(tombstone) =
@@ -1683,6 +1841,22 @@ impl SqliteStore {
             {
                 continue;
             }
+            if let Some(document_id) = &operation.document_id {
+                if let Some(document) = self.get_document(document_id)? {
+                    if document.deleted_at.is_none() {
+                        document_projection_versions
+                            .entry(document_id.clone())
+                            .or_insert(document.updated_at);
+                    }
+                }
+            }
+            operation_contexts.insert(
+                operation.id,
+                BuiltOperationContext {
+                    document_id: operation.document_id.clone(),
+                    clears_document_sync_state: false,
+                },
+            );
             if projected_block_ids.contains(block_id) {
                 let block_record_name = SyncEntityType::Block.record_name(block_id);
                 let block_tombstone_record_name =
@@ -1750,6 +1924,8 @@ impl SqliteStore {
                 delete_record_names,
             },
             record_names_by_operation_id,
+            operation_contexts,
+            document_projection_versions,
             coalesced_intent_count,
         })
     }
@@ -1759,6 +1935,11 @@ impl SqliteStore {
         built: &BuiltApplyOperations,
         response: &ApplyOperationsResponse,
     ) -> Result<ApplyResponseStats, AppError> {
+        struct DocumentApplyState {
+            all_succeeded: bool,
+            clears_sync_state: bool,
+        }
+
         let saved_record_names = response
             .saved_record_names
             .iter()
@@ -1769,6 +1950,7 @@ impl SqliteStore {
             .iter()
             .map(|failure| (failure.record_name.clone(), failure.error_code.clone()))
             .collect::<HashMap<_, _>>();
+        let mut document_apply_states: HashMap<String, DocumentApplyState> = HashMap::new();
 
         let mut failed_count = 0;
         for (operation_id, record_names) in &built.record_names_by_operation_id {
@@ -1786,8 +1968,32 @@ impl SqliteStore {
                 missing_result = true;
             }
 
+            if let Some(context) = built.operation_contexts.get(operation_id) {
+                if let Some(document_id) = &context.document_id {
+                    let entry =
+                        document_apply_states
+                            .entry(document_id.clone())
+                            .or_insert(DocumentApplyState {
+                                all_succeeded: true,
+                                clears_sync_state: false,
+                            });
+                    entry.clears_sync_state |= context.clears_document_sync_state;
+                }
+            }
+
             if let Some(error_code) = operation_failure_code {
                 failed_count += 1;
+                if let Some(context) = built.operation_contexts.get(operation_id) {
+                    if let Some(document_id) = &context.document_id {
+                        document_apply_states
+                            .entry(document_id.clone())
+                            .or_insert(DocumentApplyState {
+                                all_succeeded: true,
+                                clears_sync_state: false,
+                            })
+                            .all_succeeded = false;
+                    }
+                }
                 self.connection.execute(
                     "UPDATE sync_operations
            SET attempt_count = attempt_count + 1,
@@ -1805,6 +2011,17 @@ impl SqliteStore {
 
             if missing_result {
                 failed_count += 1;
+                if let Some(context) = built.operation_contexts.get(operation_id) {
+                    if let Some(document_id) = &context.document_id {
+                        document_apply_states
+                            .entry(document_id.clone())
+                            .or_insert(DocumentApplyState {
+                                all_succeeded: true,
+                                clears_sync_state: false,
+                            })
+                            .all_succeeded = false;
+                    }
+                }
                 self.connection.execute(
                     "UPDATE sync_operations
            SET attempt_count = attempt_count + 1,
@@ -1826,6 +2043,25 @@ impl SqliteStore {
                 "DELETE FROM sync_operations WHERE id = ?1",
                 params![operation_id],
             )?;
+        }
+
+        let now = Self::now();
+        for (document_id, state) in document_apply_states {
+            if !state.all_succeeded {
+                continue;
+            }
+
+            if state.clears_sync_state {
+                self.clear_document_sync_state(&document_id)?;
+                continue;
+            }
+
+            let Some(projected_updated_at_ms) =
+                built.document_projection_versions.get(&document_id).copied()
+            else {
+                continue;
+            };
+            self.upsert_document_sync_state(&document_id, projected_updated_at_ms, now)?;
         }
 
         Ok(ApplyResponseStats { failed_count })
@@ -1907,6 +2143,17 @@ impl SqliteStore {
             if self.normalize_positions_if_needed(&document_id)? {
                 self.record_document_touch(&document_id)?;
                 self.record_document_ordering_updated(&document_id)?;
+                continue;
+            }
+
+            if let Some(document) = self.get_document(&document_id)? {
+                if document.deleted_at.is_none() {
+                    self.upsert_document_sync_state(&document_id, document.updated_at, Self::now())?;
+                } else {
+                    self.clear_document_sync_state(&document_id)?;
+                }
+            } else {
+                self.clear_document_sync_state(&document_id)?;
             }
         }
 
@@ -2492,20 +2739,12 @@ pub(crate) fn is_retryable_sync_error(error: &AppError) -> bool {
     )
 }
 
-impl FetchChangesResponse {
-    fn is_empty(&self) -> bool {
-        self.documents.is_empty()
-            && self.blocks.is_empty()
-            && self.document_tombstones.is_empty()
-            && self.block_tombstones.is_empty()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use crate::infrastructure::cloudkit_bridge::ServerChangedRecords;
     use crate::ports::repositories::BlockRepository;
     use crate::ports::repositories::DocumentRepository;
 
@@ -2691,7 +2930,7 @@ mod tests {
     }
 
     #[test]
-    fn first_sync_with_empty_cloud_backfills_all_local_documents() {
+    fn existing_local_documents_queue_even_when_server_token_exists() {
         let mut store = test_store();
         let first = store
             .create_document(Some("첫 문서".to_string()))
@@ -2704,30 +2943,36 @@ mod tests {
             .connection
             .execute("DELETE FROM sync_operations", [])
             .expect("operations should clear");
-
-        let state = store.read_cloudkit_state().expect("state should load");
         store
-            .seed_cloud_from_local_if_needed(
-                &state,
-                &FetchChangesResponse {
-                    documents: vec![],
-                    blocks: vec![],
-                    document_tombstones: vec![],
-                    block_tombstones: vec![],
-                    next_server_change_token: None,
-                },
+            .connection
+            .execute(
+                "UPDATE cloudkit_state SET server_change_token = ?1 WHERE scope = ?2",
+                params!["token-1", ICLOUD_SCOPE_PRIVATE],
             )
-            .expect("backfill should queue local documents");
+            .expect("server change token should update");
+
+        let built = store
+            .apply_remote_changes_and_build_operations(&FetchChangesResponse {
+                documents: vec![],
+                blocks: vec![],
+                document_tombstones: vec![],
+                block_tombstones: vec![],
+                next_server_change_token: None,
+            })
+            .expect("existing local documents should queue");
+
+        assert_eq!(built.request.save_documents.len(), 2);
+        assert_eq!(built.request.save_blocks.len(), 2);
 
         let operations = store
-            .list_sync_operations()
+            .list_sync_operations_for_debug()
             .expect("operations should load");
         assert!(operations.iter().any(|entry| entry.entity_id == first.id));
         assert!(operations.iter().any(|entry| entry.entity_id == second.id));
     }
 
     #[test]
-    fn first_sync_with_remote_records_skips_local_backfill() {
+    fn remote_documents_are_marked_synced_while_local_unsynced_documents_upload() {
         let mut store = test_store();
         let local = store
             .create_document(Some("로컬 문서".to_string()))
@@ -2738,31 +2983,98 @@ mod tests {
             .execute("DELETE FROM sync_operations", [])
             .expect("operations should clear");
 
-        let state = store.read_cloudkit_state().expect("state should load");
+        let remote_updated_at = SqliteStore::now();
+        let built = store
+            .apply_remote_changes_and_build_operations(&FetchChangesResponse {
+                documents: vec![BridgeDocumentRecord {
+                    document_id: "remote-doc".to_string(),
+                    title: "원격 문서".to_string(),
+                    block_tint_override: None,
+                    document_surface_tone_override: None,
+                    updated_at_ms: remote_updated_at,
+                    updated_by_device_id: "remote-device".to_string(),
+                }],
+                blocks: vec![],
+                document_tombstones: vec![],
+                block_tombstones: vec![],
+                next_server_change_token: None,
+            })
+            .expect("remote existing state should still queue local documents");
+
+        assert_eq!(
+            built.request.save_documents.len(),
+            1,
+            "remote document should not be re-uploaded"
+        );
+        assert_eq!(built.request.save_documents[0].document_id, local.id);
+        assert!(
+            store
+                .read_document_sync_state("remote-doc")
+                .expect("remote document sync state should load")
+                .is_some(),
+            "remote document should be marked as already projected"
+        );
+    }
+
+    #[test]
+    fn successful_apply_marks_document_sync_state() {
+        let mut store = test_store();
+        let document = store
+            .create_document(Some("업로드 상태".to_string()))
+            .expect("document should be created");
+
+        let built = store
+            .build_coalesced_sync_plan()
+            .expect("coalesced plan should build");
+        let saved_record_names = built
+            .record_names_by_operation_id
+            .values()
+            .flat_map(|record_names| record_names.iter().cloned())
+            .collect::<Vec<_>>();
+
         store
-            .seed_cloud_from_local_if_needed(
-                &state,
-                &FetchChangesResponse {
-                    documents: vec![BridgeDocumentRecord {
-                        document_id: "remote-doc".to_string(),
-                        title: "원격 문서".to_string(),
-                        block_tint_override: None,
-                        document_surface_tone_override: None,
-                        updated_at_ms: SqliteStore::now(),
-                        updated_by_device_id: "remote-device".to_string(),
-                    }],
-                    blocks: vec![],
-                    document_tombstones: vec![],
-                    block_tombstones: vec![],
-                    next_server_change_token: None,
+            .process_apply_response(
+                &built,
+                &ApplyOperationsResponse {
+                    saved_record_names,
+                    failed: vec![],
+                    server_changed: ServerChangedRecords::default(),
                 },
             )
-            .expect("remote-first sync should skip backfill");
+            .expect("apply response should succeed");
 
-        let operations = store
-            .list_sync_operations()
-            .expect("operations should load");
-        assert!(!operations.iter().any(|entry| entry.entity_id == local.id));
+        let sync_state = store
+            .read_document_sync_state(&document.id)
+            .expect("document sync state should load")
+            .expect("document sync state should exist");
+        assert_eq!(
+            sync_state.last_projected_updated_at_ms,
+            Some(document.updated_at)
+        );
+        assert!(sync_state.last_uploaded_success_at_ms.is_some());
+    }
+
+    #[test]
+    fn force_redownload_clears_document_sync_state() {
+        let mut store = test_store();
+        let document = store
+            .create_document(Some("복구 테스트".to_string()))
+            .expect("document should be created");
+
+        store
+            .upsert_document_sync_state(&document.id, document.updated_at, SqliteStore::now())
+            .expect("document sync state should insert");
+
+        store
+            .force_redownload_from_cloud()
+            .expect("force redownload should succeed");
+
+        assert!(
+            store
+                .read_document_sync_state(&document.id)
+                .expect("document sync state should load")
+                .is_none()
+        );
     }
 
     #[test]

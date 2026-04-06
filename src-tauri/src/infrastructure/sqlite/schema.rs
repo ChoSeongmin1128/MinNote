@@ -91,6 +91,12 @@ impl SqliteStore {
           device_id TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS document_sync_state (
+          document_id TEXT PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
+          last_projected_updated_at_ms INTEGER NULL,
+          last_uploaded_success_at_ms INTEGER NULL
+        );
+
         CREATE VIRTUAL TABLE IF NOT EXISTS {SEARCH_INDEX_TABLE} USING fts5 (
           document_id UNINDEXED,
           title,
@@ -123,6 +129,7 @@ impl SqliteStore {
     self.migrate_legacy_sync_outbox_to_operations()?;
     self.cleanup_orphaned_sync_operations()?;
     self.cleanup_removed_sync_state()?;
+    self.cleanup_document_sync_state()?;
 
     Ok(())
   }
@@ -173,6 +180,15 @@ impl SqliteStore {
   fn cleanup_removed_sync_state(&self) -> Result<(), AppError> {
     self.connection.execute(
       "DELETE FROM app_state WHERE key IN ('icloud_sync_enabled', 'icloud_sync_mode')",
+      [],
+    )?;
+    Ok(())
+  }
+
+  fn cleanup_document_sync_state(&self) -> Result<(), AppError> {
+    self.connection.execute(
+      "DELETE FROM document_sync_state
+       WHERE document_id NOT IN (SELECT id FROM documents)",
       [],
     )?;
     Ok(())

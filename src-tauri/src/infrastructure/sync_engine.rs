@@ -79,7 +79,6 @@ impl SyncEngine {
 
     let SyncRunPreparation::Ready {
       server_change_token,
-      has_server_change_token,
     } = preparation
     else {
       let SyncRunPreparation::Disabled(status) = preparation else {
@@ -119,7 +118,7 @@ impl SyncEngine {
 
     let built = {
       let mut repository = state.repository.lock().map_err(|_| AppError::StateLock)?;
-      repository.apply_remote_changes_and_build_operations(has_server_change_token, &changes)?
+      repository.apply_remote_changes_and_build_operations(&changes)?
     };
 
     let response = if built.has_operations() {
