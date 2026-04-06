@@ -13,6 +13,7 @@ import { useICloudSync } from './hooks/useICloudSync';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
 import { applyEditorTypographyCssVars } from './lib/editorTypography';
+import type { ICloudSyncStatus } from './lib/types';
 import { useWorkspaceStore } from './stores/workspaceStore';
 import { useDocumentSessionStore } from './stores/documentSessionStore';
 import { useUiStore } from './stores/uiStore';
@@ -52,6 +53,7 @@ function App() {
   const isSettingsOpen = useUiStore((state) => state.isSettingsOpen);
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const setWorkspaceError = useWorkspaceStore((state) => state.setError);
+  const setICloudSyncStatus = useWorkspaceStore((state) => state.setICloudSyncStatus);
   const desktopSidebarExpanded = useUiStore((state) => state.desktopSidebarExpanded);
   const mobileSidebarOpen = useUiStore((state) => state.mobileSidebarOpen);
   const setDesktopSidebarExpanded = useUiStore((state) => state.setDesktopSidebarExpanded);
@@ -74,6 +76,15 @@ function App() {
       void unlisten.then((fn) => fn());
     };
   }, [setSettingsOpen]);
+
+  useEffect(() => {
+    const unlisten = listen<ICloudSyncStatus>('icloud-sync-status-changed', (event) => {
+      setICloudSyncStatus(event.payload);
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [setICloudSyncStatus]);
 
   useEffect(() => {
     let shuttingDown = false;

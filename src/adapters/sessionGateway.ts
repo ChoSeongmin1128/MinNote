@@ -33,6 +33,7 @@ export const sessionGateway: SessionGateway = {
         allBlocksSelected: false,
         focusRequest: null,
         lastSavedAt: null,
+        lastLocalMutationAt: null,
       });
       return;
     }
@@ -87,5 +88,8 @@ export const sessionGateway: SessionGateway = {
   },
   setIsFlushing(value) {
     useDocumentSessionStore.getState().setIsFlushing(value);
+  },
+  markLocalMutation(value) {
+    useDocumentSessionStore.getState().markLocalMutation(value);
   },
 };

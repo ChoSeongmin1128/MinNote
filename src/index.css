@@ -1574,10 +1574,22 @@ button {
 .settings-range-group,
 .settings-shortcut-group,
 .settings-font-group,
-.settings-icloud-debug {
+.settings-icloud-debug,
+.settings-advanced-content {
   display: flex;
   flex-direction: column;
   gap: 7px;
+}
+
+.settings-advanced-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-advanced-toggle {
+  width: 100%;
+  justify-content: space-between;
 }
 
 .settings-debug-grid {

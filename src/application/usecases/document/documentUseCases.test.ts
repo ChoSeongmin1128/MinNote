@@ -56,6 +56,7 @@ function createSessionGateway(currentDocument: DocumentVm | null = null) {
     requestBlockFocus: vi.fn(),
     clearActiveEditorRef: vi.fn(),
     setIsFlushing: vi.fn(),
+    markLocalMutation: vi.fn(),
   };
 }
 

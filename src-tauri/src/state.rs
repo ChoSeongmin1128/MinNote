@@ -1,5 +1,6 @@
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Condvar, Mutex};
+use std::time::Duration;
 use std::{fs, io};
 
 use crate::error::AppError;
@@ -17,24 +18,35 @@ pub struct AppState {
   pub repository: Mutex<SqliteStore>,
   pub window_controls: Mutex<WindowControlState>,
   pub sync_runtime: Mutex<SyncRuntimeState>,
+  pub sync_runtime_condvar: Condvar,
   pub shutdown_confirmed: Mutex<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncRuntimePhase {
   Idle,
+  Scheduled,
   Checking,
   Syncing,
+  BackoffWaiting,
 }
 
 pub struct SyncRuntimeState {
   pub phase: SyncRuntimePhase,
+  pub scheduled: bool,
+  pub force_run: bool,
+  pub backoff_attempt: usize,
+  pub next_retry_at_ms: Option<u64>,
 }
 
 impl Default for SyncRuntimeState {
   fn default() -> Self {
     Self {
       phase: SyncRuntimePhase::Idle,
+      scheduled: false,
+      force_run: false,
+      backoff_attempt: 0,
+      next_retry_at_ms: None,
     }
   }
 }
@@ -49,13 +61,18 @@ impl AppState {
     match fs::remove_file(&sync_state_path) {
       Ok(()) => {}
       Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-      Err(error) => return Err(AppError::validation(format!("기존 동기화 상태 파일을 정리하지 못했습니다: {error}"))),
+      Err(error) => {
+        return Err(AppError::validation(format!(
+          "기존 동기화 상태 파일을 정리하지 못했습니다: {error}"
+        )))
+      }
     }
 
     Ok(Self {
       repository: Mutex::new(repository),
       window_controls: Mutex::new(WindowControlState::default()),
       sync_runtime: Mutex::new(SyncRuntimeState::default()),
+      sync_runtime_condvar: Condvar::new(),
       shutdown_confirmed: Mutex::new(false),
     })
   }
@@ -119,9 +136,15 @@ impl AppState {
   pub fn try_begin_sync(&self) -> bool {
     match self.sync_runtime.lock() {
       Ok(mut state) => {
-        if state.phase != SyncRuntimePhase::Idle {
+        if matches!(
+          state.phase,
+          SyncRuntimePhase::Checking | SyncRuntimePhase::Syncing
+        ) {
           return false;
         }
+        state.scheduled = false;
+        state.force_run = false;
+        state.next_retry_at_ms = None;
         state.phase = SyncRuntimePhase::Checking;
         true
       }
@@ -136,6 +159,7 @@ impl AppState {
     if let Ok(mut state) = self.sync_runtime.lock() {
       state.phase = phase;
     }
+    self.sync_runtime_condvar.notify_all();
   }
 
   pub fn sync_phase(&self) -> SyncRuntimePhase {
@@ -146,6 +170,163 @@ impl AppState {
         SyncRuntimePhase::Idle
       }
     }
+  }
+
+  pub fn schedule_sync(&self, force: bool) {
+    if let Ok(mut state) = self.sync_runtime.lock() {
+      state.scheduled = true;
+      if force {
+        state.force_run = true;
+        state.next_retry_at_ms = None;
+      }
+      if !matches!(
+        state.phase,
+        SyncRuntimePhase::Checking | SyncRuntimePhase::Syncing
+      ) {
+        state.phase = if state.next_retry_at_ms.is_some() && !state.force_run {
+          SyncRuntimePhase::BackoffWaiting
+        } else {
+          SyncRuntimePhase::Scheduled
+        };
+      }
+    }
+    self.sync_runtime_condvar.notify_all();
+  }
+
+  pub fn reset_sync_backoff(&self) {
+    if let Ok(mut state) = self.sync_runtime.lock() {
+      state.backoff_attempt = 0;
+      state.next_retry_at_ms = None;
+      if state.scheduled
+        && !matches!(
+          state.phase,
+          SyncRuntimePhase::Checking | SyncRuntimePhase::Syncing
+        )
+      {
+        state.phase = SyncRuntimePhase::Scheduled;
+      }
+    }
+    self.sync_runtime_condvar.notify_all();
+  }
+
+  pub fn wait_for_scheduled_sync(&self) {
+    let mut state = match self.sync_runtime.lock() {
+      Ok(state) => state,
+      Err(error) => {
+        log::warn!("동기화 런타임 상태를 잠그지 못했습니다: {error}");
+        std::thread::sleep(Duration::from_secs(1));
+        return;
+      }
+    };
+
+    loop {
+      let now_ms = current_time_ms();
+      if state.scheduled {
+        let ready = state.force_run
+          || state
+            .next_retry_at_ms
+            .map_or(true, |retry_at| retry_at <= now_ms);
+        if ready {
+          state.scheduled = false;
+          state.force_run = false;
+          state.next_retry_at_ms = None;
+          state.phase = SyncRuntimePhase::Checking;
+          return;
+        }
+
+        if let Some(retry_at_ms) = state.next_retry_at_ms {
+          state.phase = SyncRuntimePhase::BackoffWaiting;
+          let wait_ms = retry_at_ms.saturating_sub(now_ms).max(1);
+          match self
+            .sync_runtime_condvar
+            .wait_timeout(state, Duration::from_millis(wait_ms))
+          {
+            Ok((next_state, _)) => {
+              state = next_state;
+            }
+            Err(error) => {
+              log::warn!("동기화 대기 상태를 복구하지 못했습니다: {error}");
+              std::thread::sleep(Duration::from_secs(1));
+              return;
+            }
+          }
+          continue;
+        }
+      }
+
+      if matches!(
+        state.phase,
+        SyncRuntimePhase::Checking | SyncRuntimePhase::Syncing
+      ) {
+        match self.sync_runtime_condvar.wait(state) {
+          Ok(next_state) => {
+            state = next_state;
+          }
+          Err(error) => {
+            log::warn!("동기화 대기 상태를 복구하지 못했습니다: {error}");
+            std::thread::sleep(Duration::from_secs(1));
+            return;
+          }
+        }
+        continue;
+      }
+
+      state.phase = SyncRuntimePhase::Idle;
+      match self.sync_runtime_condvar.wait(state) {
+        Ok(next_state) => {
+          state = next_state;
+        }
+        Err(error) => {
+          log::warn!("동기화 대기 상태를 복구하지 못했습니다: {error}");
+          std::thread::sleep(Duration::from_secs(1));
+          return;
+        }
+      }
+    }
+  }
+
+  pub fn schedule_sync_retry(&self) -> Duration {
+    let delay = if let Ok(mut state) = self.sync_runtime.lock() {
+      let delay = backoff_delay_for_attempt(state.backoff_attempt);
+      state.backoff_attempt = state.backoff_attempt.saturating_add(1);
+      state.scheduled = true;
+      state.force_run = false;
+      state.next_retry_at_ms = Some(current_time_ms().saturating_add(delay.as_millis() as u64));
+      state.phase = SyncRuntimePhase::BackoffWaiting;
+      delay
+    } else {
+      Duration::from_secs(5)
+    };
+    self.sync_runtime_condvar.notify_all();
+    delay
+  }
+
+  pub fn finish_sync_cycle(&self) {
+    if let Ok(mut state) = self.sync_runtime.lock() {
+      if state.scheduled {
+        state.phase = if state.next_retry_at_ms.is_some() && !state.force_run {
+          SyncRuntimePhase::BackoffWaiting
+        } else {
+          SyncRuntimePhase::Scheduled
+        };
+      } else {
+        state.phase = SyncRuntimePhase::Idle;
+      }
+    }
+    self.sync_runtime_condvar.notify_all();
+  }
+
+  pub fn reset_sync_worker_after_success(&self) {
+    if let Ok(mut state) = self.sync_runtime.lock() {
+      state.backoff_attempt = 0;
+      state.next_retry_at_ms = None;
+      if state.scheduled {
+        state.phase = SyncRuntimePhase::Scheduled;
+      } else {
+        state.phase = SyncRuntimePhase::Idle;
+      }
+    }
+    self.sync_runtime_condvar.notify_all();
   }
 
   pub fn shutdown_confirmed(&self) -> bool {
@@ -162,5 +343,22 @@ impl AppState {
     if let Ok(mut state) = self.shutdown_confirmed.lock() {
       *state = confirmed;
     }
+  }
+}
+
+fn current_time_ms() -> u64 {
+  std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)
+    .unwrap_or_default()
+    .as_millis() as u64
+}
+
+fn backoff_delay_for_attempt(attempt: usize) -> Duration {
+  match attempt {
+    0 => Duration::from_secs(5),
+    1 => Duration::from_secs(15),
+    2 => Duration::from_secs(30),
+    3 => Duration::from_secs(60),
+    _ => Duration::from_secs(5 * 60),
   }
 }

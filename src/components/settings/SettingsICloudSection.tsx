@@ -1,6 +1,8 @@
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Cloud,
   CloudOff,
   Download,
@@ -8,6 +10,7 @@ import {
   Upload,
   type LucideIcon,
 } from 'lucide-react';
+import { useState } from 'react';
 import type { ICloudSyncDebugInfoDto, ICloudSyncStatus } from '../../lib/types';
 
 interface ICloudPresentation {
@@ -120,6 +123,8 @@ export function SettingsICloudSection({
   const presentation = getPresentation(status);
   const Icon = presentation.icon;
   const isBusy = status.state === 'checking' || status.state === 'syncing';
+  const [isAdvancedOpen, setAdvancedOpen] = useState(false);
+  const AdvancedIcon = isAdvancedOpen ? ChevronDown : ChevronRight;
 
   return (
     <div className="settings-section">
@@ -157,51 +162,70 @@ export function SettingsICloudSection({
           지금 동기화
         </button>
       </div>
-      <div className="settings-icloud-debug">
-        <div className="settings-section-header">
-          <span className="settings-section-title">디버그 정보</span>
-          <button
-            className="ghost-button settings-inline-action"
-            type="button"
-            disabled={debugLoading}
-            onClick={onRefreshDebug}
-          >
-            <RefreshCw className={debugLoading ? 'spin' : undefined} size={14} />
-            새로고침
-          </button>
-        </div>
-        {debugInfo ? (
-          <div className="settings-debug-grid">
-            <span>Bridge</span>
-            <span>{debugInfo.bridgeAvailable ? '사용 가능' : '없음'}</span>
-            <span>Zone</span>
-            <span>{debugInfo.zoneName}</span>
-            <span>Token</span>
-            <span>{debugInfo.serverChangeTokenPresent ? '있음' : '없음'}</span>
-            <span>Pending</span>
-            <span>{debugInfo.pendingOperationCount}</span>
-            <span>Tombstones</span>
-            <span>{debugInfo.tombstoneCount}</span>
-            <span>Device</span>
-            <span>{debugInfo.deviceIdSuffix}</span>
+      <div className="settings-advanced-panel">
+        <button
+          className="ghost-button settings-advanced-toggle"
+          type="button"
+          onClick={() => {
+            setAdvancedOpen((current) => !current);
+          }}
+        >
+          <span className="settings-title-stack">
+            <AdvancedIcon size={14} />
+            <span>고급 진단</span>
+          </span>
+          <span className="settings-field-hint">복구와 디버그 정보</span>
+        </button>
+        {isAdvancedOpen ? (
+          <div className="settings-advanced-content">
+            <div className="settings-icloud-debug">
+              <div className="settings-section-header">
+                <span className="settings-section-title">디버그 정보</span>
+                <button
+                  className="ghost-button settings-inline-action"
+                  type="button"
+                  disabled={debugLoading}
+                  onClick={onRefreshDebug}
+                >
+                  <RefreshCw className={debugLoading ? 'spin' : undefined} size={14} />
+                  새로고침
+                </button>
+              </div>
+              {debugInfo ? (
+                <div className="settings-debug-grid">
+                  <span>Bridge</span>
+                  <span>{debugInfo.bridgeAvailable ? '사용 가능' : '없음'}</span>
+                  <span>Zone</span>
+                  <span>{debugInfo.zoneName}</span>
+                  <span>Token</span>
+                  <span>{debugInfo.serverChangeTokenPresent ? '있음' : '없음'}</span>
+                  <span>Pending</span>
+                  <span>{debugInfo.pendingOperationCount}</span>
+                  <span>Tombstones</span>
+                  <span>{debugInfo.tombstoneCount}</span>
+                  <span>Device</span>
+                  <span>{debugInfo.deviceIdSuffix}</span>
+                </div>
+              ) : null}
+              {debugInfo?.bridgeError ? <p className="settings-field-hint">{debugInfo.bridgeError}</p> : null}
+              {debugError ? <p className="settings-field-hint">{debugError}</p> : null}
+            </div>
+            <div className="settings-update-actions">
+              <button className="ghost-button" type="button" disabled={isBusy} onClick={onResetCheckpoint}>
+                <RefreshCw size={14} />
+                체크포인트 초기화
+              </button>
+              <button className="ghost-button" type="button" disabled={isBusy} onClick={onForceUpload}>
+                <Upload size={14} />
+                전체 다시 업로드
+              </button>
+              <button className="ghost-button" type="button" disabled={isBusy} onClick={onForceRedownload}>
+                <Download size={14} />
+                Cloud 다시 받기
+              </button>
+            </div>
           </div>
         ) : null}
-        {debugInfo?.bridgeError ? <p className="settings-field-hint">{debugInfo.bridgeError}</p> : null}
-        {debugError ? <p className="settings-field-hint">{debugError}</p> : null}
-      </div>
-      <div className="settings-update-actions">
-        <button className="ghost-button" type="button" disabled={isBusy} onClick={onResetCheckpoint}>
-          <RefreshCw size={14} />
-          체크포인트 초기화
-        </button>
-        <button className="ghost-button" type="button" disabled={isBusy} onClick={onForceUpload}>
-          <Upload size={14} />
-          전체 다시 업로드
-        </button>
-        <button className="ghost-button" type="button" disabled={isBusy} onClick={onForceRedownload}>
-          <Download size={14} />
-          Cloud 다시 받기
-        </button>
       </div>
       {status.lastErrorMessage && (
         <p className="settings-field-hint">{status.lastErrorMessage}</p>

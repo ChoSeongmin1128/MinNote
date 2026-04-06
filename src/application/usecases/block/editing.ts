@@ -58,6 +58,7 @@ export function createBlockEditingActions({
         }) ?? nextDocument.blocks.at(-1) ?? null;
 
       workspace.clearError();
+      session.markLocalMutation(nextDocument.updatedAt);
       setDocumentWithFocus(session, workspace, nextDocument, nextBlock?.id ?? null, 'start');
     }, (message) => workspace.setError(message), '블록을 만들지 못했습니다.');
   }
@@ -77,6 +78,7 @@ export function createBlockEditingActions({
       const replaced = replaceBlockInDocument(currentDocument, nextBlock);
       editorPersistence.clearBlock(currentDocument.id, blockId);
       workspace.clearError();
+      session.markLocalMutation(nextBlock.updatedAt);
       updateDocumentState(session, workspace, replaced);
     }, (message) => workspace.setError(message), '블록 형식을 바꾸지 못했습니다.');
   }
@@ -94,12 +96,14 @@ export function createBlockEditingActions({
     const previousDocument = currentDocument;
     const optimisticDocument = reorderDocumentBlocks(currentDocument, blockId, targetPosition);
     workspace.clearError();
+    session.markLocalMutation(optimisticDocument.updatedAt);
     setDocumentWithFocus(session, workspace, optimisticDocument, blockId, 'start');
     session.setIsFlushing(true);
 
     try {
       await editorPersistence.flushDocument(previousDocument.id);
       const nextDocument = await backend.moveBlock(previousDocument.id, blockId, targetPosition);
+      session.markLocalMutation(nextDocument.updatedAt);
       updateDocumentState(session, workspace, nextDocument);
       session.requestBlockFocus(blockId, 'start');
     } catch (error) {
@@ -128,6 +132,7 @@ export function createBlockEditingActions({
       editorPersistence.clearBlock(currentDocument.id, blockId);
       const nextDocument = await backend.deleteBlock(blockId);
       workspace.clearError();
+      session.markLocalMutation(nextDocument.updatedAt);
       updateDocumentState(session, workspace, nextDocument);
 
       const focusTarget = previousBlock?.id ?? nextBlock?.id;

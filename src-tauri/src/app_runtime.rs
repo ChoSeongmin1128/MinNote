@@ -10,11 +10,8 @@ use crate::infrastructure::sync_engine::SyncEngine;
 use crate::ports::repositories::AppStateRepository;
 use crate::state::{AppState, SyncRuntimePhase};
 use crate::window_controls::{
-  apply_window_preferences_with_settings,
-  menu_bar_icon,
-  register_saved_global_shortcut,
-  show_main_window,
-  toggle_main_window,
+  apply_window_preferences_with_settings, menu_bar_icon, register_saved_global_shortcut,
+  show_main_window, toggle_main_window,
 };
 use tauri::menu::{MenuBuilder, PredefinedMenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder, TrayIconEvent};
@@ -97,20 +94,18 @@ pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon>
         }
       }
     })
-    .on_menu_event(|app, event| {
-      match event.id().as_ref() {
-        "show" => {
-          let _ = show_main_window(app);
-        }
-        "settings" => {
-          if let Some(window) = app.get_webview_window("main") {
-            let _ = show_main_window(app);
-            let _ = window.emit("tray-open-settings", ());
-          }
-        }
-        "quit" => emit_shutdown_request(app),
-        _ => {}
+    .on_menu_event(|app, event| match event.id().as_ref() {
+      "show" => {
+        let _ = show_main_window(app);
       }
+      "settings" => {
+        if let Some(window) = app.get_webview_window("main") {
+          let _ = show_main_window(app);
+          let _ = window.emit("tray-open-settings", ());
+        }
+      }
+      "quit" => emit_shutdown_request(app),
+      _ => {}
     });
 
   builder.build(app)
@@ -205,7 +200,7 @@ fn run_icloud_startup_smoke(app_handle: &tauri::AppHandle) {
     }
 
     state.set_sync_phase(SyncRuntimePhase::Syncing);
-    let sync_result = SyncEngine::run(&state).map_err(|error| error.to_string());
+    let sync_result = SyncEngine::run_once(&state, None).map_err(|error| error.to_string());
     let debug_info = {
       let repository = state
         .repository
@@ -265,8 +260,10 @@ fn run_icloud_startup_smoke(app_handle: &tauri::AppHandle) {
 }
 
 fn setup_startup_smoke(app: &tauri::App) {
-  let should_open_settings = env_flag(OPEN_SETTINGS_ON_START_ENV) || has_arg(OPEN_SETTINGS_ON_START_ARG);
-  let should_run_sync = env_flag(RUN_ICLOUD_SYNC_ON_START_ENV) || has_arg(RUN_ICLOUD_SYNC_ON_START_ARG);
+  let should_open_settings =
+    env_flag(OPEN_SETTINGS_ON_START_ENV) || has_arg(OPEN_SETTINGS_ON_START_ARG);
+  let should_run_sync =
+    env_flag(RUN_ICLOUD_SYNC_ON_START_ENV) || has_arg(RUN_ICLOUD_SYNC_ON_START_ARG);
   if !should_open_settings && !should_run_sync {
     return;
   }
@@ -299,7 +296,9 @@ fn load_startup_settings(app_state: &AppState) -> Result<AppSettings, StartupErr
     .repository
     .lock()
     .map_err(|_| StartupError::LoadSettings(crate::error::AppError::StateLock))?;
-  repository.get_app_settings().map_err(StartupError::LoadSettings)
+  repository
+    .get_app_settings()
+    .map_err(StartupError::LoadSettings)
 }
 
 pub(crate) fn sync_tray_icon_enabled(app: &tauri::AppHandle, enabled: bool) -> Result<(), String> {
@@ -367,6 +366,8 @@ pub(crate) fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
       managed_state.set_menu_bar_icon_error(None);
     }
   }
+
+  SyncEngine::start_worker(app.handle().clone());
 
   register_saved_global_shortcut(app.handle());
 

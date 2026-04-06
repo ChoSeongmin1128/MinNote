@@ -214,7 +214,7 @@ export function createPreferencesUseCases({
     const previous = preferences.getICloudSyncStatus();
     preferences.setICloudSyncStatus({
       ...previous,
-      state: previous.enabled ? 'syncing' : previous.state,
+      state: previous.enabled ? 'checking' : previous.state,
       lastErrorCode: null,
       lastErrorMessage: null,
     });

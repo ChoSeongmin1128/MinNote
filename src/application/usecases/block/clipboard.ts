@@ -106,6 +106,7 @@ export function createBlockClipboardActions({
           await backend.changeBlockKind(selectedBlock.id, firstData.kind);
         }
         await writeBlockContent(backend, selectedBlock.id, firstData);
+        session.markLocalMutation();
         firstNewBlockId = selectedBlock.id;
         afterBlockId = selectedBlock.id;
       } else if (firstData) {
@@ -116,6 +117,7 @@ export function createBlockClipboardActions({
           firstNewBlockId = created.id;
           afterBlockId = created.id;
         }
+        session.markLocalMutation(doc.updatedAt);
         updateDocumentState(session, workspace, doc);
       }
 
@@ -130,11 +132,13 @@ export function createBlockClipboardActions({
           firstNewBlockId = firstNewBlockId ?? created.id;
           afterBlockId = created.id;
         }
+        session.markLocalMutation(doc.updatedAt);
         updateDocumentState(session, workspace, doc);
       }
 
       const finalDocument = await backend.openDocument(currentDocument.id);
       workspace.clearError();
+      session.markLocalMutation(finalDocument.updatedAt);
       updateDocumentState(session, workspace, finalDocument);
       session.clearBlockSelection(true);
       if (firstNewBlockId) {
@@ -189,6 +193,7 @@ export function createBlockClipboardActions({
 
       const nextDocument = await backend.openDocument(currentDocument.id);
       workspace.clearError();
+      session.markLocalMutation(nextDocument.updatedAt);
       updateDocumentState(session, workspace, nextDocument);
       session.clearBlockSelection(true);
 

@@ -46,6 +46,7 @@ describe('block usecases', () => {
       requestBlockFocus: vi.fn(),
       clearActiveEditorRef: vi.fn(),
       setIsFlushing: vi.fn(),
+      markLocalMutation: vi.fn(),
     };
     const workspace = {
       upsertDocumentSummary: vi.fn(),

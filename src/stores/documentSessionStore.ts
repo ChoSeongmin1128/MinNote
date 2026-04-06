@@ -18,6 +18,7 @@ interface DocumentSessionState {
   allBlocksSelected: boolean;
   isFlushing: boolean;
   lastSavedAt: number | null;
+  lastLocalMutationAt: number | null;
   lastCodeLanguage: CodeLanguageId;
   focusRequest: BlockFocusRequest | null;
   activeEditorRef: { current: BlockEditorHandle | null } | null;
@@ -28,6 +29,7 @@ interface DocumentSessionState {
   setAllBlocksSelected: (value: boolean) => void;
   setIsFlushing: (value: boolean) => void;
   setLastSavedAt: (value: number | null) => void;
+  markLocalMutation: (value?: number) => void;
   setLastCodeLanguage: (language: CodeLanguageId) => void;
   requestBlockFocus: (blockId: string, caret: BlockCaretPlacement) => void;
   setFocusRequest: (focusRequest: BlockFocusRequest | null) => void;
@@ -63,6 +65,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
   allBlocksSelected: false,
   isFlushing: false,
   lastSavedAt: null,
+  lastLocalMutationAt: null,
   lastCodeLanguage: 'javascript',
   focusRequest: null,
   activeEditorRef: null,
@@ -77,6 +80,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
         ? createFocusRequest(currentDocument.blocks[0].id, 'start')
         : null,
       lastSavedAt: currentDocument?.updatedAt ?? null,
+      lastLocalMutationAt: null,
     }),
   setSelectedBlockId: (selectedBlockId) => set({ selectedBlockId, selectedBlockIds: [], blockSelected: false, allBlocksSelected: false }),
   setSelectedBlockIds: (blockIds) => {
@@ -102,6 +106,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
     }),
   setIsFlushing: (isFlushing) => set({ isFlushing }),
   setLastSavedAt: (lastSavedAt) => set({ lastSavedAt }),
+  markLocalMutation: (lastLocalMutationAt = Date.now()) => set({ lastLocalMutationAt }),
   setLastCodeLanguage: (lastCodeLanguage) => set({ lastCodeLanguage }),
   requestBlockFocus: (blockId, caret) =>
     set({
