@@ -13,7 +13,7 @@ import { useICloudSync } from './hooks/useICloudSync';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
 import { applyEditorTypographyCssVars } from './lib/editorTypography';
-import type { ICloudSyncStatus } from './lib/types';
+import type { ICloudSyncStatus, WorkspaceDocumentsChangedEvent } from './lib/types';
 import { useWorkspaceStore } from './stores/workspaceStore';
 import { useDocumentSessionStore } from './stores/documentSessionStore';
 import { useUiStore } from './stores/uiStore';
@@ -37,13 +37,14 @@ function formatLastSavedAt(value: number) {
 
 function App() {
   const { flushCurrentDocument } = useDocumentController();
-  const { bootstrapApp, confirmAppShutdown } = useWorkspaceController();
+  const { bootstrapApp, confirmAppShutdown, refreshWorkspaceDocumentsAfterSync } = useWorkspaceController();
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const isFlushing = useDocumentSessionStore((state) => state.isFlushing);
   const lastSavedAt = useDocumentSessionStore((state) => state.lastSavedAt);
   const isBootstrapping = useWorkspaceStore((state) => state.isBootstrapping);
   const appUpdateStatus = useUpdaterStore((state) => state.appUpdateStatus);
   const error = useWorkspaceStore((state) => state.error);
+  const syncNotice = useWorkspaceStore((state) => state.syncNotice);
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const bodyFontFamily = useWorkspaceStore((state) => state.bodyFontFamily);
   const bodyFontSizePx = useWorkspaceStore((state) => state.bodyFontSizePx);
@@ -85,6 +86,15 @@ function App() {
       void unlisten.then((fn) => fn());
     };
   }, [setICloudSyncStatus]);
+
+  useEffect(() => {
+    const unlisten = listen<WorkspaceDocumentsChangedEvent>('workspace-documents-changed', (event) => {
+      void refreshWorkspaceDocumentsAfterSync(event.payload);
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [refreshWorkspaceDocumentsAfterSync]);
 
   useEffect(() => {
     let shuttingDown = false;
@@ -154,6 +164,7 @@ function App() {
             {currentDocument ? (
               <span className="workspace-status">
                 {isFlushing ? '저장 중…' : lastSavedAt ? `마지막 저장 ${formatLastSavedAt(lastSavedAt)}` : ''}
+                {syncNotice ? ` · ${syncNotice}` : ''}
               </span>
             ) : null}
           </div>

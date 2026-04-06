@@ -50,6 +50,7 @@ describe('block usecases', () => {
     };
     const workspace = {
       upsertDocumentSummary: vi.fn(),
+      setSyncNotice: vi.fn(),
     };
     const editorPersistence = {
       queueBlockSave: vi.fn((...args) => {

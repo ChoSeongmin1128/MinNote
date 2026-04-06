@@ -2,13 +2,20 @@ use std::thread;
 
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::application::dto::WorkspaceDocumentsChangedEventDto;
 use crate::domain::models::{ICloudAccountStatus, ICloudSyncState, ICloudSyncStatus};
 use crate::error::AppError;
 use crate::infrastructure::cloudkit_bridge::{CloudKitBridge, FetchChangesRequest};
-use crate::infrastructure::sqlite::sync::{is_retryable_sync_error, SyncRunPreparation};
+use crate::infrastructure::sqlite::sync::{is_retryable_sync_error, RemoteApplySummary, SyncRunPreparation};
 use crate::state::{AppState, SyncRuntimePhase};
 
 pub(crate) const ICLOUD_SYNC_STATUS_CHANGED_EVENT: &str = "icloud-sync-status-changed";
+pub(crate) const WORKSPACE_DOCUMENTS_CHANGED_EVENT: &str = "workspace-documents-changed";
+
+pub(crate) struct SyncRunOutcome {
+  pub status: ICloudSyncStatus,
+  pub documents_changed_event: Option<WorkspaceDocumentsChangedEventDto>,
+}
 
 pub(crate) struct SyncEngine;
 
@@ -23,10 +30,13 @@ impl SyncEngine {
 
       let result = Self::run_once(&state, Some(&app_handle));
       match result {
-        Ok(status) => {
+        Ok(outcome) => {
           state.reset_sync_worker_after_success();
-          let status = decorate_status(&state, status);
+          let status = decorate_status(&state, outcome.status);
           emit_sync_status(&app_handle, &status);
+          if let Some(event) = outcome.documents_changed_event {
+            emit_workspace_documents_changed(&app_handle, &event);
+          }
         }
         Err(error) => {
           let retryable = is_retryable_sync_error(&error);
@@ -71,7 +81,7 @@ impl SyncEngine {
   pub(crate) fn run_once(
     state: &AppState,
     app_handle: Option<&AppHandle>,
-  ) -> Result<ICloudSyncStatus, AppError> {
+  ) -> Result<SyncRunOutcome, AppError> {
     let preparation = {
       let mut repository = state.repository.lock().map_err(|_| AppError::StateLock)?;
       repository.begin_icloud_sync_run()?
@@ -84,7 +94,10 @@ impl SyncEngine {
       let SyncRunPreparation::Disabled(status) = preparation else {
         unreachable!();
       };
-      return Ok(status);
+      return Ok(SyncRunOutcome {
+        status,
+        documents_changed_event: None,
+      });
     };
 
     let bridge = CloudKitBridge::new()?;
@@ -99,7 +112,10 @@ impl SyncEngine {
     {
       let mut repository = state.repository.lock().map_err(|_| AppError::StateLock)?;
       if account_status != ICloudAccountStatus::Available {
-        return repository.handle_unavailable_account_status(account_status);
+        return Ok(SyncRunOutcome {
+          status: repository.handle_unavailable_account_status(account_status)?,
+          documents_changed_event: None,
+        });
       }
       repository.set_cloudkit_account_status(account_status.clone())?;
     }
@@ -121,14 +137,19 @@ impl SyncEngine {
       repository.apply_remote_changes_and_build_operations(&changes)?
     };
 
-    let response = if built.has_operations() {
-      Some(bridge.apply_operations(built.request())?)
+    let response = if built.built.has_operations() {
+      Some(bridge.apply_operations(built.built.request())?)
     } else {
       None
     };
 
     let mut repository = state.repository.lock().map_err(|_| AppError::StateLock)?;
-    repository.complete_icloud_sync_run(account_status, &changes, &built, response.as_ref())
+    let completion =
+      repository.complete_icloud_sync_run(account_status, &changes, &built, response.as_ref())?;
+    Ok(SyncRunOutcome {
+      status: completion.status,
+      documents_changed_event: workspace_documents_changed_event(&completion.remote_apply_summary),
+    })
   }
 
   pub(crate) fn current_status(state: &AppState) -> Result<ICloudSyncStatus, AppError> {
@@ -155,5 +176,29 @@ pub(crate) fn decorate_status(state: &AppState, mut status: ICloudSyncStatus) ->
 pub(crate) fn emit_sync_status(app_handle: &AppHandle, status: &ICloudSyncStatus) {
   if let Err(error) = app_handle.emit(ICLOUD_SYNC_STATUS_CHANGED_EVENT, status) {
     log::warn!("iCloud 동기화 상태 이벤트를 내보내지 못했습니다: {error}");
+  }
+}
+
+fn workspace_documents_changed_event(
+  summary: &RemoteApplySummary,
+) -> Option<WorkspaceDocumentsChangedEventDto> {
+  if !summary.has_changes() || summary.affected_document_ids.is_empty() {
+    return None;
+  }
+
+  Some(WorkspaceDocumentsChangedEventDto {
+    affected_document_ids: summary.affected_document_ids.clone(),
+    documents_changed: summary.documents_changed,
+    trash_changed: summary.trash_changed,
+    current_document_may_be_stale: true,
+  })
+}
+
+pub(crate) fn emit_workspace_documents_changed(
+  app_handle: &AppHandle,
+  payload: &WorkspaceDocumentsChangedEventDto,
+) {
+  if let Err(error) = app_handle.emit(WORKSPACE_DOCUMENTS_CHANGED_EVENT, payload) {
+    log::warn!("문서 목록 변경 이벤트를 내보내지 못했습니다: {error}");
   }
 }

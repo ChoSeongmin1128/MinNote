@@ -21,3 +21,13 @@ pub fn list_documents(repository: &mut dyn AppRepository) -> Result<Vec<Document
       .collect::<Vec<_>>(),
   )
 }
+
+pub fn list_trash_documents(repository: &mut dyn AppRepository) -> Result<Vec<DocumentSummaryDto>, AppError> {
+  Ok(
+    repository
+      .list_trash_documents()?
+      .into_iter()
+      .map(DocumentSummaryDto::from)
+      .collect::<Vec<_>>(),
+  )
+}

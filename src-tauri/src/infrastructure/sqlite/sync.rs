@@ -224,6 +224,37 @@ pub(crate) struct SyncDebugSnapshot {
     pub coalesced_intent_count: usize,
 }
 
+#[derive(Debug, Clone, Default)]
+pub(crate) struct RemoteApplySummary {
+    pub affected_document_ids: Vec<String>,
+    pub documents_changed: bool,
+    pub trash_changed: bool,
+}
+
+impl RemoteApplySummary {
+    pub(crate) fn has_changes(&self) -> bool {
+        self.documents_changed || self.trash_changed
+    }
+
+    fn merge(&mut self, other: Self) {
+        self.documents_changed |= other.documents_changed;
+        self.trash_changed |= other.trash_changed;
+        self.affected_document_ids.extend(other.affected_document_ids);
+        self.affected_document_ids.sort();
+        self.affected_document_ids.dedup();
+    }
+}
+
+pub(crate) struct PreparedApplyOperations {
+    pub built: BuiltApplyOperations,
+    pub remote_apply_summary: RemoteApplySummary,
+}
+
+pub(crate) struct SyncCompletion {
+    pub status: ICloudSyncStatus,
+    pub remote_apply_summary: RemoteApplySummary,
+}
+
 pub(crate) struct BuiltApplyOperations {
     request: ApplyOperationsRequest,
     record_names_by_operation_id: HashMap<i64, HashSet<String>>,
@@ -321,29 +352,34 @@ impl SqliteStore {
     pub(crate) fn apply_remote_changes_and_build_operations(
         &mut self,
         changes: &FetchChangesResponse,
-    ) -> Result<BuiltApplyOperations, AppError> {
-        self.apply_remote_changes(changes)?;
+    ) -> Result<PreparedApplyOperations, AppError> {
+        let remote_apply_summary = self.apply_remote_changes(changes)?;
         self.queue_unsynced_documents_for_upload()?;
-        self.build_coalesced_sync_plan()
+        Ok(PreparedApplyOperations {
+            built: self.build_coalesced_sync_plan()?,
+            remote_apply_summary,
+        })
     }
 
     pub(crate) fn complete_icloud_sync_run(
         &mut self,
         account_status: ICloudAccountStatus,
         changes: &FetchChangesResponse,
-        built: &BuiltApplyOperations,
+        prepared: &PreparedApplyOperations,
         response: Option<&ApplyOperationsResponse>,
-    ) -> Result<ICloudSyncStatus, AppError> {
+    ) -> Result<SyncCompletion, AppError> {
         let mut apply_stats = ApplyResponseStats::default();
+        let mut remote_apply_summary = prepared.remote_apply_summary.clone();
         if let Some(response) = response {
-            apply_stats = self.process_apply_response(built, response)?;
-            self.apply_remote_changes(&FetchChangesResponse {
+            apply_stats = self.process_apply_response(&prepared.built, response)?;
+            let server_changed_summary = self.apply_remote_changes(&FetchChangesResponse {
                 documents: response.server_changed.documents.clone(),
                 blocks: response.server_changed.blocks.clone(),
                 document_tombstones: response.server_changed.document_tombstones.clone(),
                 block_tombstones: response.server_changed.block_tombstones.clone(),
                 next_server_change_token: None,
             })?;
+            remote_apply_summary.merge(server_changed_summary);
         }
 
         if let Some(token) = &changes.next_server_change_token {
@@ -358,7 +394,10 @@ impl SqliteStore {
         self.purge_expired_tombstones(Self::now())?;
         self.ensure_sync_completion_succeeded(apply_stats)?;
         self.mark_sync_success(account_status)?;
-        self.get_icloud_sync_status()
+        Ok(SyncCompletion {
+            status: self.get_icloud_sync_status()?,
+            remote_apply_summary,
+        })
     }
 
     pub(crate) fn finish_failed_icloud_sync(
@@ -695,7 +734,7 @@ impl SqliteStore {
             bridge,
             current_state.server_change_token.clone(),
         )?;
-        self.apply_remote_changes(&changes)?;
+        let _ = self.apply_remote_changes(&changes)?;
         self.queue_unsynced_documents_for_upload()?;
 
         let built = self.build_coalesced_sync_plan()?;
@@ -703,7 +742,7 @@ impl SqliteStore {
         if built.request.has_operations() {
             let response = bridge.apply_operations(&built.request)?;
             apply_stats = self.process_apply_response(&built, &response)?;
-            self.apply_remote_changes(&FetchChangesResponse {
+            let _ = self.apply_remote_changes(&FetchChangesResponse {
                 documents: response.server_changed.documents.clone(),
                 blocks: response.server_changed.blocks.clone(),
                 document_tombstones: response.server_changed.document_tombstones.clone(),
@@ -2110,54 +2149,74 @@ impl SqliteStore {
         })
     }
 
-    fn apply_remote_changes(&mut self, changes: &FetchChangesResponse) -> Result<(), AppError> {
+    fn apply_remote_changes(
+        &mut self,
+        changes: &FetchChangesResponse,
+    ) -> Result<RemoteApplySummary, AppError> {
         let mut affected_documents = HashSet::new();
         let mut next_temp_position = 1_000_000_000_i64;
+        let mut documents_changed = false;
+        let mut trash_changed = false;
 
         for document in &changes.documents {
+            let was_trashed = self
+                .get_document(&document.document_id)?
+                .is_some_and(|entry| entry.deleted_at.is_some());
             if self.apply_remote_document(document)? {
                 affected_documents.insert(document.document_id.clone());
+                documents_changed = true;
+                trash_changed |= was_trashed;
             }
         }
 
         for tombstone in &changes.document_tombstones {
             if self.apply_remote_document_tombstone(tombstone)? {
                 affected_documents.insert(tombstone.document_id.clone());
+                documents_changed = true;
+                trash_changed = true;
             }
         }
 
         for block in &changes.blocks {
             if self.apply_remote_block(block, &mut next_temp_position)? {
                 affected_documents.insert(block.document_id.clone());
+                documents_changed = true;
             }
         }
 
         for tombstone in &changes.block_tombstones {
             if self.apply_remote_block_tombstone(tombstone)? {
                 affected_documents.insert(tombstone.document_id.clone());
+                documents_changed = true;
             }
         }
 
-        for document_id in affected_documents {
-            self.rebuild_search_index(&document_id)?;
-            if self.normalize_positions_if_needed(&document_id)? {
-                self.record_document_touch(&document_id)?;
-                self.record_document_ordering_updated(&document_id)?;
+        for document_id in &affected_documents {
+            self.rebuild_search_index(document_id)?;
+            if self.normalize_positions_if_needed(document_id)? {
+                self.record_document_touch(document_id)?;
+                self.record_document_ordering_updated(document_id)?;
                 continue;
             }
 
-            if let Some(document) = self.get_document(&document_id)? {
+            if let Some(document) = self.get_document(document_id)? {
                 if document.deleted_at.is_none() {
-                    self.upsert_document_sync_state(&document_id, document.updated_at, Self::now())?;
+                    self.upsert_document_sync_state(document_id, document.updated_at, Self::now())?;
                 } else {
-                    self.clear_document_sync_state(&document_id)?;
+                    self.clear_document_sync_state(document_id)?;
                 }
             } else {
-                self.clear_document_sync_state(&document_id)?;
+                self.clear_document_sync_state(document_id)?;
             }
         }
 
-        Ok(())
+        let mut affected_document_ids = affected_documents.into_iter().collect::<Vec<_>>();
+        affected_document_ids.sort();
+        Ok(RemoteApplySummary {
+            affected_document_ids,
+            documents_changed,
+            trash_changed,
+        })
     }
 
     fn apply_remote_document(&mut self, remote: &BridgeDocumentRecord) -> Result<bool, AppError> {
@@ -2961,8 +3020,8 @@ mod tests {
             })
             .expect("existing local documents should queue");
 
-        assert_eq!(built.request.save_documents.len(), 2);
-        assert_eq!(built.request.save_blocks.len(), 2);
+        assert_eq!(built.built.request.save_documents.len(), 2);
+        assert_eq!(built.built.request.save_blocks.len(), 2);
 
         let operations = store
             .list_sync_operations_for_debug()
@@ -3002,11 +3061,11 @@ mod tests {
             .expect("remote existing state should still queue local documents");
 
         assert_eq!(
-            built.request.save_documents.len(),
+            built.built.request.save_documents.len(),
             1,
             "remote document should not be re-uploaded"
         );
-        assert_eq!(built.request.save_documents[0].document_id, local.id);
+        assert_eq!(built.built.request.save_documents[0].document_id, local.id);
         assert!(
             store
                 .read_document_sync_state("remote-doc")
@@ -3014,6 +3073,63 @@ mod tests {
                 .is_some(),
             "remote document should be marked as already projected"
         );
+    }
+
+    #[test]
+    fn remote_apply_summary_marks_document_list_changes() {
+        let mut store = test_store();
+
+        let summary = store
+            .apply_remote_changes(&FetchChangesResponse {
+                documents: vec![BridgeDocumentRecord {
+                    document_id: "remote-doc".to_string(),
+                    title: "원격 문서".to_string(),
+                    block_tint_override: None,
+                    document_surface_tone_override: None,
+                    updated_at_ms: SqliteStore::now(),
+                    updated_by_device_id: "remote-device".to_string(),
+                }],
+                blocks: vec![],
+                document_tombstones: vec![],
+                block_tombstones: vec![],
+                next_server_change_token: None,
+            })
+            .expect("remote apply should succeed");
+
+        assert!(summary.documents_changed);
+        assert!(!summary.trash_changed);
+        assert_eq!(summary.affected_document_ids, vec!["remote-doc".to_string()]);
+    }
+
+    #[test]
+    fn remote_apply_summary_marks_trash_changes_for_document_tombstones() {
+        let mut store = test_store();
+        let document = store
+            .create_document(Some("휴지통 이동".to_string()))
+            .expect("document should be created");
+
+        store
+            .connection
+            .execute("DELETE FROM sync_operations", [])
+            .expect("operations should clear");
+
+        let summary = store
+            .apply_remote_changes(&FetchChangesResponse {
+                documents: vec![],
+                blocks: vec![],
+                document_tombstones: vec![BridgeDocumentTombstoneRecord {
+                    document_id: document.id.clone(),
+                    deleted_at_ms: SqliteStore::now() + 100,
+                    deleted_by_device_id: "remote-device".to_string(),
+                }],
+                block_tombstones: vec![],
+                next_server_change_token: None,
+            })
+            .expect("remote tombstone should apply");
+
+        assert!(summary.documents_changed);
+        assert!(summary.trash_changed);
+        assert_eq!(summary.affected_document_ids, vec![document.id]);
     }
 
     #[test]

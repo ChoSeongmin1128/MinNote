@@ -106,6 +106,13 @@ export interface ICloudSyncStatus {
   lastErrorMessage: string | null;
 }
 
+export interface WorkspaceDocumentsChangedEvent {
+  affectedDocumentIds: string[];
+  documentsChanged: boolean;
+  trashChanged: boolean;
+  currentDocumentMayBeStale: boolean;
+}
+
 export interface ICloudSyncDebugInfoDto {
   bridgeAvailable: boolean;
   bridgeError: string | null;

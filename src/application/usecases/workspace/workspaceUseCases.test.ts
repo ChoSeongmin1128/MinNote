@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DocumentVm } from '../../models/document';
 import type { WorkspaceBootstrapState } from '../../models/workspace';
+import type { BackendPort } from '../../ports/backendPort';
+import type { WorkspaceDocumentsChangedEvent } from '../../../lib/types';
 import { createWorkspaceUseCases } from './workspaceUseCases';
 
 function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKind']): WorkspaceBootstrapState {
@@ -41,6 +43,7 @@ function createSessionGateway(currentDocument: DocumentVm | null = null) {
 
   return {
     getCurrentDocument: vi.fn(() => current),
+    hasUnsavedLocalChanges: vi.fn(() => false),
     getSelectionState: vi.fn(() => ({
       selectedBlockId: null,
       selectedBlockIds: [],
@@ -64,12 +67,25 @@ function createWorkspaceGateway() {
   return {
     setDocuments: vi.fn(),
     setTrashDocuments: vi.fn(),
+    setSyncNotice: vi.fn(),
     upsertDocumentSummary: vi.fn(),
     setSearchResults: vi.fn(),
     setSearchQuery: vi.fn(),
     setIsBootstrapping: vi.fn(),
     clearError: vi.fn(),
     setError: vi.fn(),
+  };
+}
+
+function createDocumentsChangedEvent(
+  overrides: Partial<WorkspaceDocumentsChangedEvent> = {},
+): WorkspaceDocumentsChangedEvent {
+  return {
+    affectedDocumentIds: [],
+    documentsChanged: true,
+    trashChanged: false,
+    currentDocumentMayBeStale: false,
+    ...overrides,
   };
 }
 
@@ -126,6 +142,8 @@ describe('workspace usecases', () => {
     const useCases = createWorkspaceUseCases({
       backend: {
         bootstrapApp: vi.fn(async () => payload),
+        listDocuments: vi.fn(),
+        listTrashDocuments: vi.fn(),
         getWindowControlRuntimeState: vi.fn(),
         searchDocuments: vi.fn(),
         deleteAllDocuments: vi.fn(),
@@ -159,6 +177,8 @@ describe('workspace usecases', () => {
         bootstrapApp: vi.fn(async () => {
           throw new Error('database error: malformed');
         }),
+        listDocuments: vi.fn(),
+        listTrashDocuments: vi.fn(),
         getWindowControlRuntimeState: vi.fn(),
         searchDocuments: vi.fn(),
         deleteAllDocuments: vi.fn(),
@@ -187,6 +207,8 @@ describe('workspace usecases', () => {
     const useCases = createWorkspaceUseCases({
       backend: {
         bootstrapApp: vi.fn(),
+        listDocuments: vi.fn(),
+        listTrashDocuments: vi.fn(),
         getWindowControlRuntimeState: vi.fn(),
         searchDocuments: vi.fn(),
         deleteAllDocuments: vi.fn(async () => payload),
@@ -205,5 +227,192 @@ describe('workspace usecases', () => {
     expect(preferences.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
     expect(ui.setSettingsOpen).toHaveBeenCalledWith(false);
     expect(editorPersistence.clearAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes document lists after sync without full bootstrap', async () => {
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const session = createSessionGateway();
+    const ui = createUiGateway();
+    const documents = [
+      {
+        id: 'doc-1',
+        title: '문서',
+        blockTintOverride: null,
+        documentSurfaceToneOverride: null,
+        preview: '내용',
+        updatedAt: 10,
+        lastOpenedAt: 10,
+        blockCount: 1,
+      },
+    ];
+    const trashDocuments = [
+      {
+        id: 'trash-1',
+        title: '휴지통 문서',
+        blockTintOverride: null,
+        documentSurfaceToneOverride: null,
+        preview: '',
+        updatedAt: 9,
+        lastOpenedAt: 9,
+        blockCount: 1,
+      },
+    ];
+    const backend = {
+      bootstrapApp: vi.fn(),
+      listDocuments: vi.fn(async () => documents),
+      listTrashDocuments: vi.fn(async () => trashDocuments),
+      getWindowControlRuntimeState: vi.fn(),
+      searchDocuments: vi.fn(),
+      deleteAllDocuments: vi.fn(),
+      openDocument: vi.fn(),
+    } as unknown as BackendPort;
+    const useCases = createWorkspaceUseCases({
+      backend,
+      editorPersistence: { clearAll: vi.fn() } as never,
+      preferences: preferences as never,
+      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
+      session,
+      ui: ui as never,
+      workspace,
+    });
+
+    await useCases.refreshWorkspaceDocumentsAfterSync(createDocumentsChangedEvent());
+
+    expect(backend.listDocuments).toHaveBeenCalledTimes(1);
+    expect(backend.listTrashDocuments).toHaveBeenCalledTimes(1);
+    expect(workspace.setDocuments).toHaveBeenCalledWith(documents);
+    expect(workspace.setTrashDocuments).toHaveBeenCalledWith(trashDocuments);
+  });
+
+  it('reopens current document only when affected and there are no unsaved local changes', async () => {
+    const currentDocument = {
+      id: 'doc-1',
+      title: '현재 문서',
+      blockTintOverride: null,
+      documentSurfaceToneOverride: null,
+      preview: '내용',
+      updatedAt: 1,
+      lastOpenedAt: 1,
+      blockCount: 1,
+      blocks: [
+        {
+          id: 'block-1',
+          documentId: 'doc-1',
+          kind: 'markdown' as const,
+          position: 0,
+          content: '내용',
+          language: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    };
+    const refreshedDocument = {
+      ...currentDocument,
+      updatedAt: 2,
+    };
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const session = createSessionGateway(currentDocument);
+    const ui = createUiGateway();
+    const backend = {
+      bootstrapApp: vi.fn(),
+      listDocuments: vi.fn(async () => [
+        {
+          id: 'doc-1',
+          title: '현재 문서',
+          blockTintOverride: null,
+          documentSurfaceToneOverride: null,
+          preview: '내용',
+          updatedAt: 2,
+          lastOpenedAt: 2,
+          blockCount: 1,
+        },
+      ]),
+      listTrashDocuments: vi.fn(async () => []),
+      getWindowControlRuntimeState: vi.fn(),
+      searchDocuments: vi.fn(),
+      deleteAllDocuments: vi.fn(),
+      openDocument: vi.fn(async () => refreshedDocument),
+    } as unknown as BackendPort;
+    const useCases = createWorkspaceUseCases({
+      backend,
+      editorPersistence: { clearAll: vi.fn() } as never,
+      preferences: preferences as never,
+      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
+      session,
+      ui: ui as never,
+      workspace,
+    });
+
+    await useCases.refreshWorkspaceDocumentsAfterSync(
+      createDocumentsChangedEvent({
+        affectedDocumentIds: ['doc-1'],
+      }),
+    );
+
+    expect(backend.openDocument).toHaveBeenCalledWith('doc-1');
+    expect(session.setCurrentDocumentState).toHaveBeenCalledWith(refreshedDocument);
+    expect(workspace.setSyncNotice).toHaveBeenLastCalledWith(null);
+  });
+
+  it('keeps current document and shows notice when remote change arrives during unsaved local edits', async () => {
+    const currentDocument = {
+      id: 'doc-1',
+      title: '현재 문서',
+      blockTintOverride: null,
+      documentSurfaceToneOverride: null,
+      preview: '내용',
+      updatedAt: 1,
+      lastOpenedAt: 1,
+      blockCount: 1,
+      blocks: [
+        {
+          id: 'block-1',
+          documentId: 'doc-1',
+          kind: 'markdown' as const,
+          position: 0,
+          content: '내용',
+          language: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    };
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const session = createSessionGateway(currentDocument);
+    session.hasUnsavedLocalChanges.mockReturnValue(true);
+    const ui = createUiGateway();
+    const backend = {
+      bootstrapApp: vi.fn(),
+      listDocuments: vi.fn(async () => []),
+      listTrashDocuments: vi.fn(async () => []),
+      getWindowControlRuntimeState: vi.fn(),
+      searchDocuments: vi.fn(),
+      deleteAllDocuments: vi.fn(),
+      openDocument: vi.fn(),
+    } as unknown as BackendPort;
+    const useCases = createWorkspaceUseCases({
+      backend,
+      editorPersistence: { clearAll: vi.fn() } as never,
+      preferences: preferences as never,
+      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
+      session,
+      ui: ui as never,
+      workspace,
+    });
+
+    await useCases.refreshWorkspaceDocumentsAfterSync(
+      createDocumentsChangedEvent({
+        affectedDocumentIds: ['doc-1'],
+      }),
+    );
+
+    expect(backend.openDocument).not.toHaveBeenCalled();
+    expect(workspace.setSyncNotice).toHaveBeenCalledWith(
+      '다른 기기 변경이 있습니다. 저장 후 다시 반영됩니다.',
+    );
   });
 });

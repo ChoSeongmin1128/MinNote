@@ -63,6 +63,9 @@ export const desktopApi = {
   listDocuments() {
     return call<DocumentSummaryDto[]>('list_documents');
   },
+  listTrashDocuments() {
+    return call<DocumentSummaryDto[]>('list_trash_documents');
+  },
   searchDocuments(query: string) {
     return call<SearchResultDto[]>('search_documents', { query });
   },

@@ -14,7 +14,7 @@ pub use blocks::{
   update_markdown_block,
   update_text_block,
 };
-pub use bootstrap::{bootstrap_app, list_documents};
+pub use bootstrap::{bootstrap_app, list_documents, list_trash_documents};
 pub use documents::{
   create_document,
   delete_all_documents,

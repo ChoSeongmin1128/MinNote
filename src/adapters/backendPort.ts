@@ -3,6 +3,7 @@ import {
   mapBlockDtoToVm,
   mapBootstrapPayloadToState,
   mapDocumentDtoToVm,
+  mapDocumentSummaryDtoToVm,
   mapSearchResultDtoToVm,
   mapWindowControlRuntimeStateDto,
 } from './backendMappers';
@@ -11,6 +12,12 @@ import { desktopApi } from '../lib/desktopApi';
 export const backendPort: BackendPort = {
   async bootstrapApp() {
     return mapBootstrapPayloadToState(await desktopApi.bootstrapApp());
+  },
+  async listDocuments() {
+    return (await desktopApi.listDocuments()).map(mapDocumentSummaryDtoToVm);
+  },
+  async listTrashDocuments() {
+    return (await desktopApi.listTrashDocuments()).map(mapDocumentSummaryDtoToVm);
   },
   async getWindowControlRuntimeState() {
     return mapWindowControlRuntimeStateDto(await desktopApi.getWindowControlRuntimeState());

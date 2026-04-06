@@ -21,6 +21,7 @@ pub fn run() {
       commands::workspace::bootstrap_app,
       commands::window_controls::get_window_control_runtime_state,
       commands::workspace::list_documents,
+      commands::workspace::list_trash_documents,
       commands::workspace::open_document,
       commands::workspace::create_document,
       commands::workspace::rename_document,

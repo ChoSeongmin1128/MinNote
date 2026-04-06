@@ -10,6 +10,7 @@ export interface SessionSelectionState {
 
 export interface SessionGateway {
   getCurrentDocument(): DocumentVm | null;
+  hasUnsavedLocalChanges(): boolean;
   getSelectionState(): SessionSelectionState;
   setCurrentDocument(document: DocumentVm | null): void;
   setCurrentDocumentState(document: DocumentVm): void;

@@ -18,6 +18,7 @@ interface WorkspaceState {
   searchQuery: string;
   isBootstrapping: boolean;
   error: string | null;
+  syncNotice: string | null;
   defaultBlockTintPreset: BlockTintPreset;
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
@@ -42,6 +43,7 @@ interface WorkspaceState {
   setSearchQuery: (query: string) => void;
   setIsBootstrapping: (value: boolean) => void;
   setError: (value: string | null) => void;
+  setSyncNotice: (value: string | null) => void;
   setDefaultBlockTintPreset: (preset: BlockTintPreset) => void;
   setDefaultDocumentSurfaceTonePreset: (preset: DocumentSurfaceTonePreset) => void;
   setDefaultBlockKind: (kind: BlockKind) => void;
@@ -72,6 +74,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   searchQuery: '',
   isBootstrapping: true,
   error: null,
+  syncNotice: null,
   defaultBlockTintPreset: 'mist',
   defaultDocumentSurfaceTonePreset: 'default',
   defaultBlockKind: 'markdown' as BlockKind,
@@ -115,6 +118,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setIsBootstrapping: (isBootstrapping) => set({ isBootstrapping }),
   setError: (error) => set({ error }),
+  setSyncNotice: (syncNotice) => set({ syncNotice }),
   setDefaultBlockTintPreset: (defaultBlockTintPreset) => set({ defaultBlockTintPreset }),
   setDefaultDocumentSurfaceTonePreset: (defaultDocumentSurfaceTonePreset) => set({ defaultDocumentSurfaceTonePreset }),
   setDefaultBlockKind: (defaultBlockKind) => set({ defaultBlockKind }),

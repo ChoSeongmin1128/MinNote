@@ -14,6 +14,16 @@ export const sessionGateway: SessionGateway = {
   getCurrentDocument() {
     return useDocumentSessionStore.getState().currentDocument;
   },
+  hasUnsavedLocalChanges() {
+    const state = useDocumentSessionStore.getState();
+    if (state.isFlushing) {
+      return true;
+    }
+    if (state.lastLocalMutationAt == null) {
+      return false;
+    }
+    return (state.lastSavedAt ?? 0) < state.lastLocalMutationAt;
+  },
   getSelectionState() {
     const state = useDocumentSessionStore.getState();
     return {

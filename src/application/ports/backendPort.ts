@@ -8,11 +8,19 @@ import type {
   ICloudSyncStatus,
   ThemeMode,
 } from '../../lib/types';
-import type { BlockVm, DocumentVm, RestoreBlockInput, SearchResultVm } from '../models/document';
+import type {
+  BlockVm,
+  DocumentSummaryVm,
+  DocumentVm,
+  RestoreBlockInput,
+  SearchResultVm,
+} from '../models/document';
 import type { WindowControlRuntimeState, WorkspaceBootstrapState } from '../models/workspace';
 
 export interface BackendPort {
   bootstrapApp(): Promise<WorkspaceBootstrapState>;
+  listDocuments(): Promise<DocumentSummaryVm[]>;
+  listTrashDocuments(): Promise<DocumentSummaryVm[]>;
   getWindowControlRuntimeState(): Promise<WindowControlRuntimeState>;
   searchDocuments(query: string): Promise<SearchResultVm[]>;
   openDocument(documentId: string): Promise<DocumentVm>;

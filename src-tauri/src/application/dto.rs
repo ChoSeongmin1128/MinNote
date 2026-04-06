@@ -103,6 +103,15 @@ pub struct ICloudSyncDebugInfoDto {
     pub device_id_suffix: String,
 }
 
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceDocumentsChangedEventDto {
+    pub affected_document_ids: Vec<String>,
+    pub documents_changed: bool,
+    pub trash_changed: bool,
+    pub current_document_may_be_stale: bool,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockRestoreDto {

@@ -41,6 +41,7 @@ function createSessionGateway(currentDocument: DocumentVm | null = null) {
 
   return {
     getCurrentDocument: vi.fn(() => current),
+    hasUnsavedLocalChanges: vi.fn(() => false),
     getSelectionState: vi.fn(() => ({
       selectedBlockId: null,
       selectedBlockIds: [],
@@ -64,6 +65,7 @@ function createWorkspaceGateway() {
   return {
     setDocuments: vi.fn(),
     setTrashDocuments: vi.fn(),
+    setSyncNotice: vi.fn(),
     upsertDocumentSummary: vi.fn(),
     setSearchResults: vi.fn(),
     setSearchQuery: vi.fn(),

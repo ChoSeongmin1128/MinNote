@@ -31,6 +31,11 @@ pub fn list_documents(state: State<'_, AppState>) -> Result<Vec<DocumentSummaryD
 }
 
 #[tauri::command]
+pub fn list_trash_documents(state: State<'_, AppState>) -> Result<Vec<DocumentSummaryDto>, String> {
+  with_repository(state, services::list_trash_documents)
+}
+
+#[tauri::command]
 pub fn open_document(
   state: State<'_, AppState>,
   document_id: String,

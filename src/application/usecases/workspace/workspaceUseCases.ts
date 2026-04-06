@@ -5,6 +5,7 @@ import type { SchedulerPort } from '../../ports/schedulerPort';
 import type { SessionGateway } from '../../ports/sessionGateway';
 import type { UiGateway } from '../../ports/uiGateway';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
+import type { WorkspaceDocumentsChangedEvent } from '../../../lib/types';
 import { applyBootstrapPayloadState } from '../shared/documentState';
 import { normalizeBootstrapErrorMessage, normalizeErrorMessage } from '../shared/errors';
 
@@ -43,6 +44,65 @@ export function createWorkspaceUseCases({
       workspace.setError(normalizeBootstrapErrorMessage(error, '초기화에 실패했습니다.'));
     } finally {
       workspace.setIsBootstrapping(false);
+    }
+  }
+
+  async function refreshWorkspaceDocumentsAfterSync(event: WorkspaceDocumentsChangedEvent) {
+    if (!event.documentsChanged && !event.trashChanged) {
+      return;
+    }
+
+    try {
+      const [documents, trashDocuments] = await Promise.all([
+        backend.listDocuments(),
+        backend.listTrashDocuments(),
+      ]);
+
+      workspace.setDocuments(documents);
+      workspace.setTrashDocuments(trashDocuments);
+      workspace.clearError();
+
+      const currentDocument = session.getCurrentDocument();
+      if (!currentDocument || !event.affectedDocumentIds.includes(currentDocument.id)) {
+        workspace.setSyncNotice(null);
+        return;
+      }
+
+      if (session.hasUnsavedLocalChanges()) {
+        workspace.setSyncNotice('다른 기기 변경이 있습니다. 저장 후 다시 반영됩니다.');
+        return;
+      }
+
+      const currentStillActive = documents.some((document) => document.id === currentDocument.id);
+      if (currentStillActive) {
+        const nextDocument = await backend.openDocument(currentDocument.id);
+        session.setCurrentDocumentState(nextDocument);
+        workspace.upsertDocumentSummary({
+          id: nextDocument.id,
+          title: nextDocument.title,
+          blockTintOverride: nextDocument.blockTintOverride,
+          documentSurfaceToneOverride: nextDocument.documentSurfaceToneOverride,
+          preview: nextDocument.preview,
+          updatedAt: nextDocument.updatedAt,
+          lastOpenedAt: nextDocument.lastOpenedAt,
+          blockCount: nextDocument.blockCount,
+        });
+        workspace.setSyncNotice(null);
+        return;
+      }
+
+      const nextActiveDocument = documents[0] ?? null;
+      if (!nextActiveDocument) {
+        session.setCurrentDocument(null);
+        workspace.setSyncNotice(null);
+        return;
+      }
+
+      const nextDocument = await backend.openDocument(nextActiveDocument.id);
+      session.setCurrentDocument(nextDocument);
+      workspace.setSyncNotice(null);
+    } catch (error) {
+      workspace.setError(normalizeErrorMessage(error, '동기화된 문서 목록을 반영하지 못했습니다.'));
     }
   }
 
@@ -90,6 +150,7 @@ export function createWorkspaceUseCases({
 
   return {
     bootstrapApp,
+    refreshWorkspaceDocumentsAfterSync,
     setSearchQuery,
     deleteAllDocuments,
     confirmAppShutdown: backend.confirmAppShutdown,

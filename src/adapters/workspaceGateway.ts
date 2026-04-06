@@ -8,6 +8,9 @@ export const workspaceGateway: WorkspaceGateway = {
   setTrashDocuments(documents) {
     useWorkspaceStore.getState().setTrashDocuments(documents);
   },
+  setSyncNotice(message) {
+    useWorkspaceStore.getState().setSyncNotice(message);
+  },
   upsertDocumentSummary(document) {
     useWorkspaceStore.getState().upsertDocumentSummary(document);
   },

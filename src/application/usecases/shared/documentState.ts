@@ -17,6 +17,7 @@ export function updateDocumentState(
   workspace: WorkspaceGateway,
   document: DocumentVm,
 ) {
+  workspace.setSyncNotice(null);
   session.setCurrentDocumentState(document);
   workspace.upsertDocumentSummary(summarizeDocument(document));
 }
@@ -28,6 +29,7 @@ export function setDocumentWithFocus(
   focusBlockId: string | null,
   caret: BlockCaretPlacement = 'start',
 ) {
+  workspace.setSyncNotice(null);
   session.setDocumentWithFocus(document, focusBlockId, caret);
   workspace.upsertDocumentSummary(summarizeDocument(document));
 }
@@ -41,6 +43,7 @@ export function applyBootstrapPayloadState(
 ) {
   workspace.setDocuments(payload.documents);
   workspace.setTrashDocuments(payload.trashDocuments);
+  workspace.setSyncNotice(null);
   preferences.setThemeMode(payload.themeMode);
   preferences.setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
   preferences.setDefaultDocumentSurfaceTonePreset(payload.defaultDocumentSurfaceTonePreset);

@@ -220,7 +220,8 @@ fn run_icloud_startup_smoke(app_handle: &tauri::AppHandle) {
                 .map_err(|error| error.to_string())?;
         }
 
-        let status = sync_result?;
+        let outcome = sync_result?;
+        let status = outcome.status;
         Ok(serde_json::json!({
           "ok": true,
           "phase": "completed",
