@@ -101,7 +101,10 @@ if [ -z "$APPLE_PROVISIONING_PROFILE_RESOLVED" ] || [ ! -f "$APPLE_PROVISIONING_
   exit 1
 fi
 /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.aps-environment" /dev/stdin <<<"$(security cms -D -i "$APPLE_PROVISIONING_PROFILE_RESOLVED")" >/dev/null
-/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-services:0" /dev/stdin <<<"$(security cms -D -i "$APPLE_PROVISIONING_PROFILE_RESOLVED")" >/dev/null
+PROFILE_PLIST="$(mktemp)"
+security cms -D -i "$APPLE_PROVISIONING_PROFILE_RESOLVED" > "$PROFILE_PLIST"
+/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-services" "$PROFILE_PLIST" >/dev/null
+rm -f "$PROFILE_PLIST"
 if [ -z "$APPLE_SIGNING_IDENTITY_REF" ]; then
   echo "codesign identity fingerprint를 해석할 수 없습니다."
   exit 1

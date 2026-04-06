@@ -33,7 +33,7 @@ jobs:
           PROFILE_PLIST="$RUNNER_TEMP/minnote-cloudkit.plist"
           security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
           /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.aps-environment" "$PROFILE_PLIST" >/dev/null
-          /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-services:0" "$PROFILE_PLIST" >/dev/null
+          /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-services" "$PROFILE_PLIST" >/dev/null
           [ -x ./scripts/package-notarized-app.sh ] || { echo "scripts/package-notarized-app.sh must be executable."; exit 1; }
           [ -x ./scripts/package-notarized-dmg.sh ] || { echo "scripts/package-notarized-dmg.sh must be executable."; exit 1; }
 
