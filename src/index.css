@@ -465,12 +465,79 @@ button {
   padding-top: 6px;
 }
 
-.trash-section-header {
+.trash-section-summary {
   display: flex;
+  width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 2px 8px 5px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.trash-section-summary:hover {
+  background: var(--bg-hover);
+}
+
+.trash-section-summary:focus-visible {
+  outline: 2px solid var(--brand-ring);
+  outline-offset: 2px;
+}
+
+.trash-section-summary-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.trash-section-summary-title {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.trash-section-summary-count {
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+}
+
+.trash-section-summary-chevron {
+  flex-shrink: 0;
+  color: var(--text-soft);
+  transition: transform 140ms ease;
+}
+
+.trash-section-summary-chevron.is-expanded {
+  transform: rotate(180deg);
+}
+
+.trash-section-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.trash-empty-state {
+  padding: 4px 8px 8px;
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+}
+
+.trash-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 2px 8px 3px;
   color: var(--text-soft);
   font-size: 0.68rem;
   font-weight: 600;
@@ -482,6 +549,8 @@ button {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .trash-empty-header-button {

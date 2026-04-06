@@ -61,7 +61,12 @@ describe('Sidebar', () => {
       searchResults: [],
       searchQuery: '',
     });
-    useUiStore.setState({ isSettingsOpen: false });
+    useUiStore.setState({
+      isSettingsOpen: false,
+      isTrashExpanded: false,
+      desktopSidebarExpanded: true,
+      mobileSidebarOpen: false,
+    });
 
     useDocumentSessionStore.setState({
       currentDocument: null,
@@ -129,5 +134,45 @@ describe('Sidebar', () => {
 
     expect(screen.getByLabelText('사이드바 레일')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '사이드바 펼치기' })).toBeInTheDocument();
+  });
+
+  it('shows trash as a collapsed summary until expanded', async () => {
+    useWorkspaceStore.setState({
+      trashDocuments: [
+        {
+          id: 'trash-1',
+          title: '버린 문서',
+          blockTintOverride: null,
+          documentSurfaceToneOverride: null,
+          preview: '',
+          updatedAt: Date.now(),
+          lastOpenedAt: Date.now(),
+          blockCount: 1,
+        },
+      ],
+    });
+    useUiStore.setState({ isTrashExpanded: false });
+
+    renderSidebar();
+
+    expect(screen.getByRole('button', { name: /휴지통/i })).toBeInTheDocument();
+    expect(screen.queryByText('버린 문서')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /휴지통/i }));
+
+    expect(screen.getByText('버린 문서')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '복원' })).toBeInTheDocument();
+  });
+
+  it('keeps the trash summary visible when empty', async () => {
+    renderSidebar();
+
+    expect(screen.getByRole('button', { name: /휴지통/i })).toBeInTheDocument();
+    expect(screen.getByText('비어 있음')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /휴지통/i }));
+
+    expect(screen.getByText('삭제된 문서가 없습니다')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /휴지통 비우기/i })).not.toBeInTheDocument();
   });
 });

@@ -39,6 +39,8 @@ export function Sidebar({
   const searchResults = useWorkspaceStore((state) => state.searchResults);
   const searchQuery = useWorkspaceStore((state) => state.searchQuery);
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
+  const isTrashExpanded = useUiStore((state) => state.isTrashExpanded);
+  const toggleTrashExpanded = useUiStore((state) => state.toggleTrashExpanded);
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -137,6 +139,8 @@ export function Sidebar({
 
           <SidebarTrashSection
             documents={trashDocuments}
+            isExpanded={isTrashExpanded}
+            onToggleExpanded={toggleTrashExpanded}
             onEmptyTrash={() => void emptyTrash()}
             onRestoreDocument={(documentId) => void restoreDocumentFromTrash(documentId)}
           />
