@@ -134,7 +134,7 @@ for TARGET in "${TARGETS[@]}"; do
   ARCH_LABEL="$(arch_label "$TARGET")"
   echo "  - $TARGET"
 
-  ./scripts/run-tauri-build.sh --bundles app --target "$TARGET"
+  ./scripts/run-tauri-build.sh --bundles app --target "$TARGET" --no-sign
 
   APP_PATH="$ROOT_DIR/src-tauri/target/$TARGET/release/bundle/macos/MinNote.app"
   DIST_DIR="$RELEASE_DIR/dist/$ARCH_LABEL"
