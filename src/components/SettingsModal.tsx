@@ -214,13 +214,21 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             void resetICloudSyncCheckpoint();
           }}
           onForceUpload={() => {
-            if (!window.confirm('로컬 문서를 기준으로 Cloud 내용을 다시 덮어쓸 수 있습니다. 계속하시겠습니까?')) {
+            if (
+              !window.confirm(
+                '현재 Mac의 문서 상태를 기준으로 iCloud 내용을 다시 업로드합니다. 계속하시겠습니까?',
+              )
+            ) {
               return;
             }
             void forceUploadAllDocuments();
           }}
           onForceRedownload={() => {
-            if (!window.confirm('로컬 문서를 비우고 Cloud 기준으로 다시 받습니다. 계속하시겠습니까?')) {
+            if (
+              !window.confirm(
+                '현재 Mac의 로컬 문서를 비우고 iCloud 기준으로 다시 받습니다. 계속하시겠습니까?',
+              )
+            ) {
               return;
             }
             void forceRedownloadFromCloud();

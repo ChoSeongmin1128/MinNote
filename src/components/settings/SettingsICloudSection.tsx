@@ -143,7 +143,6 @@ export function SettingsICloudSection({
       <div className="settings-section-header">
         <div className="settings-title-stack">
           <span className="settings-section-title">iCloud 동기화</span>
-          <span className="settings-experimental-badge">Experimental</span>
         </div>
         <span className={`settings-status-chip is-${presentation.tone}`}>
           <Icon className={presentation.spin ? 'spin' : undefined} size={14} />
@@ -151,7 +150,7 @@ export function SettingsICloudSection({
         </span>
       </div>
       <p className="settings-description">
-        아직 배포 전 검증 단계입니다. 기본값은 꺼짐이며, 로컬 우선 저장을 유지합니다.
+        이 Mac에 먼저 저장한 뒤 iCloud로 백그라운드 동기화합니다. 오프라인이어도 작성 내용은 로컬에 유지됩니다.
       </p>
       <div className="settings-update-actions">
         <button
@@ -184,15 +183,15 @@ export function SettingsICloudSection({
         >
           <span className="settings-title-stack">
             <AdvancedIcon size={14} />
-            <span>고급 진단</span>
+            <span>고급 옵션</span>
           </span>
-          <span className="settings-field-hint">복구와 디버그 정보</span>
+          <span className="settings-field-hint">진단 정보와 복구 도구</span>
         </button>
         {isAdvancedOpen ? (
           <div className="settings-advanced-content">
             <div className="settings-icloud-debug">
               <div className="settings-section-header">
-                <span className="settings-section-title">디버그 정보</span>
+                <span className="settings-section-title">동기화 진단</span>
                 <button
                   className="ghost-button settings-inline-action"
                   type="button"
@@ -231,21 +230,23 @@ export function SettingsICloudSection({
                   <span>{debugInfo.deviceIdSuffix}</span>
                 </div>
               ) : null}
-              {debugInfo?.bridgeError ? <p className="settings-field-hint">{debugInfo.bridgeError}</p> : null}
+              {debugInfo?.bridgeError ? (
+                <p className="settings-field-hint">{debugInfo.bridgeError}</p>
+              ) : null}
               {debugError ? <p className="settings-field-hint">{debugError}</p> : null}
             </div>
             <div className="settings-update-actions">
               <button className="ghost-button" type="button" disabled={isBusy} onClick={onResetCheckpoint}>
                 <RefreshCw size={14} />
-                체크포인트 초기화
+                동기화 상태 초기화
               </button>
               <button className="ghost-button" type="button" disabled={isBusy} onClick={onForceUpload}>
                 <Upload size={14} />
-                전체 다시 업로드
+                Cloud에 다시 업로드
               </button>
               <button className="ghost-button" type="button" disabled={isBusy} onClick={onForceRedownload}>
                 <Download size={14} />
-                Cloud 다시 받기
+                Cloud에서 다시 받기
               </button>
             </div>
           </div>
