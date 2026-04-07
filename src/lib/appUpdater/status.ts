@@ -26,6 +26,14 @@ export function normalizeUpdateError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
 
   if (
+    message.includes('failed to unpack')
+    || message.includes('failed to extract')
+    || message.includes('tauri_updated_app')
+  ) {
+    return '업데이트 파일 적용 실패';
+  }
+
+  if (
     message.includes('latest.json')
     || message.includes('404')
     || message.includes('Not Found')

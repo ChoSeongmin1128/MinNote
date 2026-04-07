@@ -106,6 +106,19 @@ describe('runUpdateCheck', () => {
     });
   });
 
+  it('maps unpack failures to a user-facing install message', async () => {
+    checkMock.mockRejectedValueOnce(
+      new Error("failed to unpack `._MinNote.app` into `/var/folders/.../tauri_updated_app123/`"),
+    );
+
+    await runUpdateCheck();
+
+    expect(useUpdaterStore.getState().appUpdateStatus).toMatchObject({
+      state: 'error',
+      message: '업데이트 파일 적용 실패',
+    });
+  });
+
   it('marks the updater as error when the updater check hangs longer than the watchdog', async () => {
     vi.useFakeTimers();
     checkMock.mockImplementationOnce(() => new Promise(() => {}));

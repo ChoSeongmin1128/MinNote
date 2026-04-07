@@ -203,6 +203,35 @@ jobs:
             [ -s "$FILE" ] || { echo "Empty release asset: $FILE"; exit 1; }
           done
 
+          python3 - <<'PY'
+          import tarfile
+
+          for archive_name in (
+              "MinNote_aarch64.app.tar.gz",
+              "MinNote_x86_64.app.tar.gz",
+          ):
+              with tarfile.open(archive_name, "r:gz") as archive:
+                  invalid = [
+                      member.name
+                      for member in archive.getmembers()
+                      if member.name.startswith("._")
+                      or "/._" in member.name
+                      or member.name.endswith("/.DS_Store")
+                      or member.name.endswith(".DS_Store")
+                  ]
+                  if invalid:
+                      raise SystemExit(f"{archive_name} contains unsupported Apple metadata entries: {invalid}")
+          PY
+
+          TMP_VALIDATE_DIR="$(mktemp -d "${RUNNER_TEMP}/minnote-updater-validate.XXXXXX")"
+          trap 'rm -rf "$TMP_VALIDATE_DIR"' EXIT
+          for FILE in MinNote_aarch64.app.tar.gz MinNote_x86_64.app.tar.gz; do
+            EXTRACT_DIR="$TMP_VALIDATE_DIR/${FILE%.tar.gz}"
+            mkdir -p "$EXTRACT_DIR"
+            tar -xzf "$FILE" -C "$EXTRACT_DIR"
+            [ -d "$EXTRACT_DIR/MinNote.app" ] || { echo "Updater archive did not extract MinNote.app from $FILE"; exit 1; }
+          done
+
       - name: Upload updater release assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

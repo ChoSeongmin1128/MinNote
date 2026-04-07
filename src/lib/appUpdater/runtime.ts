@@ -150,6 +150,10 @@ async function performUpdateCheck(source: string) {
     }
   } catch (error) {
     abandoned = true;
+    console.error('[updater] check failed', {
+      source,
+      error,
+    });
     debugUpdater('check:error', {
       source,
       error: normalizeUpdateError(error),
@@ -222,6 +226,9 @@ export async function applyPreparedUpdate() {
       '업데이트 적용 지연',
     );
   } catch (error) {
+    console.error('[updater] install failed', {
+      error,
+    });
     debugUpdater('install:error', {
       error: normalizeUpdateError(error),
     });

@@ -24,6 +24,13 @@ usage:
 EOF
 }
 
+cleanup_temp_dir() {
+  local dir_path="$1"
+  if [ -n "$dir_path" ] && [ -d "$dir_path" ]; then
+    rm -rf "$dir_path"
+  fi
+}
+
 require_env() {
   local name="$1"
   if [ -z "${(P)name:-}" ]; then
@@ -166,12 +173,47 @@ package_updater_artifacts() {
   local target="$1"
   local arch_label="$2"
   local output_dir="$3"
-  local app_path app_tar_path
+  local app_path app_tar_path staging_dir extract_dir
 
   app_path="$(app_path_for_target "$target")"
   mkdir -p "$output_dir"
   app_tar_path="$output_dir/MinNote_${arch_label}.app.tar.gz"
-  tar -czf "$app_tar_path" -C "$(dirname "$app_path")" "$(basename "$app_path")"
+  staging_dir="$(mktemp -d "${TMPDIR:-/tmp}/minnote-updater-stage.XXXXXX")"
+  extract_dir="$(mktemp -d "${TMPDIR:-/tmp}/minnote-updater-extract.XXXXXX")"
+  trap 'cleanup_temp_dir "$staging_dir"; cleanup_temp_dir "$extract_dir"' RETURN
+
+  ditto "$app_path" "$staging_dir/MinNote.app"
+  xattr -cr "$staging_dir/MinNote.app"
+
+  rm -f "$app_tar_path"
+  COPYFILE_DISABLE=1 bsdtar --disable-copyfile -czf "$app_tar_path" -C "$staging_dir" "MinNote.app"
+
+  python3 - "$app_tar_path" <<'PY'
+import sys
+import tarfile
+
+archive_path = sys.argv[1]
+invalid_entries = []
+
+with tarfile.open(archive_path, "r:gz") as archive:
+    for member in archive.getmembers():
+        name = member.name
+        if name.startswith("._") or "/._" in name or name.endswith("/.DS_Store") or name.endswith(".DS_Store"):
+            invalid_entries.append(name)
+
+if invalid_entries:
+    print("Updater archive contains unsupported Apple metadata entries:", file=sys.stderr)
+    for entry in invalid_entries:
+        print(f" - {entry}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+
+  tar -xzf "$app_tar_path" -C "$extract_dir"
+  [ -d "$extract_dir/MinNote.app" ] || { echo "Updater archive smoke extract failed: MinNote.app missing"; exit 1; }
+  if find "$extract_dir" \( -name '._*' -o -name '.DS_Store' \) -print -quit | grep -q .; then
+    echo "Updater archive smoke extract produced unsupported Apple metadata files"
+    exit 1
+  fi
 
   if [ -n "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]; then
     pnpm exec tauri signer sign "$app_tar_path" \
@@ -180,6 +222,10 @@ package_updater_artifacts() {
   else
     pnpm exec tauri signer sign "$app_tar_path"
   fi
+
+  trap - RETURN
+  cleanup_temp_dir "$staging_dir"
+  cleanup_temp_dir "$extract_dir"
 }
 
 package_full() {

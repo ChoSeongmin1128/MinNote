@@ -174,6 +174,29 @@ jq -e '.version and .pub_date and .platforms["darwin-aarch64"] and .platforms["d
 [ -s "$RELEASE_DIR/MinNote_aarch64.app.tar.gz.sig" ]
 [ -s "$RELEASE_DIR/MinNote_x86_64.app.tar.gz.sig" ]
 
+python3 - "$RELEASE_DIR" <<'PY'
+import pathlib
+import sys
+import tarfile
+
+release_dir = pathlib.Path(sys.argv[1])
+for archive_path in (
+    release_dir / "MinNote_aarch64.app.tar.gz",
+    release_dir / "MinNote_x86_64.app.tar.gz",
+):
+    with tarfile.open(archive_path, "r:gz") as archive:
+        invalid = [
+            member.name
+            for member in archive.getmembers()
+            if member.name.startswith("._")
+            or "/._" in member.name
+            or member.name.endswith("/.DS_Store")
+            or member.name.endswith(".DS_Store")
+        ]
+        if invalid:
+            raise SystemExit(f"{archive_path.name} contains unsupported Apple metadata entries: {invalid}")
+PY
+
 echo "[6/8] 작업 트리 확인"
 git diff --quiet
 git diff --cached --quiet
