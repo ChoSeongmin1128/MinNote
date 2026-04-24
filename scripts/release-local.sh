@@ -16,13 +16,11 @@ TAG="v$VERSION"
 RELEASE_DIR="/tmp/minnote-release-$VERSION"
 TARGETS=(
   "aarch64-apple-darwin"
-  "x86_64-apple-darwin"
 )
 
 arch_label() {
   case "$1" in
     aarch64-apple-darwin) echo "aarch64" ;;
-    x86_64-apple-darwin) echo "x86_64" ;;
     *)
       echo "unsupported target: $1" >&2
       exit 1
@@ -142,9 +140,7 @@ done
 echo "[5/8] latest.json 생성"
 PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 SIG_AARCH64="$(cat "$RELEASE_DIR/MinNote_aarch64.app.tar.gz.sig")"
-SIG_X86_64="$(cat "$RELEASE_DIR/MinNote_x86_64.app.tar.gz.sig")"
 URL_AARCH64="https://github.com/ChoSeongmin1128/MinNote/releases/download/$TAG/MinNote_aarch64.app.tar.gz"
-URL_X86_64="https://github.com/ChoSeongmin1128/MinNote/releases/download/$TAG/MinNote_x86_64.app.tar.gz"
 
 jq -n \
   --arg version "$VERSION" \
@@ -152,8 +148,6 @@ jq -n \
   --arg pub_date "$PUB_DATE" \
   --arg sig_arm "$SIG_AARCH64" \
   --arg url_arm "$URL_AARCH64" \
-  --arg sig_x64 "$SIG_X86_64" \
-  --arg url_x64 "$URL_X86_64" \
   '{
     version: $version,
     notes: $notes,
@@ -162,17 +156,12 @@ jq -n \
       "darwin-aarch64": {
         signature: $sig_arm,
         url: $url_arm
-      },
-      "darwin-x86_64": {
-        signature: $sig_x64,
-        url: $url_x64
       }
     }
   }' > "$RELEASE_DIR/latest.json"
 
-jq -e '.version and .pub_date and .platforms["darwin-aarch64"] and .platforms["darwin-x86_64"]' "$RELEASE_DIR/latest.json" >/dev/null
+jq -e '.version and .pub_date and .platforms["darwin-aarch64"]' "$RELEASE_DIR/latest.json" >/dev/null
 [ -s "$RELEASE_DIR/MinNote_aarch64.app.tar.gz.sig" ]
-[ -s "$RELEASE_DIR/MinNote_x86_64.app.tar.gz.sig" ]
 
 python3 - "$RELEASE_DIR" <<'PY'
 import pathlib
@@ -182,7 +171,6 @@ import tarfile
 release_dir = pathlib.Path(sys.argv[1])
 for archive_path in (
     release_dir / "MinNote_aarch64.app.tar.gz",
-    release_dir / "MinNote_x86_64.app.tar.gz",
 ):
     with tarfile.open(archive_path, "r:gz") as archive:
         invalid = [
@@ -214,11 +202,8 @@ fi
 echo "[8/8] GitHub release 업로드"
 gh release upload "$TAG" \
   "$RELEASE_DIR/MinNote_${VERSION}_aarch64.dmg#MinNote_${VERSION}_aarch64.dmg" \
-  "$RELEASE_DIR/MinNote_${VERSION}_x86_64.dmg#MinNote_${VERSION}_x86_64.dmg" \
   "$RELEASE_DIR/MinNote_aarch64.app.tar.gz#MinNote_aarch64.app.tar.gz" \
   "$RELEASE_DIR/MinNote_aarch64.app.tar.gz.sig#MinNote_aarch64.app.tar.gz.sig" \
-  "$RELEASE_DIR/MinNote_x86_64.app.tar.gz#MinNote_x86_64.app.tar.gz" \
-  "$RELEASE_DIR/MinNote_x86_64.app.tar.gz.sig#MinNote_x86_64.app.tar.gz.sig" \
   "$RELEASE_DIR/latest.json#latest.json" \
   --clobber
 

@@ -30,14 +30,17 @@ fn build_cloudkit_sidecar() {
   let target = env::var("TARGET").unwrap_or_else(|_| "aarch64-apple-darwin".to_string());
   let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
   let swift_configuration = if profile == "release" { "release" } else { "debug" };
-  let arch = if target.starts_with("x86_64") { "x86_64" } else { "arm64" };
+
+  if target != "aarch64-apple-darwin" {
+    panic!("unsupported macOS target for MinNote: {target}. Apple Silicon macOS only is supported.");
+  }
 
   let status = Command::new("swift")
     .arg("build")
     .arg("-c")
     .arg(swift_configuration)
     .arg("--arch")
-    .arg(arch)
+    .arg("arm64")
     .arg("--product")
     .arg("minnote-cloudkit-bridge")
     .arg("--package-path")

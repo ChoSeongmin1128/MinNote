@@ -36,4 +36,27 @@ if { [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ] || [ -n "${TAURI_SIGNING_PRIVATE_KE
   exit 1
 fi
 
-tauri build "$@"
+BUILD_ARGS=("$@")
+TARGET_VALUE=""
+
+for ((i = 1; i <= ${#BUILD_ARGS[@]}; i++)); do
+  if [ "${BUILD_ARGS[$i]}" = "--target" ]; then
+    if [ "$i" -eq "${#BUILD_ARGS[@]}" ]; then
+      echo "--target requires a value"
+      exit 1
+    fi
+
+    TARGET_VALUE="${BUILD_ARGS[$((i + 1))]}"
+    break
+  fi
+done
+
+if [ -z "$TARGET_VALUE" ]; then
+  BUILD_ARGS+=(--target aarch64-apple-darwin)
+elif [ "$TARGET_VALUE" != "aarch64-apple-darwin" ]; then
+  echo "Unsupported target: $TARGET_VALUE"
+  echo "MinNote release builds support Apple Silicon macOS only."
+  exit 1
+fi
+
+tauri build "${BUILD_ARGS[@]}"

@@ -16,7 +16,7 @@ Build a signed MinNote.app bundle for local verification and optionally open it.
 
 Options:
   --release         Build the release app bundle instead of debug
-  --target <triple> Build for a specific target triple
+  --target <triple> Build for a specific target triple. Only aarch64-apple-darwin is supported.
   --no-open         Skip launching the built app bundle
   --strict-gatekeeper Fail if spctl rejects the app
 EOF
@@ -25,7 +25,7 @@ EOF
 BUILD_MODE="debug"
 OPEN_APP="yes"
 STRICT_GATEKEEPER="no"
-TARGET_ARGS=()
+TARGET_ARGS=(--target aarch64-apple-darwin)
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -36,6 +36,11 @@ while [ "$#" -gt 0 ]; do
     --target)
       if [ "$#" -lt 2 ]; then
         echo "--target requires a value"
+        exit 1
+      fi
+      if [ "$2" != "aarch64-apple-darwin" ]; then
+        echo "Unsupported target: $2"
+        echo "MinNote signed app checks support Apple Silicon macOS only."
         exit 1
       fi
       TARGET_ARGS=(--target "$2")

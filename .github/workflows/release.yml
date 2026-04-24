@@ -62,8 +62,6 @@ jobs:
         include:
           - target: aarch64-apple-darwin
             arch_label: aarch64
-          - target: x86_64-apple-darwin
-            arch_label: x86_64
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +74,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: aarch64-apple-darwin
 
       - name: Install dependencies
         run: pnpm install
@@ -195,9 +193,7 @@ jobs:
         run: |
           for FILE in \
             MinNote_aarch64.app.tar.gz \
-            MinNote_aarch64.app.tar.gz.sig \
-            MinNote_x86_64.app.tar.gz \
-            MinNote_x86_64.app.tar.gz.sig
+            MinNote_aarch64.app.tar.gz.sig
           do
             [ -f "$FILE" ] || { echo "Missing release asset: $FILE"; exit 1; }
             [ -s "$FILE" ] || { echo "Empty release asset: $FILE"; exit 1; }
@@ -208,7 +204,6 @@ jobs:
 
           for archive_name in (
               "MinNote_aarch64.app.tar.gz",
-              "MinNote_x86_64.app.tar.gz",
           ):
               with tarfile.open(archive_name, "r:gz") as archive:
                   invalid = [
@@ -225,7 +220,7 @@ jobs:
 
           TMP_VALIDATE_DIR="$(mktemp -d "${RUNNER_TEMP}/minnote-updater-validate.XXXXXX")"
           trap 'rm -rf "$TMP_VALIDATE_DIR"' EXIT
-          for FILE in MinNote_aarch64.app.tar.gz MinNote_x86_64.app.tar.gz; do
+          for FILE in MinNote_aarch64.app.tar.gz; do
             EXTRACT_DIR="$TMP_VALIDATE_DIR/${FILE%.tar.gz}"
             mkdir -p "$EXTRACT_DIR"
             tar -xzf "$FILE" -C "$EXTRACT_DIR"
@@ -240,19 +235,13 @@ jobs:
           VERSION="${TAG#v}"
           ARM_APP_TAR_FILE="MinNote_aarch64.app.tar.gz"
           ARM_SIG_FILE="MinNote_aarch64.app.tar.gz.sig"
-          X64_APP_TAR_FILE="MinNote_x86_64.app.tar.gz"
-          X64_SIG_FILE="MinNote_x86_64.app.tar.gz.sig"
 
           gh release upload "$TAG" "$ARM_APP_TAR_FILE#MinNote_aarch64.app.tar.gz" --clobber
           gh release upload "$TAG" "$ARM_SIG_FILE#MinNote_aarch64.app.tar.gz.sig" --clobber
-          gh release upload "$TAG" "$X64_APP_TAR_FILE#MinNote_x86_64.app.tar.gz" --clobber
-          gh release upload "$TAG" "$X64_SIG_FILE#MinNote_x86_64.app.tar.gz.sig" --clobber
 
           ARM_SIGNATURE="$(cat "$ARM_SIG_FILE")"
-          X64_SIGNATURE="$(cat "$X64_SIG_FILE")"
           PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           ARM_DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$TAG/MinNote_aarch64.app.tar.gz"
-          X64_DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$TAG/MinNote_x86_64.app.tar.gz"
 
           jq -n \
             --arg version "$VERSION" \
@@ -260,21 +249,17 @@ jobs:
             --arg pub_date "$PUB_DATE" \
             --arg arm_sig "$ARM_SIGNATURE" \
             --arg arm_url "$ARM_DOWNLOAD_URL" \
-            --arg x64_sig "$X64_SIGNATURE" \
-            --arg x64_url "$X64_DOWNLOAD_URL" \
             '{
               version: $version,
               notes: $notes,
               pub_date: $pub_date,
               platforms: {
-                "darwin-aarch64": { signature: $arm_sig, url: $arm_url },
-                "darwin-x86_64": { signature: $x64_sig, url: $x64_url }
+                "darwin-aarch64": { signature: $arm_sig, url: $arm_url }
               }
             }' > latest.json
 
-          jq -e '.version and .pub_date and .platforms["darwin-aarch64"] and .platforms["darwin-x86_64"]' latest.json >/dev/null
+          jq -e '.version and .pub_date and .platforms["darwin-aarch64"]' latest.json >/dev/null
           grep -q "MinNote_aarch64.app.tar.gz" latest.json
-          grep -q "MinNote_x86_64.app.tar.gz" latest.json
 
           gh release upload "$TAG" latest.json --clobber
 
@@ -287,7 +272,7 @@ jobs:
             echo "## Updater assets uploaded"
             echo ""
             echo "- Release: $RELEASE_URL"
-            echo "- Assets: MinNote_aarch64.app.tar.gz, MinNote_aarch64.app.tar.gz.sig, MinNote_x86_64.app.tar.gz, MinNote_x86_64.app.tar.gz.sig, latest.json"
+            echo "- Assets: MinNote_aarch64.app.tar.gz, MinNote_aarch64.app.tar.gz.sig, latest.json"
           } >> "$GITHUB_STEP_SUMMARY"
 
   release_dmg:
@@ -335,9 +320,8 @@ jobs:
 
       - name: Extract notarized app bundle
         run: |
-          mkdir -p dist/aarch64 dist/x86_64
+          mkdir -p dist/aarch64
           tar -xzf MinNote_aarch64.app.tar.gz -C dist/aarch64
-          tar -xzf MinNote_x86_64.app.tar.gz -C dist/x86_64
 
       - name: Create signed and notarized DMG
         env:
@@ -350,14 +334,11 @@ jobs:
           [ -n "$APPLE_SIGNING_IDENTITY_REF" ] || { echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"; exit 1; }
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
-          for ARCH in aarch64 x86_64
-          do
-            APPLE_SIGNING_IDENTITY_REF="$APPLE_SIGNING_IDENTITY_REF" \
-            APPLE_ID="$APPLE_ID" \
-            APPLE_PASSWORD="$APPLE_PASSWORD" \
-            APPLE_TEAM_ID="$APPLE_TEAM_ID" \
-            ./scripts/package-notarized-dmg.sh full "dist/$ARCH/MinNote.app" dist "$VERSION" "$ARCH"
-          done
+          APPLE_SIGNING_IDENTITY_REF="$APPLE_SIGNING_IDENTITY_REF" \
+          APPLE_ID="$APPLE_ID" \
+          APPLE_PASSWORD="$APPLE_PASSWORD" \
+          APPLE_TEAM_ID="$APPLE_TEAM_ID" \
+          ./scripts/package-notarized-dmg.sh full "dist/aarch64/MinNote.app" dist "$VERSION" "aarch64"
 
       - name: Upload DMG to release
         env:
@@ -367,7 +348,6 @@ jobs:
           VERSION="${VERSION#v}"
           gh release upload "${{ github.ref_name }}" \
             "dist/MinNote_${VERSION}_aarch64.dmg#MinNote_${VERSION}_aarch64.dmg" \
-            "dist/MinNote_${VERSION}_x86_64.dmg#MinNote_${VERSION}_x86_64.dmg" \
             --clobber
 
       - name: Write DMG release summary
@@ -381,7 +361,7 @@ jobs:
             echo "## DMG assets uploaded"
             echo ""
             echo "- Release: $RELEASE_URL"
-            echo "- Assets: MinNote_${VERSION}_aarch64.dmg, MinNote_${VERSION}_x86_64.dmg"
+            echo "- Assets: MinNote_${VERSION}_aarch64.dmg"
           } >> "$GITHUB_STEP_SUMMARY"
 
   finalize_release:
@@ -403,11 +383,8 @@ jobs:
           ASSETS_JSON="$(gh release view "$TAG" --repo "$GH_REPO" --json url,assets)"
           for ASSET in \
             "MinNote_${VERSION}_aarch64.dmg" \
-            "MinNote_${VERSION}_x86_64.dmg" \
             "MinNote_aarch64.app.tar.gz" \
             "MinNote_aarch64.app.tar.gz.sig" \
-            "MinNote_x86_64.app.tar.gz" \
-            "MinNote_x86_64.app.tar.gz.sig" \
             "latest.json"
           do
             echo "$ASSETS_JSON" | jq -e --arg name "$ASSET" '.assets[] | select(.name == $name)' >/dev/null || {
@@ -424,7 +401,7 @@ jobs:
             echo ""
             echo "- Version: $VERSION"
             echo "- Release: $RELEASE_URL"
-            echo "- DMG: MinNote_${VERSION}_aarch64.dmg, MinNote_${VERSION}_x86_64.dmg"
-            echo "- Updater assets: MinNote_aarch64.app.tar.gz, MinNote_aarch64.app.tar.gz.sig, MinNote_x86_64.app.tar.gz, MinNote_x86_64.app.tar.gz.sig, latest.json"
+            echo "- DMG: MinNote_${VERSION}_aarch64.dmg"
+            echo "- Updater assets: MinNote_aarch64.app.tar.gz, MinNote_aarch64.app.tar.gz.sig, latest.json"
             echo "- Draft: false"
           } >> "$GITHUB_STEP_SUMMARY"

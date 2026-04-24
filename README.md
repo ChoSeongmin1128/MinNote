@@ -1,10 +1,10 @@
 # MinNote
 
-MinNote는 macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heynote식 상위 블록 구분을 유지하면서, Markdown 블록 안에서는 Notion에 가까운 직접 편집 경험을 만드는 것입니다.
+MinNote는 Apple Silicon macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heynote식 상위 블록 구분을 유지하면서, Markdown 블록 안에서는 Notion에 가까운 직접 편집 경험을 만드는 것입니다.
 
 ## 확정된 전제
 
-- 앱은 `macOS 단독`을 전제로 합니다.
+- 앱은 `Apple Silicon macOS 단독`을 전제로 합니다. Intel Mac과 Windows 배포는 지원하지 않습니다.
 - 패키지 매니저는 `pnpm`을 기준으로 합니다.
 - 상위 레벨 구조는 블록 중심으로 유지합니다.
 - Markdown 블록은 단순 미리보기보다 직접 편집 가능한 경험을 우선합니다.
@@ -44,7 +44,7 @@ MinNote는 macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heyno
 
 ## 현재 상태
 
-- 이 저장소는 `Tauri + React + TypeScript + Rust + SQLite` 기반의 macOS 앱 구현을 포함합니다.
+- 이 저장소는 `Tauri + React + TypeScript + Rust + SQLite` 기반의 Apple Silicon macOS 앱 구현을 포함합니다.
 - 프런트엔드에는 문서 목록, 블록 셸, Markdown/Code/Text 편집기, autosave, 검색 UI, 휴지통, iCloud 동기화 상태 UI, 업데이트 UI가 들어 있습니다.
 - 앱은 초기 로딩이 끝나면 업데이트를 한 번 확인하고, 이후 `6시간` 간격으로 다시 확인합니다.
 - 새 버전이 있으면 백그라운드 다운로드를 먼저 진행하고, 헤더 우측의 작은 버튼으로 `업데이트 적용`을 실행합니다.
@@ -77,12 +77,12 @@ MinNote는 macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heyno
 ## 릴리스 흐름
 
 - 공식 설치 채널은 DMG입니다. 앱 내 업데이트는 Tauri updater용 `latest.json + .app.tar.gz + .sig` 산출물을 사용합니다.
-- DMG 산출물은 `MinNote_<version>_aarch64.dmg`, `MinNote_<version>_x86_64.dmg`입니다.
-- updater 기준 산출물은 `MinNote_aarch64.app.tar.gz`, `MinNote_aarch64.app.tar.gz.sig`, `MinNote_x86_64.app.tar.gz`, `MinNote_x86_64.app.tar.gz.sig`, `latest.json`입니다.
+- DMG 산출물은 Apple Silicon macOS용 `MinNote_<version>_aarch64.dmg`입니다.
+- updater 기준 산출물은 `MinNote_aarch64.app.tar.gz`, `MinNote_aarch64.app.tar.gz.sig`, `latest.json`입니다.
 - 자동 릴리스 워크플로우는 [`.github/workflows/release.yml`](/Users/seongmin/Personal/MinNote/.github/workflows/release.yml)에 남아 있습니다.
 - 다만 현재 기준으로 가장 안정적으로 검증된 배포 경로는 `로컬 Mac에서 빌드/서명/공증/검증 후 gh release로 업로드`하는 방식입니다.
 - 자동 워크플로우를 쓸 때는 `GitHub hosted macOS runner`가 공증된 `.app`과 updater 산출물을 만들고, `self-hosted Mac runner`가 DMG 생성과 release publish를 담당합니다.
-- 수동 릴리스에서는 [`scripts/release-local.sh`](/Users/seongmin/Personal/MinNote/scripts/release-local.sh)가 검증, 양 아키텍처 app 빌드/서명/공증, updater 산출물 생성, DMG 공증, `latest.json` 생성, release 업로드를 한 번에 수행합니다.
+- 수동 릴리스에서는 [`scripts/release-local.sh`](/Users/seongmin/Personal/MinNote/scripts/release-local.sh)가 검증, Apple Silicon app 빌드/서명/공증, updater 산출물 생성, DMG 공증, `latest.json` 생성, release 업로드를 한 번에 수행합니다.
 - DMG 생성 스크립트는 [`scripts/create-dmg.sh`](/Users/seongmin/Personal/MinNote/scripts/create-dmg.sh) 기준으로 유지합니다.
 - release는 DMG가 첨부되기 전까지 완료로 보지 않습니다.
 
