@@ -5,7 +5,6 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::domain::models::ICloudAccountStatus;
 use crate::error::AppError;
-use crate::infrastructure::legacy_identity_migration::LEGACY_ICLOUD_CONTAINER_IDENTIFIER;
 
 const PRIMARY_ICLOUD_CONTAINER_IDENTIFIER: &str = "iCloud.com.seongmin.madi";
 const CLOUDKIT_CONTAINER_ENV: &str = "MADI_CLOUDKIT_CONTAINER_IDENTIFIER";
@@ -129,14 +128,6 @@ impl CloudKitBridge {
         Ok(Self {
             executable_path,
             container_identifier: PRIMARY_ICLOUD_CONTAINER_IDENTIFIER.to_string(),
-        })
-    }
-
-    pub fn legacy() -> Result<Self, AppError> {
-        let executable_path = resolve_bridge_path()?;
-        Ok(Self {
-            executable_path,
-            container_identifier: LEGACY_ICLOUD_CONTAINER_IDENTIFIER.to_string(),
         })
     }
 

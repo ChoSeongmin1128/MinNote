@@ -26,8 +26,6 @@ pub enum StartupError {
     ResolveAppDataDir,
     #[error("앱 데이터 디렉터리를 준비하지 못했습니다: {0}")]
     PrepareAppDataDir(#[source] std::io::Error),
-    #[error("기존 앱 데이터를 Madi로 가져오지 못했습니다: {0}")]
-    MigrateLegacyData(#[source] std::io::Error),
     #[error("앱 저장소를 초기화하지 못했습니다: {0}")]
     InitializeState(#[source] AppError),
     #[error("저장된 설정을 읽지 못했습니다: {0}")]

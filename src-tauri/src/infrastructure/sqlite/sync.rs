@@ -15,9 +15,6 @@ use crate::infrastructure::cloudkit_bridge::{
     BridgeDocumentRecord, BridgeDocumentTombstoneRecord, CloudKitBridge, FetchChangesRequest,
     FetchChangesResponse,
 };
-use crate::infrastructure::legacy_identity_migration::{
-    LEGACY_ICLOUD_SCOPE_PRIVATE, LEGACY_ICLOUD_ZONE_NAME,
-};
 
 use super::*;
 
@@ -474,83 +471,6 @@ impl SqliteStore {
                 ICloudAccountStatus::Unknown.as_str()
             ],
         )?;
-        self.connection.execute(
-            "INSERT INTO cloudkit_state (
-         scope,
-         zone_name,
-         server_change_token,
-         last_sync_started_at_ms,
-         last_sync_succeeded_at_ms,
-         last_error_code,
-         last_error_message,
-         account_status,
-         sync_enabled,
-         subscription_installed,
-         subscription_last_verified_at_ms
-       ) VALUES (?1, ?2, NULL, NULL, NULL, NULL, NULL, ?3, 0, 0, NULL)
-       ON CONFLICT(scope) DO NOTHING",
-            params![
-                LEGACY_ICLOUD_SCOPE_PRIVATE,
-                LEGACY_ICLOUD_ZONE_NAME,
-                ICloudAccountStatus::Unknown.as_str()
-            ],
-        )?;
-        Ok(())
-    }
-
-    pub(crate) fn prepare_after_legacy_local_import(&mut self) -> Result<(), AppError> {
-        self.connection.execute(
-            "INSERT INTO cloudkit_state (
-         scope,
-         zone_name,
-         server_change_token,
-         last_sync_started_at_ms,
-         last_sync_succeeded_at_ms,
-         last_error_code,
-         last_error_message,
-         account_status,
-         sync_enabled,
-         subscription_installed,
-         subscription_last_verified_at_ms
-       )
-       SELECT ?1,
-              ?2,
-              server_change_token,
-              last_sync_started_at_ms,
-              last_sync_succeeded_at_ms,
-              last_error_code,
-              last_error_message,
-              account_status,
-              sync_enabled,
-              subscription_installed,
-              subscription_last_verified_at_ms
-       FROM cloudkit_state
-       WHERE scope = ?3
-       ON CONFLICT(scope) DO NOTHING",
-            params![
-                LEGACY_ICLOUD_SCOPE_PRIVATE,
-                LEGACY_ICLOUD_ZONE_NAME,
-                ICLOUD_SCOPE_PRIVATE
-            ],
-        )?;
-        self.connection.execute(
-            "UPDATE cloudkit_state
-       SET zone_name = ?1,
-           server_change_token = NULL,
-           last_sync_started_at_ms = NULL,
-           last_sync_succeeded_at_ms = NULL,
-           last_error_code = NULL,
-           last_error_message = NULL,
-           account_status = 'unknown',
-           subscription_installed = 0,
-           subscription_last_verified_at_ms = NULL
-       WHERE scope = ?2",
-            params![ICLOUD_ZONE_NAME, ICLOUD_SCOPE_PRIVATE],
-        )?;
-        self.connection
-            .execute("DELETE FROM document_sync_state", [])?;
-        self.queue_all_active_documents_for_sync()?;
-        self.set_state_value("madi_legacy_local_imported_at_ms", &Self::now().to_string())?;
         Ok(())
     }
 
@@ -1381,8 +1301,8 @@ impl SqliteStore {
        SET server_change_token = NULL,
            last_error_code = NULL,
            last_error_message = NULL
-       WHERE scope IN (?1, ?2)",
-            params![ICLOUD_SCOPE_PRIVATE, LEGACY_ICLOUD_SCOPE_PRIVATE],
+       WHERE scope = ?1",
+            params![ICLOUD_SCOPE_PRIVATE],
         )?;
         self.get_icloud_sync_status()
     }
@@ -1406,8 +1326,8 @@ impl SqliteStore {
        SET server_change_token = NULL,
            last_error_code = NULL,
            last_error_message = NULL
-       WHERE scope IN (?1, ?2)",
-            params![ICLOUD_SCOPE_PRIVATE, LEGACY_ICLOUD_SCOPE_PRIVATE],
+       WHERE scope = ?1",
+            params![ICLOUD_SCOPE_PRIVATE],
         )?;
         self.get_icloud_sync_status()
     }
@@ -1585,26 +1505,6 @@ impl SqliteStore {
         })
       },
     ).map_err(AppError::from)
-    }
-
-    pub(crate) fn legacy_server_change_token(&self) -> Result<Option<String>, AppError> {
-        self.read_cloudkit_state_for_scope(LEGACY_ICLOUD_SCOPE_PRIVATE)
-            .map(|state| state.server_change_token)
-    }
-
-    pub(crate) fn set_legacy_server_change_token(
-        &self,
-        token: Option<&str>,
-    ) -> Result<(), AppError> {
-        self.connection.execute(
-            "UPDATE cloudkit_state
-       SET server_change_token = ?1,
-           last_error_code = NULL,
-           last_error_message = NULL
-       WHERE scope = ?2",
-            params![token, LEGACY_ICLOUD_SCOPE_PRIVATE],
-        )?;
-        Ok(())
     }
 
     pub(crate) fn set_cloudkit_account_status(

@@ -22,11 +22,6 @@ pub(crate) fn ensure_main_window_visible_on_screen(app: &AppHandle) -> Result<()
   ensure_window_visible_on_screen(&window)
 }
 
-pub(crate) fn recenter_main_window_on_preferred_display(app: &AppHandle) -> Result<(), String> {
-  let window = main_window(app)?;
-  recenter_window_on_preferred_display(&window)
-}
-
 pub(crate) fn toggle_main_window(app: &AppHandle) -> Result<(), String> {
   let window = main_window(app)?;
   let is_visible = window.is_visible().map_err(|error| error.to_string())?;

@@ -35,7 +35,6 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.aps-environment" "$PROFILE_PLIST" >/dev/null
           /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-services" "$PROFILE_PLIST" >/dev/null
           /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-container-identifiers" "$PROFILE_PLIST" | grep -Fq "iCloud.com.seongmin.madi" || { echo "Madi iCloud container is required."; exit 1; }
-          /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-container-identifiers" "$PROFILE_PLIST" | grep -Fq "iCloud.com.seongmin.minnote" || { echo "Legacy iCloud container is required for Phase 2 read-only import."; exit 1; }
           [ -x ./scripts/package-notarized-app.sh ] || { echo "scripts/package-notarized-app.sh must be executable."; exit 1; }
           [ -x ./scripts/package-notarized-dmg.sh ] || { echo "scripts/package-notarized-dmg.sh must be executable."; exit 1; }
 
