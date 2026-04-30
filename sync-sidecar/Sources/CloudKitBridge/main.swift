@@ -7,7 +7,6 @@ private let documentRecordType = "Document"
 private let blockRecordType = "Block"
 private let documentTombstoneRecordType = "DocumentTombstone"
 private let blockTombstoneRecordType = "BlockTombstone"
-private let migrationMarkerRecordType = "MigrationMarker"
 
 @main
 struct Main {
@@ -37,10 +36,6 @@ struct Main {
         let request: ApplyOperationsRequest = try readPayload()
         let response = try await applyOperations(request: request)
         try writeResponse(response)
-      case "saveMigrationMarker":
-        let request: SaveMigrationMarkerRequest = try readPayload()
-        try await saveMigrationMarker(request: request)
-        try writeResponse(EmptyResponse())
       default:
         throw BridgeError.invalidCommand(command)
       }
@@ -88,13 +83,6 @@ private struct ApplyOperationsRequest: Codable {
   let saveDocumentTombstones: [BridgeDocumentTombstoneRecord]
   let saveBlockTombstones: [BridgeBlockTombstoneRecord]
   let deleteRecordNames: [String]
-}
-
-private struct SaveMigrationMarkerRequest: Codable {
-  let zoneName: String
-  let markerName: String
-  let phase: String
-  let writtenAtMs: Int64
 }
 
 private struct ApplyOperationsResponse: Codable {
@@ -387,26 +375,6 @@ private func applyOperations(request: ApplyOperationsRequest) async throws -> Ap
     }
 
     privateDatabase().add(operation)
-  }
-}
-
-private func saveMigrationMarker(request: SaveMigrationMarkerRequest) async throws {
-  let zone = zoneID(named: request.zoneName)
-  let recordID = CKRecord.ID(recordName: request.markerName, zoneID: zone)
-  let record = CKRecord(recordType: migrationMarkerRecordType, recordID: recordID)
-  record["phase"] = request.phase as CKRecordValue
-  record["writtenAtMs"] = NSNumber(value: request.writtenAtMs)
-
-  _ = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CKRecord, Error>) in
-    privateDatabase().save(record) { savedRecord, error in
-      if let error {
-        continuation.resume(throwing: error)
-      } else if let savedRecord {
-        continuation.resume(returning: savedRecord)
-      } else {
-        continuation.resume(throwing: BridgeError.invalidCommand("saveMigrationMarker"))
-      }
-    }
   }
 }
 

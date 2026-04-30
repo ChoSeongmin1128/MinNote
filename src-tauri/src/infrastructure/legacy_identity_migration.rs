@@ -10,7 +10,6 @@ pub(crate) const LEGACY_ICLOUD_ZONE_NAME: &str = "MinNoteZone";
 #[allow(dead_code)]
 pub(crate) const LEGACY_ICLOUD_ZONE_SUBSCRIPTION_ID: &str = "minnote-zone-subscription";
 pub(crate) const LEGACY_ICLOUD_SCOPE_PRIVATE: &str = "legacy_private";
-pub(crate) const LEGACY_MIGRATION_SEEN_MARKER: &str = "madi_migration_seen";
 
 pub(crate) struct LegacyLocalMigration {
     pub imported: bool,

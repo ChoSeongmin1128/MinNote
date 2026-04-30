@@ -121,7 +121,7 @@ require_profile_entitlement \
   "$PROFILE_PLIST" \
   ":Entitlements:com.apple.developer.icloud-container-identifiers" \
   "iCloud.com.seongmin.minnote" \
-  "Phase 1 migration release에는 legacy iCloud container가 포함된 provisioning profile이 필요합니다."
+  "Phase 2 read-only import에는 legacy iCloud container가 포함된 provisioning profile이 필요합니다."
 rm -f "$PROFILE_PLIST"
 if [ -z "$APPLE_SIGNING_IDENTITY_REF" ]; then
   echo "codesign identity fingerprint를 해석할 수 없습니다."

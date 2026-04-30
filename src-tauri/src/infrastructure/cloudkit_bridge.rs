@@ -187,24 +187,6 @@ impl CloudKitBridge {
         self.invoke("applyOperations", request)
     }
 
-    pub fn save_migration_marker(
-        &self,
-        zone_name: &str,
-        marker_name: &str,
-        phase: &str,
-    ) -> Result<(), AppError> {
-        self.invoke::<SaveMigrationMarkerRequest, EmptyResponse>(
-            "saveMigrationMarker",
-            &SaveMigrationMarkerRequest {
-                zone_name: zone_name.to_string(),
-                marker_name: marker_name.to_string(),
-                phase: phase.to_string(),
-                written_at_ms: current_timestamp_ms(),
-            },
-        )?;
-        Ok(())
-    }
-
     fn invoke<TReq: Serialize, TResp: DeserializeOwned>(
         &self,
         command: &str,
@@ -259,15 +241,6 @@ struct EnsureSubscriptionRequest {
     subscription_id: String,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SaveMigrationMarkerRequest {
-    zone_name: String,
-    marker_name: String,
-    phase: String,
-    written_at_ms: i64,
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AccountStatusResponse {
@@ -276,15 +249,6 @@ struct AccountStatusResponse {
 
 #[derive(Debug, Deserialize)]
 struct EmptyResponse {}
-
-fn current_timestamp_ms() -> i64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as i64
-}
 
 fn resolve_bridge_path() -> Result<PathBuf, AppError> {
     let target_triple = option_env!("MADI_TARGET_TRIPLE")

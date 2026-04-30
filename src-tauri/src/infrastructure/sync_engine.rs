@@ -6,11 +6,9 @@ use crate::application::dto::WorkspaceDocumentsChangedEventDto;
 use crate::domain::models::{ICloudAccountStatus, ICloudSyncState, ICloudSyncStatus};
 use crate::error::AppError;
 use crate::infrastructure::cloudkit_bridge::{
-    ApplyOperationsRequest, CloudKitBridge, FetchChangesRequest, FetchChangesResponse,
+    CloudKitBridge, FetchChangesRequest, FetchChangesResponse,
 };
-use crate::infrastructure::legacy_identity_migration::{
-    LEGACY_ICLOUD_ZONE_NAME, LEGACY_MIGRATION_SEEN_MARKER,
-};
+use crate::infrastructure::legacy_identity_migration::LEGACY_ICLOUD_ZONE_NAME;
 use crate::infrastructure::sqlite::sync::{
     is_retryable_sync_error, RemoteApplySummary, SyncRunPreparation,
 };
@@ -135,7 +133,7 @@ impl SyncEngine {
             zone_name: ICLOUD_ZONE_NAME.to_string(),
             server_change_token,
         })?;
-        let (legacy_bridge, legacy_changes) = fetch_legacy_changes(state);
+        let legacy_changes = fetch_legacy_changes(state);
         let combined_changes = combine_changes(changes, legacy_changes.as_ref());
 
         state.set_sync_phase(SyncRuntimePhase::Syncing);
@@ -150,16 +148,10 @@ impl SyncEngine {
 
         let response = if built.built.has_operations() {
             let response = bridge.apply_operations(built.built.request())?;
-            if let Some(legacy_bridge) = &legacy_bridge {
-                mirror_operations_to_legacy(legacy_bridge, built.built.request());
-            }
             Some(response)
         } else {
             None
         };
-        if let Some(legacy_bridge) = &legacy_bridge {
-            mark_legacy_migration_seen(legacy_bridge);
-        }
 
         let mut repository = state.repository.lock().map_err(|_| AppError::StateLock)?;
         let completion = repository.complete_icloud_sync_run(
@@ -196,17 +188,15 @@ impl SyncEngine {
     }
 }
 
-fn fetch_legacy_changes(
-    state: &AppState,
-) -> (Option<CloudKitBridge>, Option<FetchChangesResponse>) {
+fn fetch_legacy_changes(state: &AppState) -> Option<FetchChangesResponse> {
     let legacy_token = match state.repository.lock() {
         Ok(repository) => match repository.legacy_server_change_token() {
             Ok(token) => token,
-            Err(_) => return (None, None),
+            Err(_) => return None,
         },
         Err(error) => {
             log::warn!("legacy iCloud 상태를 읽기 위해 저장소를 잠그지 못했습니다: {error}");
-            return (None, None);
+            return None;
         }
     };
 
@@ -214,27 +204,22 @@ fn fetch_legacy_changes(
         Ok(bridge) => bridge,
         Err(error) => {
             log::warn!("legacy iCloud bridge를 준비하지 못했습니다: {error}");
-            return (None, None);
+            return None;
         }
     };
 
-    if let Err(error) = legacy_bridge.ensure_zone(LEGACY_ICLOUD_ZONE_NAME) {
-        log::warn!("legacy iCloud zone 확인에 실패했습니다: {error}");
-        return (Some(legacy_bridge), None);
-    }
-
-    let legacy_changes = match legacy_bridge.fetch_changes(&FetchChangesRequest {
+    // Phase 2 keeps legacy iCloud as a read-only import source only.
+    // Do not create old zones, mirror records, or write migration markers here.
+    match legacy_bridge.fetch_changes(&FetchChangesRequest {
         zone_name: LEGACY_ICLOUD_ZONE_NAME.to_string(),
         server_change_token: legacy_token,
     }) {
-        Ok(changes) => changes,
+        Ok(changes) => Some(changes),
         Err(error) => {
             log::warn!("legacy iCloud 변경을 가져오지 못했습니다: {error}");
-            return (Some(legacy_bridge), None);
+            None
         }
-    };
-
-    (Some(legacy_bridge), Some(legacy_changes))
+    }
 }
 
 fn combine_changes(
@@ -254,24 +239,6 @@ fn combine_changes(
         .block_tombstones
         .extend(legacy.block_tombstones.clone());
     primary
-}
-
-fn mirror_operations_to_legacy(legacy_bridge: &CloudKitBridge, request: &ApplyOperationsRequest) {
-    let mut legacy_request = request.clone();
-    legacy_request.zone_name = LEGACY_ICLOUD_ZONE_NAME.to_string();
-    if let Err(error) = legacy_bridge.apply_operations(&legacy_request) {
-        log::warn!("legacy iCloud mirror write에 실패했습니다: {error}");
-    }
-}
-
-fn mark_legacy_migration_seen(legacy_bridge: &CloudKitBridge) {
-    if let Err(error) = legacy_bridge.save_migration_marker(
-        LEGACY_ICLOUD_ZONE_NAME,
-        LEGACY_MIGRATION_SEEN_MARKER,
-        "migration_dual_write",
-    ) {
-        log::warn!("legacy iCloud migration marker 기록에 실패했습니다: {error}");
-    }
 }
 
 fn ensure_cloudkit_subscription(state: &AppState, bridge: &CloudKitBridge) {
@@ -349,5 +316,102 @@ pub(crate) fn emit_workspace_documents_changed(
 ) {
     if let Err(error) = app_handle.emit(WORKSPACE_DOCUMENTS_CHANGED_EVENT, payload) {
         log::warn!("문서 목록 변경 이벤트를 내보내지 못했습니다: {error}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infrastructure::cloudkit_bridge::{
+        BridgeBlockRecord, BridgeBlockTombstoneRecord, BridgeDocumentRecord,
+        BridgeDocumentTombstoneRecord,
+    };
+
+    fn empty_changes(token: Option<&str>) -> FetchChangesResponse {
+        FetchChangesResponse {
+            documents: Vec::new(),
+            blocks: Vec::new(),
+            document_tombstones: Vec::new(),
+            block_tombstones: Vec::new(),
+            next_server_change_token: token.map(str::to_string),
+        }
+    }
+
+    fn document(id: &str) -> BridgeDocumentRecord {
+        BridgeDocumentRecord {
+            document_id: id.to_string(),
+            title: format!("document {id}"),
+            block_tint_override: None,
+            document_surface_tone_override: None,
+            updated_at_ms: 10,
+            updated_by_device_id: "device".to_string(),
+        }
+    }
+
+    fn block(id: &str, document_id: &str) -> BridgeBlockRecord {
+        BridgeBlockRecord {
+            block_id: id.to_string(),
+            document_id: document_id.to_string(),
+            kind: "text".to_string(),
+            content: format!("block {id}"),
+            language: None,
+            position: 1000,
+            updated_at_ms: 20,
+            updated_by_device_id: "device".to_string(),
+        }
+    }
+
+    #[test]
+    fn combine_changes_imports_legacy_records_but_keeps_primary_token() {
+        let mut primary = empty_changes(Some("madi-token"));
+        primary.documents.push(document("madi-document"));
+        primary.blocks.push(block("madi-block", "madi-document"));
+        primary
+            .document_tombstones
+            .push(BridgeDocumentTombstoneRecord {
+                document_id: "madi-deleted-document".to_string(),
+                deleted_at_ms: 30,
+                deleted_by_device_id: "device".to_string(),
+            });
+
+        let mut legacy = empty_changes(Some("legacy-token"));
+        legacy.documents.push(document("legacy-document"));
+        legacy.blocks.push(block("legacy-block", "legacy-document"));
+        legacy.block_tombstones.push(BridgeBlockTombstoneRecord {
+            block_id: "legacy-deleted-block".to_string(),
+            document_id: "legacy-document".to_string(),
+            deleted_at_ms: 40,
+            deleted_by_device_id: "device".to_string(),
+        });
+
+        let combined = combine_changes(primary, Some(&legacy));
+
+        assert_eq!(
+            combined.next_server_change_token.as_deref(),
+            Some("madi-token")
+        );
+        assert_eq!(combined.documents.len(), 2);
+        assert_eq!(combined.blocks.len(), 2);
+        assert_eq!(combined.document_tombstones.len(), 1);
+        assert_eq!(combined.block_tombstones.len(), 1);
+        assert!(combined
+            .documents
+            .iter()
+            .any(|record| record.document_id == "legacy-document"));
+    }
+
+    #[test]
+    fn combine_changes_without_legacy_returns_primary_only() {
+        let mut primary = empty_changes(Some("madi-token"));
+        primary.documents.push(document("madi-document"));
+
+        let combined = combine_changes(primary, None);
+
+        assert_eq!(combined.documents.len(), 1);
+        assert_eq!(combined.documents[0].document_id, "madi-document");
+        assert_eq!(
+            combined.next_server_change_token.as_deref(),
+            Some("madi-token")
+        );
     }
 }
