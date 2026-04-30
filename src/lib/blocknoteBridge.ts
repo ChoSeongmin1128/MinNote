@@ -29,6 +29,32 @@ function dispatchTransaction(editor: BlockNoteEditorLike, transaction: unknown) 
   editor._tiptapEditor.view.dispatch(dispatchable);
 }
 
+function getBlockId(block: unknown): string | null {
+  if (!block || typeof block !== 'object' || !('id' in block)) {
+    return null;
+  }
+
+  const { id } = block as { id?: unknown };
+  return typeof id === 'string' ? id : null;
+}
+
+function restoreCursorToBlockEnd(editor: BlockNoteEditorLike, blockId: string) {
+  const restore = () => {
+    try {
+      editor.focus();
+      editor.setTextCursorPosition(blockId, 'end');
+    } catch {
+      // BlockNote can briefly reject cursor placement while normalizing a block type change.
+    }
+  };
+
+  restore();
+
+  if (typeof queueMicrotask === 'function') {
+    queueMicrotask(restore);
+  }
+}
+
 export function getBlockNoteMarkdown(editor: BlockNoteEditorLike) {
   return editor.blocksToMarkdownLossy(editor.document);
 }
@@ -148,7 +174,8 @@ export function replaceBlockNoteTaskShortcut(editor: BlockNoteEditorLike, should
   }
 
   const block = editor.getTextCursorPosition().block;
-  if (!block) {
+  const blockId = getBlockId(block);
+  if (!blockId) {
     return false;
   }
 
@@ -156,6 +183,7 @@ export function replaceBlockNoteTaskShortcut(editor: BlockNoteEditorLike, should
     type: 'checkListItem',
     content: [],
   });
+  restoreCursorToBlockEnd(editor, blockId);
   return true;
 }
 

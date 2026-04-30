@@ -3,6 +3,8 @@ import { replaceBlockNoteTaskShortcut, type BlockNoteEditorLike } from './blockn
 
 function createTaskShortcutEditor(beforeText: string, afterText = '') {
   const updateBlock = vi.fn();
+  const focus = vi.fn();
+  const setTextCursorPosition = vi.fn();
   const text = `${beforeText}${afterText}`;
   const editor = {
     _tiptapEditor: {
@@ -23,15 +25,17 @@ function createTaskShortcutEditor(beforeText: string, afterText = '') {
       },
     },
     updateBlock,
+    focus,
+    setTextCursorPosition,
     getTextCursorPosition: () => ({ block: { id: 'block-1' } }),
   } as unknown as BlockNoteEditorLike;
 
-  return { editor, updateBlock };
+  return { editor, updateBlock, focus, setTextCursorPosition };
 }
 
 describe('blocknote bridge', () => {
   it('turns [] into an empty checklist item without inserting a space', () => {
-    const { editor, updateBlock } = createTaskShortcutEditor('[]');
+    const { editor, updateBlock, focus, setTextCursorPosition } = createTaskShortcutEditor('[]');
 
     const replaced = replaceBlockNoteTaskShortcut(editor, (text) => text.trim() === '[]');
 
@@ -43,14 +47,18 @@ describe('blocknote bridge', () => {
         content: [],
       },
     );
+    expect(focus).toHaveBeenCalled();
+    expect(setTextCursorPosition).toHaveBeenCalledWith('block-1', 'end');
   });
 
   it('does not replace [] when text already follows the cursor', () => {
-    const { editor, updateBlock } = createTaskShortcutEditor('[]', ' 내용');
+    const { editor, updateBlock, focus, setTextCursorPosition } = createTaskShortcutEditor('[]', ' 내용');
 
     const replaced = replaceBlockNoteTaskShortcut(editor, (text) => text.trim() === '[]');
 
     expect(replaced).toBe(false);
     expect(updateBlock).not.toHaveBeenCalled();
+    expect(focus).not.toHaveBeenCalled();
+    expect(setTextCursorPosition).not.toHaveBeenCalled();
   });
 });
