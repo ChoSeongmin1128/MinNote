@@ -108,8 +108,9 @@ describe('blocknote bridge', () => {
       nestBlock: vi.fn(() => {
         editor.document = [{ ...rootBlock, children: [...rootBlock.children, currentBlock] }];
       }),
-      updateBlock: vi.fn((block: { children: unknown[] }, update: { children: unknown[] }) => {
-        block.children = update.children;
+      removeBlocks: vi.fn((blocksToRemove: TestBlock[]) => {
+        const idsToRemove = new Set(blocksToRemove.map((block) => block.id));
+        currentBlock.children = currentBlock.children.filter((block) => !idsToRemove.has(block.id));
       }),
       insertBlocks: vi.fn((blocksToInsert: unknown[], referenceBlock: { id: string }) => {
         const parentChildren = editor.document[0].children;
@@ -122,7 +123,7 @@ describe('blocknote bridge', () => {
 
     expect(nested).toBe(true);
     expect(editor.nestBlock).toHaveBeenCalled();
-    expect(editor.updateBlock).toHaveBeenCalledWith(currentBlock, { children: [] });
+    expect(editor.removeBlocks).toHaveBeenCalledWith([nestedSibling]);
     expect(editor.insertBlocks).toHaveBeenCalledWith([nestedSibling], currentBlock, 'after');
     expect(editor.document).toEqual([
       {

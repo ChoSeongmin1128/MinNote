@@ -11,6 +11,7 @@ export type BlockNoteEditorLike = {
   pasteMarkdown: (markdown: string) => void;
   updateBlock?: (blockOrId: any, update: any) => void;
   insertBlocks?: (blocksToInsert: any[], referenceBlock: any, placement?: 'before' | 'after') => void;
+  removeBlocks?: (blocksToRemove: any[]) => void;
   getTextCursorPosition?: () => { block?: any };
   canNestBlock?: () => boolean;
   nestBlock?: () => void;
@@ -81,7 +82,7 @@ function cloneBlockTree(block: unknown): unknown {
 }
 
 function promoteCurrentBlockChildrenToSiblings(editor: BlockNoteEditorLike, blockId: string) {
-  if (typeof editor.updateBlock !== 'function' || typeof editor.insertBlocks !== 'function') {
+  if (typeof editor.removeBlocks !== 'function' || typeof editor.insertBlocks !== 'function') {
     return false;
   }
 
@@ -96,7 +97,7 @@ function promoteCurrentBlockChildrenToSiblings(editor: BlockNoteEditorLike, bloc
   }
 
   const childrenToInsert = children.map((child) => cloneBlockTree(child));
-  editor.updateBlock(currentBlock, { children: [] });
+  editor.removeBlocks(children);
 
   const updatedBlock = findBlockById(editor.document, blockId) ?? currentBlock;
   editor.insertBlocks(childrenToInsert, updatedBlock, 'after');
