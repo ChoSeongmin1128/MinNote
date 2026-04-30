@@ -1081,10 +1081,11 @@ button {
   right: 0;
   z-index: 30;
   display: flex;
-  width: min(236px, calc(100vw - 24px));
+  width: min(264px, calc(100vw - 24px));
   max-height: min(520px, calc(100vh - 72px));
   flex-direction: column;
   gap: 6px;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--border);
@@ -1160,13 +1161,18 @@ button {
 
 .document-menu-section {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 3px;
 }
 
 .document-menu-status {
   display: block;
+  min-width: 0;
+  overflow: hidden;
   padding: 0 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .document-menu-section-header {
@@ -1177,6 +1183,7 @@ button {
 }
 
 .document-menu-popover .segmented-selector.is-inline {
+  min-width: 0;
   gap: 3px;
   padding: 3px;
 }
@@ -1220,6 +1227,7 @@ button {
 .document-menu-option-copy {
   display: flex;
   min-width: 0;
+  overflow: hidden;
   flex: 1;
   flex-direction: column;
   gap: 1px;
@@ -1423,11 +1431,13 @@ button {
 }
 
 .document-menu-option-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
   font-size: 0.92rem;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .document-menu-divider {
@@ -1782,8 +1792,14 @@ button {
 }
 
 .document-menu-popover .segmented-selector.is-palette {
+  min-width: 0;
   gap: 4px;
   padding: 4px;
+}
+
+.document-menu-option > .document-menu-option-preview {
+  width: 52px;
+  min-width: 52px;
 }
 
 .document-menu-popover .segmented-selector.is-palette .segmented-selector-option {
