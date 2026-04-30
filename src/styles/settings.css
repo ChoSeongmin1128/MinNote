@@ -429,20 +429,33 @@
 
   .settings-sidebar {
     display: grid;
-    min-height: 54px;
-    max-height: 54px;
-    grid-auto-columns: minmax(104px, 1fr);
+    min-height: 42px;
+    max-height: 42px;
+    grid-auto-columns: max-content;
     grid-auto-flow: column;
+    gap: 4px;
     overflow-x: auto;
     overflow-y: hidden;
     border-right: none;
     border-bottom: 1px solid color-mix(in srgb, CanvasText 7%, transparent);
-    padding: 8px;
+    padding: 6px 8px;
   }
 
   .settings-category-button {
-    min-height: 38px;
-    grid-template-columns: 16px minmax(0, 1fr);
+    min-height: 30px;
+    grid-template-columns: 14px max-content;
+    gap: 6px;
+    padding: 5px 8px;
+    white-space: nowrap;
+  }
+
+  .settings-category-button svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .settings-category-label {
+    font-size: 0.8rem;
   }
 
   .settings-category-description,
