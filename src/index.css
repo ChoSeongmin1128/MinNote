@@ -2202,6 +2202,12 @@ button {
   padding: 2px 0;
 }
 
+.markdown-blocknote-shell .bn-block-group .bn-block-group > .bn-block-outer::before {
+  display: none !important;
+  content: none !important;
+  border-left: 0 !important;
+}
+
 .markdown-blocknote-shell .bn-block-content[data-content-type='checkListItem'] > div:has(> input) {
   min-width: 1.65em;
   justify-content: flex-start;
