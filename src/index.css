@@ -34,7 +34,7 @@
   --app-surface-bg: var(--bg);
   --workspace-surface-bg: color-mix(in srgb, var(--bg) 96%, transparent);
   --sidebar-surface-bg: color-mix(in srgb, var(--bg) 92%, var(--bg-muted) 8%);
-  --header-surface-bg: color-mix(in srgb, var(--bg) 96%, CanvasText 4%);
+  --header-surface-bg: transparent;
   --canvas-surface-bg: var(--bg);
   --document-surface-bg: var(--canvas-surface-bg);
   --editor-body-font-family:
@@ -632,7 +632,7 @@ button {
   z-index: 5;
   flex-shrink: 0;
   margin: -4px -8px 0;
-  border-bottom: 1px solid color-mix(in srgb, CanvasText 6%, transparent);
+  border-bottom: 0;
   background: var(--header-surface-bg);
   padding: 8px 8px 10px;
 }
@@ -853,7 +853,7 @@ button {
   --app-surface-bg: var(--bg);
   --workspace-surface-bg: color-mix(in srgb, var(--bg) 96%, transparent);
   --sidebar-surface-bg: color-mix(in srgb, var(--bg) 92%, var(--bg-muted) 8%);
-  --header-surface-bg: color-mix(in srgb, var(--bg) 96%, CanvasText 4%);
+  --header-surface-bg: transparent;
   --canvas-surface-bg: var(--bg);
 }
 
@@ -1356,7 +1356,7 @@ button {
   --app-surface-bg: var(--bg);
   --workspace-surface-bg: color-mix(in srgb, var(--bg) 94%, transparent);
   --sidebar-surface-bg: color-mix(in srgb, var(--bg) 90%, CanvasText 10%);
-  --header-surface-bg: color-mix(in srgb, var(--bg) 94%, CanvasText 6%);
+  --header-surface-bg: transparent;
   --canvas-surface-bg: var(--bg);
 }
 
@@ -2647,7 +2647,7 @@ body.is-block-dragging * {
     --app-surface-bg: var(--bg);
     --workspace-surface-bg: color-mix(in srgb, var(--bg) 94%, transparent);
     --sidebar-surface-bg: color-mix(in srgb, var(--bg) 90%, CanvasText 10%);
-    --header-surface-bg: color-mix(in srgb, var(--bg) 94%, CanvasText 6%);
+    --header-surface-bg: transparent;
     --canvas-surface-bg: var(--bg);
   }
 
