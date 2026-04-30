@@ -1,6 +1,6 @@
 [package]
 name = "madi"
-version = "1.1.2"
+version = "1.2.0"
 description = "Madi desktop app"
 authors = ["seongmin"]
 license = ""
