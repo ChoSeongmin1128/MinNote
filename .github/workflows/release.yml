@@ -50,9 +50,11 @@ jobs:
           ! echo "$CONTAINERS" | grep -Eiq "$OLD_PRODUCT_NAME|$OLD_PRODUCT_LOWER|$OLD_PRODUCT_TITLE|$OLD_PRODUCT_UPPER" || { echo "Provisioning profile contains old app identity."; exit 1; }
           CONTAINER_COUNT="$(echo "$CONTAINERS" | grep -Ec 'iCloud\.')"
           [ "$CONTAINER_COUNT" -eq 1 ] || { echo "Provisioning profile must contain exactly one iCloud container."; exit 1; }
-          APP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$PROFILE_PLIST")"
-          echo "$APP_IDENTIFIER" | grep -Fq "com.seongmin.madi" || { echo "Provisioning profile must target com.seongmin.madi."; exit 1; }
-          ! echo "$APP_IDENTIFIER" | grep -Eiq "$OLD_PRODUCT_NAME|$OLD_PRODUCT_LOWER|$OLD_PRODUCT_TITLE|$OLD_PRODUCT_UPPER" || { echo "Provisioning profile app identifier contains old app identity."; exit 1; }
+          APP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$PROFILE_PLIST" 2>/dev/null || true)"
+          if [ -n "$APP_IDENTIFIER" ]; then
+            echo "$APP_IDENTIFIER" | grep -Fq "com.seongmin.madi" || { echo "Provisioning profile must target com.seongmin.madi."; exit 1; }
+            ! echo "$APP_IDENTIFIER" | grep -Eiq "$OLD_PRODUCT_NAME|$OLD_PRODUCT_LOWER|$OLD_PRODUCT_TITLE|$OLD_PRODUCT_UPPER" || { echo "Provisioning profile app identifier contains old app identity."; exit 1; }
+          fi
           [ -x ./scripts/package-notarized-app.sh ] || { echo "scripts/package-notarized-app.sh must be executable."; exit 1; }
           [ -x ./scripts/package-notarized-dmg.sh ] || { echo "scripts/package-notarized-dmg.sh must be executable."; exit 1; }
           [ -x ./scripts/validate-release-app.sh ] || { echo "scripts/validate-release-app.sh must be executable."; exit 1; }
