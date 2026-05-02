@@ -7,7 +7,6 @@ use super::{TRASH_TTL_MS, build_workspace_payload};
 pub fn bootstrap_app(repository: &mut dyn AppRepository) -> Result<BootstrapPayload, AppError> {
   repository.purge_expired_trash(super::now_ms() - TRASH_TTL_MS)?;
   repository.ensure_initial_document()?;
-  repository.migrate_legacy_markdown_blocks()?;
   let last_opened_document_id = repository.get_last_opened_document_id()?;
   build_workspace_payload(repository, last_opened_document_id)
 }

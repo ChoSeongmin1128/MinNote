@@ -122,7 +122,6 @@ impl DocumentRepository for MockRepository {
 }
 
 impl BlockRepository for MockRepository {
-  fn migrate_legacy_markdown_blocks(&mut self) -> Result<(), AppError> { Ok(()) }
   fn list_blocks(&self, _document_id: &str) -> Result<Vec<Block>, AppError> { Ok(self.current_blocks.clone()) }
   fn create_block_below(
     &mut self,

@@ -4,7 +4,7 @@ use super::*;
 
 mod blocks;
 mod document_pipeline;
-mod legacy_markdown;
+mod markdown_storage;
 mod state_values;
 mod titles;
 

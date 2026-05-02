@@ -505,99 +505,6 @@ impl SqliteStore {
         Ok(())
     }
 
-    pub(crate) fn migrate_legacy_sync_outbox_to_operations(&self) -> Result<(), AppError> {
-        let legacy_count =
-            self.connection
-                .query_row("SELECT COUNT(*) FROM sync_outbox", [], |row| {
-                    row.get::<_, i64>(0)
-                })?;
-        if legacy_count == 0 {
-            return Ok(());
-        }
-
-        let rows = self
-            .connection
-            .prepare(
-                "SELECT entity_type, entity_id, op, queued_at_ms, attempt_count, last_error_code
-         FROM sync_outbox
-         ORDER BY queued_at_ms ASC, id ASC",
-            )?
-            .query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, i64>(3)?,
-                    row.get::<_, i64>(4)?,
-                    row.get::<_, Option<String>>(5)?,
-                ))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-
-        for (entity_type_raw, entity_id, op_raw, queued_at_ms, attempt_count, last_error_code) in
-            rows
-        {
-            let entity_type = SyncEntityType::try_from_str(&entity_type_raw)?;
-            let operation_type = match (entity_type, op_raw.as_str()) {
-                (SyncEntityType::Document, _) => SyncOperationType::DocumentTouched,
-                (SyncEntityType::Block, _) => SyncOperationType::BlockContentUpdated,
-                (SyncEntityType::DocumentTombstone, _) => SyncOperationType::DocumentDeleted,
-                (SyncEntityType::BlockTombstone, _) => SyncOperationType::BlockDeleted,
-            };
-            let document_id = match entity_type {
-                SyncEntityType::Document => Some(entity_id.clone()),
-                SyncEntityType::Block => self
-                    .fetch_block(&entity_id)
-                    .ok()
-                    .map(|block| block.document_id),
-                SyncEntityType::DocumentTombstone => Some(entity_id.clone()),
-                SyncEntityType::BlockTombstone => self
-                    .read_tombstone(SyncEntityType::BlockTombstone, &entity_id)?
-                    .and_then(|row| row.parent_document_id),
-            };
-            if matches!(
-                entity_type,
-                SyncEntityType::DocumentTombstone | SyncEntityType::BlockTombstone
-            ) && document_id.is_none()
-            {
-                continue;
-            }
-            self.connection.execute(
-                "INSERT INTO sync_operations (
-           operation_type,
-           entity_type,
-           entity_id,
-           document_id,
-           payload_json,
-           logical_clock,
-           created_at_ms,
-           attempt_count,
-           last_error_code,
-           status
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                params![
-                    operation_type.as_str(),
-                    entity_type.as_str(),
-                    entity_id,
-                    document_id,
-                    json!({ "migratedFrom": "sync_outbox", "legacyOp": op_raw }).to_string(),
-                    queued_at_ms,
-                    queued_at_ms,
-                    attempt_count,
-                    last_error_code,
-                    if last_error_code.is_some() {
-                        SyncOperationStatus::Failed.as_str()
-                    } else {
-                        SyncOperationStatus::Pending.as_str()
-                    },
-                ],
-            )?;
-        }
-
-        self.connection.execute("DELETE FROM sync_outbox", [])?;
-        Ok(())
-    }
-
     pub(crate) fn cleanup_orphaned_sync_operations(&self) -> Result<(), AppError> {
         let operations =
             self.list_sync_operations_with_statuses(&["pending", "processing", "failed"])?;
@@ -621,13 +528,7 @@ impl SqliteStore {
                 }
             };
 
-            let migrated_legacy = operation
-                .payload_json
-                .get("migratedFrom")
-                .and_then(Value::as_str)
-                == Some("sync_outbox");
-
-            if is_orphaned || (migrated_legacy && operation.document_id.is_none()) {
+            if is_orphaned {
                 delete_ids.push(operation.id);
             }
         }
@@ -2690,7 +2591,7 @@ impl SqliteStore {
         let kind = BlockKind::try_from_str(&remote.kind)?;
         let search_text = match kind {
             BlockKind::Markdown => {
-                let (_, search_text, _) = Self::normalize_markdown_storage(&remote.content);
+                let (_, search_text) = Self::normalize_markdown_storage(&remote.content);
                 search_text
             }
             BlockKind::Code | BlockKind::Text => remote.content.clone(),
@@ -3945,10 +3846,10 @@ mod tests {
     }
 
     #[test]
-    fn legacy_block_moved_rows_expand_to_document_ordering_projection() {
+    fn block_moved_rows_expand_to_document_ordering_projection() {
         let mut store = test_store();
         let document = store
-            .create_document(Some("legacy move".to_string()))
+            .create_document(Some("block move".to_string()))
             .expect("document should be created");
         let blocks = store
             .create_block_below(&document.id, None, BlockKind::Text)
@@ -3968,7 +3869,7 @@ mod tests {
                 json!({ "targetPosition": 1 }),
                 SqliteStore::now(),
             )
-            .expect("legacy move operation should enqueue");
+            .expect("block move operation should enqueue");
 
         let built = store
             .build_coalesced_sync_plan()
@@ -4003,45 +3904,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn cleanup_orphaned_legacy_tombstone_operations_removes_pending_rows() {
-        let store = test_store();
-        store
-            .connection
-            .execute(
-                "INSERT INTO sync_operations (
-                   operation_type,
-                   entity_type,
-                   entity_id,
-                   document_id,
-                   payload_json,
-                   logical_clock,
-                   created_at_ms,
-                   attempt_count,
-                   last_error_code,
-                   status
-                 ) VALUES (?1, ?2, ?3, NULL, ?4, ?5, ?5, 0, NULL, 'pending')",
-                params![
-                    SyncOperationType::BlockDeleted.as_str(),
-                    SyncEntityType::BlockTombstone.as_str(),
-                    "orphan-block-id",
-                    json!({ "migratedFrom": "sync_outbox", "legacyOp": "upsert" }).to_string(),
-                    SqliteStore::now(),
-                ],
-            )
-            .expect("legacy orphan row should insert");
-
-        store
-            .cleanup_orphaned_sync_operations()
-            .expect("orphan cleanup should succeed");
-
-        let count = store
-            .connection
-            .query_row("SELECT COUNT(*) FROM sync_operations", [], |row| {
-                row.get::<_, i64>(0)
-            })
-            .expect("operation count should load");
-
-        assert_eq!(count, 0);
-    }
 }

@@ -30,7 +30,6 @@ pub trait DocumentRepository {
 }
 
 pub trait BlockRepository {
-  fn migrate_legacy_markdown_blocks(&mut self) -> Result<(), AppError>;
   fn list_blocks(&self, document_id: &str) -> Result<Vec<Block>, AppError>;
   fn create_block_below(
     &mut self,

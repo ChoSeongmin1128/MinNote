@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use rusqlite::{params, Connection, OptionalExtension};
-use serde_json::Value;
 use uuid::Uuid;
 
 use crate::domain::models::{

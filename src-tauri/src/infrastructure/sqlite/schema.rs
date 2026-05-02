@@ -33,17 +33,6 @@ impl SqliteStore {
           value TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS sync_outbox (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          entity_type TEXT NOT NULL,
-          entity_id TEXT NOT NULL,
-          op TEXT NOT NULL,
-          queued_at_ms INTEGER NOT NULL,
-          attempt_count INTEGER NOT NULL DEFAULT 0,
-          last_error_code TEXT NULL,
-          UNIQUE(entity_type, entity_id, op)
-        );
-
         CREATE TABLE IF NOT EXISTS sync_tombstones (
           entity_type TEXT NOT NULL,
           entity_id TEXT NOT NULL,
@@ -130,7 +119,6 @@ impl SqliteStore {
     self.ensure_cloudkit_state_row()?;
     self.ensure_device_state_row()?;
     self.ensure_sync_operations_defaults()?;
-    self.migrate_legacy_sync_outbox_to_operations()?;
     self.cleanup_orphaned_sync_operations()?;
     self.cleanup_removed_sync_state()?;
     self.cleanup_document_sync_state()?;

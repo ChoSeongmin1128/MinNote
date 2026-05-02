@@ -1,7 +1,13 @@
 use super::*;
 
 impl SqliteStore {
-  pub(crate) fn markdown_plain_text(markdown: &str) -> String {
+  pub(crate) fn normalize_markdown_storage(raw: &str) -> (String, String) {
+    let normalized = raw.replace("\r\n", "\n");
+    let search_text = Self::markdown_plain_text(&normalized);
+    (normalized, search_text)
+  }
+
+  fn markdown_plain_text(markdown: &str) -> String {
     markdown
       .lines()
       .map(|line| {

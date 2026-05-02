@@ -5,51 +5,6 @@ use super::*;
 mod tests;
 
 impl BlockRepository for SqliteStore {
-    fn migrate_legacy_markdown_blocks(&mut self) -> Result<(), AppError> {
-        let mut statement = self.connection.prepare(
-            "SELECT id, document_id, content, search_text FROM blocks WHERE kind = 'markdown'",
-        )?;
-
-        let markdown_blocks = statement
-            .query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, String>(3)?,
-                ))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        drop(statement);
-
-        let mut changed_document_ids = std::collections::HashSet::new();
-
-        for (block_id, document_id, content, search_text) in markdown_blocks {
-            let (normalized_content, normalized_search_text, did_migrate) =
-                Self::normalize_markdown_storage(&content);
-
-            if did_migrate {
-                self.connection.execute(
-                    "UPDATE blocks SET content = ?1, search_text = ?2 WHERE id = ?3",
-                    params![normalized_content, normalized_search_text, block_id],
-                )?;
-                changed_document_ids.insert(document_id);
-            } else if normalized_search_text != search_text {
-                self.connection.execute(
-                    "UPDATE blocks SET search_text = ?1 WHERE id = ?2",
-                    params![normalized_search_text, block_id],
-                )?;
-                changed_document_ids.insert(document_id);
-            }
-        }
-
-        for document_id in changed_document_ids {
-            self.rebuild_search_index(&document_id)?;
-        }
-
-        Ok(())
-    }
-
     fn list_blocks(&self, document_id: &str) -> Result<Vec<Block>, AppError> {
         let mut statement = self.connection.prepare(&format!(
             "SELECT {BLOCK_COLUMNS}
@@ -193,7 +148,7 @@ impl BlockRepository for SqliteStore {
         content: String,
     ) -> Result<Block, AppError> {
         let document_id = self.block_document_id(block_id)?;
-        let (normalized_content, search_text, _) = Self::normalize_markdown_storage(&content);
+        let (normalized_content, search_text) = Self::normalize_markdown_storage(&content);
         let now = Self::now();
         let device_id = self.current_device_id()?;
 
@@ -260,7 +215,7 @@ impl BlockRepository for SqliteStore {
             for (i, block) in ordered.iter().enumerate() {
                 let (content, search_text) = match block.kind {
                     BlockKind::Markdown => {
-                        let (c, s, _) = Self::normalize_markdown_storage(&block.content);
+                        let (c, s) = Self::normalize_markdown_storage(&block.content);
                         (c, s)
                     }
                     BlockKind::Code | BlockKind::Text => {
