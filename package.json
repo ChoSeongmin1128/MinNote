@@ -12,8 +12,8 @@
     "tauri:dev": "tauri dev",
     "tauri:dev:signed": "./scripts/run-signed-dev-app.sh",
     "tauri:build": "./scripts/run-tauri-build.sh",
-    "test": "vitest",
-    "test:run": "vitest run"
+    "test": "./scripts/run-vitest.sh",
+    "test:run": "./scripts/run-vitest.sh run"
   },
   "dependencies": {
     "@blocknote/core": "0.47.2",
